@@ -587,9 +587,18 @@ function showPage(pageId) {
     let score = { correct: 0, total: 0, streak: 0 }, qIndex = 1, current = null, answered = false;
     let testSession = null, dictSession = null, hasPlayed = false;
 
-    function buildSymbol(root, key){
-      const rootPc = ((root % 12) + 12) % 12;
-      return `${ROOT_SPELLING[rootPc].letter}${accCodeFromDiff(ROOT_SPELLING[rootPc].diff) || ''}${QUALITIES[key].symbol}`;
+    /* 和絃代號：轉位時以斜線標示實際最低音（例如 Cmaj7/E）；原位維持原樣。
+       intervals 已套用轉位並由低到高排序，故 intervals[0] 即為低音與根音的距離。 */
+    function pcName(pc){
+      const p = ((pc % 12) + 12) % 12;
+      return `${ROOT_SPELLING[p].letter}${accCodeFromDiff(ROOT_SPELLING[p].diff) || ''}`;
+    }
+    function buildSymbol(root, key, intervals){
+      const base = `${pcName(root)}${QUALITIES[key].symbol}`;
+      if (!intervals || !intervals.length) return base;
+      const bassOffset = intervals[0];
+      if (!bassOffset) return base;                 // 原位：不加斜線
+      return `${base}/${pcName(root + bassOffset)}`;
     }
     function applyInv(baseIvs, invIdx){
       return baseIvs.map((semis, idx) => ({ step: idx * 2, semis: idx < invIdx ? semis + 12 : semis })).sort((a,b) => a.semis - b.semis);
@@ -715,7 +724,7 @@ function showPage(pageId) {
         : `你的答案：<span class="wrong-ans">${userLabel}</span>　正解：<span class="right-ans">${QUALITIES[correctKey].label}</span>`;
       const staffDiv = document.getElementById('chr-ansStaff'); staffDiv.innerHTML = '';
       renderGrandStaff(staffDiv, current.root, current.intervals, current.steps, 280, 260);
-      const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.textContent = buildSymbol(current.root, correctKey); staffDiv.appendChild(lbl);
+      const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.textContent = buildSymbol(current.root, correctKey, current.intervals); staffDiv.appendChild(lbl);
       document.getElementById('chr-ansScore').textContent = (mode==='test' && testSession) ? `${testSession.correct} / ${testSession.total}` : `${score.correct} / ${score.total}`;
       const nb = document.getElementById('chr-ansNextBtn');
       if(mode==='test' && testSession){ nb.textContent = testSession.index >= testSession.total ? '查看成績 →' : '下一題 →'; }
@@ -758,7 +767,7 @@ function showPage(pageId) {
         const row = document.createElement('div'); row.className = 'review-item' + (item.corrected ? ' corrected' : '');
         const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
         renderGrandStaff(staffMini, item.root, item.intervals, item.steps, 210, 210);
-        const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.style.fontSize = '13.5px'; lbl.textContent = buildSymbol(item.root, item.qualityKey); staffMini.appendChild(lbl);
+        const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.style.fontSize = '13.5px'; lbl.textContent = buildSymbol(item.root, item.qualityKey, item.intervals); staffMini.appendChild(lbl);
         const meta = document.createElement('div'); meta.className = 'review-meta';
         if(item.questionNum) meta.innerHTML += `<div class="q-num-badge">【第 ${item.questionNum} 題】</div>`;
         const userLabel = item.userAnswerKey ? QUALITIES[item.userAnswerKey].label : '（未作答）';

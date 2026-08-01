@@ -132,6 +132,9 @@
     background: var(--panel); border: 2px dashed var(--panel-border); border-radius: 8px; padding: 4px;
     text-align: center; transition: all 0.1s; display:flex; flex-direction:column; justify-content:center; align-items:center;
   }
+  /* 修飾（升降記號／轉位／斜線）會套用到的那一格：虛線提示 */
+  .chord-slot.last-edited-slot { border-style: dashed; border-color: var(--accent-line); border-width: 2px; }
+  .active-note-box.last-edited-box { border-style: dashed !important; border-color: var(--accent-line) !important; background: transparent !important; box-shadow: none !important; }
   .chord-slot.active-slot { border-style: solid; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft); transform: translateY(-2px); z-index: 5; }
   .chord-slot.correct { border-style: solid; border-color: var(--correct); background: var(--correct-soft); }
   .chord-slot.wrong { border-style: solid; border-color: var(--wrong); background: var(--wrong-soft); }
@@ -1987,7 +1990,9 @@ window.addEventListener('resize', setVH); setVH();
              let isOk = forceResults[i].chord;
              slot.className = 'chord-slot ' + (isOk ? 'correct' : 'wrong');
           } else {
-             slot.className = 'chord-slot' + ((this.activeTab === 'chord' && i === this.activeSlot) ? ' active-slot' : '');
+             slot.className = 'chord-slot'
+               + ((this.activeTab === 'chord' && i === this.activeSlot) ? ' active-slot' : '')
+               + ((this.activeTab === 'chord' && i !== this.activeSlot && this.lastEditedChordSlot === i) ? ' last-edited-slot' : '');
           }
           slot.innerHTML = `<div class="slot-bar-num">${i+1}</div><div class="slot-value" style="font-size:15px;">${this.userSeq[i] || '—'}</div>`;
         }
@@ -2155,6 +2160,16 @@ window.addEventListener('resize', setVH); setVH();
             noteBox.style.width = (slotWidth - 6) + 'px';
             noteBox.style.height = '74px';
             overlay.appendChild(noteBox);
+        }
+        // 2b. 升降記號／八度會套用到的那一格（剛編輯過的低音）：虛線框提示
+        else if (!isSubmitted && !showAnswer && this.activeTab === 'bass' && this.lastEditedBassSlot === i) {
+            let hintBox = document.createElement('div');
+            hintBox.className = 'active-note-box last-edited-box';
+            hintBox.style.top = (bassOnly ? 14 : 125) + 'px';
+            hintBox.style.left = slotLeft + 'px';
+            hintBox.style.width = (slotWidth - 6) + 'px';
+            hintBox.style.height = '74px';
+            overlay.appendChild(hintBox);
         }
 
         // 3. 視覺焦點與作答框：級數作答格
