@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>模擬測驗 - 音樂聽力練習 App</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="聽力訓練">
+<meta name="theme-color" content="#33415c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
+    --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
+    --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body{ margin:0; background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height:100vh; padding: 20px 16px 64px; }
+  .wrap{ max-width: 680px; margin: 0 auto; }
+  .page-view { display: none; animation: fadeIn 0.22s ease-out; }
+  .page-view.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  h1{ font-family: var(--font-display); font-weight: 600; font-size: 30px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .subtitle{ color: var(--ink-soft); font-size: 14px; margin: 0 0 22px; line-height: 1.6; }
+  .nav-back-btn{ display:inline-flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); padding:10px 18px; border-radius:999px; cursor:pointer; margin-bottom:20px; box-shadow:0 2px 4px rgba(38,36,32,0.04); touch-action:manipulation; }
+  .nav-back-btn:hover, .nav-back-btn:active{ border-color:var(--accent); background:var(--accent); color:var(--panel); }
+
+  /* 統計小晶片 */
+  .stat-row{ display:flex; gap:10px; flex-wrap:wrap; margin:0 0 22px; }
+  .stat-chip{ flex:1; min-width:96px; background:var(--panel); border:1px solid var(--panel-border); border-radius:14px; padding:12px 14px; text-align:center; }
+  .stat-chip .k{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; color:var(--ink-soft); text-transform:uppercase; }
+  .stat-chip .v{ font-family:var(--font-display); font-size:26px; font-weight:600; color:var(--accent); line-height:1.1; margin-top:4px; }
+  .stat-chip .v small{ font-size:14px; color:var(--ink-soft); font-family:var(--font-body); }
+
+  /* 開始頁卡片 */
+  .exam-card{ background:var(--panel); border:1px solid var(--panel-border); border-radius:var(--radius); padding:22px; margin-bottom:16px; box-shadow:0 4px 16px rgba(51,65,92,0.06); }
+  .exam-card h2{ font-family:var(--font-display); font-size:20px; font-weight:600; margin:0 0 6px; }
+  .exam-card p{ font-size:13.5px; color:var(--ink-soft); line-height:1.6; margin:0 0 16px; }
+  .exam-card p b{ color:var(--ink); }
+  /* 配分明細 */
+  .score-breakdown{ list-style:none; margin:0; padding:0; border-top:1px dashed var(--hairline); }
+  .score-breakdown li{ display:flex; align-items:baseline; gap:8px; padding:9px 2px; border-bottom:1px dashed var(--hairline); font-size:14px; }
+  .score-breakdown li span{ flex:0 0 auto; font-weight:600; color:var(--ink); }
+  .score-breakdown li b{ font-family:var(--font-mono); color:var(--accent); font-size:13.5px; }
+  .score-breakdown li em{ flex:1; text-align:right; font-style:normal; font-size:12px; color:var(--ink-soft); }
+  .big-btn{ display:inline-flex; align-items:center; justify-content:center; gap:10px; width:100%; font-family:var(--font-body); font-weight:700; font-size:17px; padding:16px; border-radius:999px; background:var(--accent); color:var(--panel); border:none; cursor:pointer; box-shadow:0 6px 20px rgba(51,65,92,0.22); transition:all .15s ease; touch-action:manipulation; }
+  .big-btn:hover, .big-btn:active{ filter:brightness(1.1); transform:translateY(-2px); }
+  .soon-card{ opacity:0.55; }
+  .soon-tag{ font-family:var(--font-mono); font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--hairline); color:var(--ink-soft); }
+  .ghost-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:13px; border-radius:999px; background:transparent; color:var(--ink); border:1px solid var(--panel-border); cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
+  .ghost-btn:hover, .ghost-btn:active{ border-color:var(--accent); background:var(--accent-soft); }
+  .resume-box{ background:var(--wrong-soft); border:1px solid rgba(166,73,59,0.3); border-radius:14px; padding:16px; margin-bottom:16px; }
+  .resume-box .rt{ font-weight:700; color:var(--wrong); font-size:14px; margin-bottom:10px; }
+  .resume-actions{ display:flex; gap:10px; }
+  .resume-actions button{ flex:1; }
+
+  /* 成績單 */
+  .score-hero{ text-align:center; background:var(--panel); border:1px solid var(--panel-border); border-radius:var(--radius); padding:26px 20px; margin-bottom:18px; box-shadow:0 4px 16px rgba(51,65,92,0.06); }
+  .score-hero .pct{ font-family:var(--font-display); font-size:64px; font-weight:600; color:var(--accent); line-height:1; }
+  .score-hero .raw{ font-family:var(--font-mono); font-size:14px; color:var(--ink-soft); margin-top:6px; }
+  .score-hero .cap{ font-size:13px; color:var(--ink-soft); margin-top:10px; }
+  .sec-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; margin-bottom:8px; }
+  .sec-row.soon{ opacity:0.5; }
+  .sec-name{ font-weight:600; font-size:14.5px; }
+  .sec-name small{ color:var(--ink-soft); font-weight:400; font-family:var(--font-mono); font-size:11px; margin-left:6px; }
+  .sec-score{ font-family:var(--font-mono); font-weight:700; font-size:15px; color:var(--accent); }
+  .sec-score.soon{ color:var(--ink-soft); font-weight:500; font-size:12px; }
+  .bar{ height:6px; border-radius:999px; background:var(--hairline); overflow:hidden; margin-top:6px; }
+  .bar > i{ display:block; height:100%; background:var(--accent); border-radius:999px; }
+
+  /* 逐題回顧 */
+  .review-acc{ margin-top:14px; }
+  .acc-head{ width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; gap:10px; font-family:var(--font-body); font-weight:700; font-size:14px; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:13px 16px; cursor:pointer; touch-action:manipulation; }
+  .acc-body{ display:none; padding:6px 4px 2px; }
+  .acc-body.open{ display:block; }
+  .q-item{ display:flex; align-items:center; gap:10px; font-size:13px; padding:8px 6px; border-top:1px dashed var(--hairline); }
+  .q-item:first-child{ border-top:none; }
+  .q-idx{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); width:34px; flex-shrink:0; }
+  .q-mark{ width:20px; flex-shrink:0; text-align:center; }
+  .q-mark.ok{ color:var(--correct); } .q-mark.no{ color:var(--wrong); }
+  .q-ans{ flex:1; }
+  .q-ans .your.bad{ color:var(--wrong); font-weight:600; }
+  .q-ans .right{ color:var(--correct); font-weight:600; }
+
+  .btn-col{ display:flex; flex-direction:column; gap:10px; margin-top:18px; }
+
+  /* 歷史趨勢 */
+  .chart-wrap{ background:var(--panel); border:1px solid var(--panel-border); border-radius:var(--radius); padding:16px 12px 8px; margin-bottom:16px; }
+  .chart-wrap svg{ width:100%; height:auto; display:block; }
+  .muted{ color:var(--ink-soft); font-size:13.5px; text-align:center; padding:24px 0; }
+  .hist-item{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; padding:11px 4px; border-top:1px dashed var(--hairline); }
+  .hist-item:first-child{ border-top:none; }
+  .hist-when{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-soft); }
+  .hist-pct{ font-family:var(--font-mono); font-weight:700; color:var(--accent); }
+  .hist-pct small{ color:var(--ink-soft); font-weight:500; }
+  .danger-btn{ font-family:var(--font-body); font-size:12px; font-weight:600; color:#8a3b2f; background:#fff; border:1px solid rgba(166,73,59,0.4); padding:8px 14px; border-radius:999px; cursor:pointer; }
+  @media (max-width:480px){ .score-hero .pct{ font-size:52px; } h1{ font-size:26px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 開始頁 -->
+  <div id="pageStart" class="page-view active">
+    <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+    <h1>模擬測驗</h1>
+    <p class="subtitle">六大項綜合、滿分 100 分的模擬考卷，一次交卷計分，並記錄你的長期進步曲線。</p>
+    <div id="startStats"></div>
+    <div id="resumeSlot"></div>
+    <div class="exam-card">
+      <h2>標準考卷 <span style="font-weight:400;font-size:14px;color:var(--ink-soft);">（模擬大學入學考試難度）</span></h2>
+      <p>六大項綜合、<b>滿分 100 分</b>，固定範圍、隨機出題。全部作答完畢後一次交卷計分。</p>
+      <ul class="score-breakdown">
+        <li><span>一、音程</span><b>10 分</b><em>10 題</em></li>
+        <li><span>二、和絃性質判斷</span><b>10 分</b><em>10 題</em></li>
+        <li><span>三、節奏</span><b>20 分</b><em>單拍子、複拍子各 1 題</em></li>
+        <li><span>四、單旋律</span><b>20 分</b><em>單拍子、複拍子各 1 題</em></li>
+        <li><span>五、兩聲部</span><b>20 分</b><em>1 題</em></li>
+        <li><span>六、四部和聲</span><b>20 分</b><em>1 題</em></li>
+      </ul>
+      <p style="margin-top:12px;">每段播放次數固定，作答期間可自由往返修改。</p>
+      <button class="big-btn" onclick="startExam()">開始標準考卷 →</button>
+    </div>
+    <div class="exam-card soon-card">
+      <h2 style="display:flex;align-items:center;gap:10px;">自訂考卷 <span class="soon-tag">即將開放</span></h2>
+      <p>由你自己挑選要考的範圍與題數。將於後續階段開放。</p>
+    </div>
+    <button id="histBtn" class="ghost-btn" style="display:none;" onclick="goHistory()">📈 查看歷史趨勢</button>
+  </div>
+
+  <!-- 成績單 -->
+  <div id="pageResult" class="page-view">
+    <h1>成績單</h1>
+    <p class="subtitle" id="resultScope">標準考卷</p>
+    <div id="resultHero"></div>
+    <div id="resultSections"></div>
+    <div id="resultReview" class="review-acc"></div>
+    <div class="btn-col">
+      <button class="big-btn" onclick="startExam()">再考一次（同標準）→</button>
+      <button class="ghost-btn" onclick="goHistory()">📈 查看歷史趨勢</button>
+      <button class="ghost-btn" onclick="location.href='index.html#menu'">🏠 回選單</button>
+    </div>
+  </div>
+
+  <!-- 歷史趨勢 -->
+  <div id="pageHistory" class="page-view">
+    <button class="nav-back-btn" onclick="goStart()">← 返回</button>
+    <h1>歷史趨勢</h1>
+    <p class="subtitle">縱軸為得分率 %（題數增加也能公平比較）。只顯示標準考卷。</p>
+    <div id="histStats"></div>
+    <div class="chart-wrap" id="chartWrap"></div>
+    <div id="histList"></div>
+    <div style="text-align:right;margin-top:14px;"><button class="danger-btn" onclick="clearHist()">🗑️ 清空歷史</button></div>
+  </div>
+
+</div>
+
+<script src="exam-common.js"></script>
+<script>
+  var EX = window.EXAM;
+  function qs(id){ return document.getElementById(id); }
+  function showView(id){ document.querySelectorAll('.page-view').forEach(function(p){ p.classList.remove('active'); }); qs(id).classList.add('active'); window.scrollTo({top:0,behavior:'smooth'}); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+  function fmtDate(ts){ try{ var d=new Date(ts); var mm=String(d.getMonth()+1).padStart(2,'0'); var dd=String(d.getDate()).padStart(2,'0'); var h=String(d.getHours()).padStart(2,'0'); var mi=String(d.getMinutes()).padStart(2,'0'); return (d.getFullYear())+'/'+mm+'/'+dd+' '+h+':'+mi; }catch(e){ return ''; } }
+
+  /* ---------- 開始頁 ---------- */
+  function renderStart(){
+    var st = EX.historyStats('standard');
+    qs('startStats').innerHTML = st ? (
+      '<div class="stat-row">' +
+      '<div class="stat-chip"><div class="k">最佳</div><div class="v">'+st.best+'<small>%</small></div></div>' +
+      '<div class="stat-chip"><div class="k">最近</div><div class="v">'+st.last+'<small>%</small></div></div>' +
+      '<div class="stat-chip"><div class="k">平均</div><div class="v">'+st.avg+'<small>%</small></div></div>' +
+      '</div>'
+    ) : '';
+    qs('histBtn').style.display = st ? 'flex' : 'none';
+    // 續考
+    var s = EX.loadSession();
+    if(s){
+      var p = EX.progress(s); var secLabel = EX.SECTIONS[p.key] ? EX.SECTIONS[p.key].label : '';
+      qs('resumeSlot').innerHTML =
+        '<div class="resume-box"><div class="rt">有一份未完成的考試</div>' +
+        '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;">進度：第 '+p.index+' / '+p.total+' 段（'+esc(secLabel)+'）</div>' +
+        '<div class="resume-actions">' +
+        '<button class="big-btn" style="font-size:14.5px;padding:12px;" onclick="resumeExam()">繼續作答</button>' +
+        '<button class="ghost-btn" onclick="abandonExam()">放棄重來</button>' +
+        '</div></div>';
+    } else {
+      qs('resumeSlot').innerHTML = '';
+    }
+  }
+  function startExam(){
+    var msg = '即將開始模擬測驗\n\n'
+            + '考試前建議準備空白五線譜與鉛筆，聽寫時直接在紙上作答，再將答案填上測驗系統，作答會更順手。\n\n'
+            + '考試中每段僅能播放固定次數，作答可自由往返修改，最後按「交卷」一次計分。\n\n'
+            + '準備好了嗎？';
+    if(!window.confirm(msg)) return;
+    EX.startStandard(); location.href = EX.SECTIONS[EX.PHASE1[0]].page + '?exam=1';
+  }
+  function resumeExam(){ var s=EX.loadSession(); if(!s){ renderStart(); return; } var k=EX.currentSection(s); if(!k){ location.href='exam.html?done=1'; return; } location.href = EX.SECTIONS[k].page + '?exam=1'; }
+  function abandonExam(){ if(window.confirm('確定放棄這份未完成的考試嗎？此動作無法復原。')){ EX.clearSession(); renderStart(); } }
+  function goStart(){ renderStart(); showView('pageStart'); }
+  function goHistory(){ renderHistory(); showView('pageHistory'); }
+
+  /* ---------- 成績單 ---------- */
+  function renderResult(rec){
+    if(!rec){ qs('resultHero').innerHTML='<div class="muted">找不到成績資料。</div>'; qs('resultSections').innerHTML=''; qs('resultReview').innerHTML=''; return; }
+    qs('resultScope').textContent = rec.scope || '標準考卷';
+    qs('resultHero').innerHTML =
+      '<div class="score-hero"><div class="pct">'+rec.pct+'<span style="font-size:28px;">%</span></div>' +
+      '<div class="raw">'+rec.total+' / '+rec.max+' 分</div></div>';
+    var rowsHtml = '';
+    EX.FULL_ORDER.forEach(function(k){
+      var def = EX.SECTIONS[k]; var sc = rec.sections[k];
+      if(sc){
+        var w = sc.max>0 ? Math.round(sc.score/sc.max*100) : 0;
+        rowsHtml += '<div class="sec-row"><div><div class="sec-name">'+esc(def.label)+'</div>' +
+          '<div class="bar"><i style="width:'+w+'%;"></i></div></div>' +
+          '<div class="sec-score">'+sc.score+' / '+sc.max+'</div></div>';
+      } else {
+        rowsHtml += '<div class="sec-row soon"><div class="sec-name">'+esc(def.label)+'<small>滿分 '+def.max+'</small></div>' +
+          '<div class="sec-score soon">尚未開放</div></div>';
+      }
+    });
+    qs('resultSections').innerHTML = rowsHtml;
+    // 逐題回顧
+    var revHtml = '';
+    EX.FULL_ORDER.forEach(function(k){
+      var sc = rec.sections[k];
+      if(sc && sc.detail && sc.detail.length){
+        var def = EX.SECTIONS[k];
+        var items = sc.detail.map(function(d, i){
+          var ok = d.correct;
+          var ans = ok
+            ? '<span class="right">'+esc(d.right)+'</span>'
+            : '你的：<span class="your bad">'+esc(d.your||'（未作答）')+'</span>　正解：<span class="right">'+esc(d.right)+'</span>';
+          return '<div class="q-item"><span class="q-idx">'+(i+1)+'</span>' +
+            '<span class="q-mark '+(ok?'ok':'no')+'">'+(ok?'✓':'✗')+'</span>' +
+            '<span class="q-ans">'+ans+'</span></div>';
+        }).join('');
+        revHtml += '<button class="acc-head" onclick="this.nextElementSibling.classList.toggle(\'open\')">'+
+          esc(def.label)+' 逐題回顧　<span style="color:var(--ink-soft);font-weight:500;">'+sc.score+'/'+sc.max+' ▾</span></button>' +
+          '<div class="acc-body">'+items+'</div>';
+      }
+    });
+    qs('resultReview').innerHTML = revHtml;
+  }
+
+  /* ---------- 歷史趨勢 ---------- */
+  function renderHistory(){
+    var h = EX.loadHistory().filter(function(r){ return r.mode==='standard'; });
+    var st = EX.historyStats('standard');
+    qs('histStats').innerHTML = st ? (
+      '<div class="stat-row">' +
+      '<div class="stat-chip"><div class="k">最佳</div><div class="v">'+st.best+'<small>%</small></div></div>' +
+      '<div class="stat-chip"><div class="k">最近</div><div class="v">'+st.last+'<small>%</small></div></div>' +
+      '<div class="stat-chip"><div class="k">平均</div><div class="v">'+st.avg+'<small>%</small></div></div>' +
+      '<div class="stat-chip"><div class="k">次數</div><div class="v">'+st.count+'</div></div>' +
+      '</div>'
+    ) : '';
+    qs('chartWrap').innerHTML = chartSVG(h.map(function(r){ return r.pct; }));
+    var listHtml = h.slice().reverse().map(function(r){
+      return '<div class="hist-item"><span class="hist-when">'+fmtDate(r.date)+'</span>' +
+        '<span class="hist-pct">'+r.pct+'% <small>('+r.total+'/'+r.max+')</small></span></div>';
+    }).join('');
+    qs('histList').innerHTML = listHtml || '<div class="muted">尚無紀錄，先考一份標準考卷吧。</div>';
+  }
+  function chartSVG(pcts){
+    if(!pcts.length) return '<div class="muted">尚無紀錄，先考一份標準考卷吧。</div>';
+    var W=640, H=220, pad=34, n=pcts.length;
+    var xw=W-pad*2, yh=H-pad*2;
+    function X(i){ return pad + (n===1 ? xw/2 : (i/(n-1))*xw); }
+    function Y(v){ return pad + (1 - v/100)*yh; }
+    var grid='';
+    [0,50,100].forEach(function(g){
+      var y=Y(g);
+      grid += '<line x1="'+pad+'" y1="'+y+'" x2="'+(W-pad)+'" y2="'+y+'" stroke="#e2ddce" stroke-width="1"/>' +
+        '<text x="'+(pad-8)+'" y="'+(y+4)+'" text-anchor="end" font-family="JetBrains Mono,monospace" font-size="11" fill="#75705f">'+g+'</text>';
+    });
+    var line = '<polyline fill="none" stroke="#33415c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="'+
+      pcts.map(function(v,i){ return X(i).toFixed(1)+','+Y(v).toFixed(1); }).join(' ')+'"/>';
+    var dots = pcts.map(function(v,i){ return '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="3.5" fill="#33415c"/>'; }).join('');
+    var lastLbl='';
+    if(n){ var lv=pcts[n-1]; lastLbl='<text x="'+X(n-1).toFixed(1)+'" y="'+(Y(lv)-9).toFixed(1)+'" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700" fill="#33415c">'+lv+'%</text>'; }
+    return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="得分率趨勢圖">'+grid+line+dots+lastLbl+'</svg>';
+  }
+  function clearHist(){ if(window.confirm('確定清空所有模擬測驗歷史紀錄嗎？此動作無法復原。')){ EX.clearHistory(); renderHistory(); renderStart(); } }
+
+  /* ---------- 進入點 ---------- */
+  (function(){
+    var params = new URLSearchParams(location.search);
+    if(params.get('done')==='1'){
+      var rec = EX.finalize();
+      if(!rec){ var h = EX.loadHistory(); rec = h.length ? h[h.length-1] : null; }
+      renderResult(rec); showView('pageResult'); return;
+    }
+    renderStart(); showView('pageStart');
+  })();
+</script>
+</body>
+</html>

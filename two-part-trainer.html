@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>兩聲部曲調 - 音樂聽力練習</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="聽力訓練">
+<meta name="theme-color" content="#33415c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
+<script src="soundfont-player.min.js"></script>
+<script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
+<script src="vexflow-min.js"></script>
+<script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
+<style>
+  :root{
+    --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
+    --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
+    --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--font-body); }
+  .wrap { height: 100%; display: flex; flex-direction: column; max-width: 820px; margin: 0 auto; width: 100%; }
+
+  .page-view { display: none; height: 100%; flex-direction: column; animation: fadeIn 0.2s ease-out; }
+  .page-view.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ================= 設定頁 / 解答頁 / 錯題本頁（可捲動） ================= */
+  #pageTpSettings, #pageTpAnswer, #pageTpReview { overflow-y: auto; padding: 20px 16px 64px; }
+  .nav-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .nav-back-btn, .reset-cache-btn {
+    display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid var(--panel-border); background: var(--panel); color: var(--ink); cursor: pointer; text-decoration: none;
+  }
+  .reset-cache-btn { color: #8a6d20; border-color: #ffd885; background: #fff8e6; margin-left: 8px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: 28px; margin: 0 0 8px; }
+  .subtitle { color: var(--ink-soft); font-size: 13.5px; margin: 0 0 20px; line-height: 1.5; }
+
+  .switch-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .switch-group { display: flex; flex-direction: column; gap: 8px; }
+  .switch-group-label { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+  .switch-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mode-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 10px; background: transparent; border: 1px solid var(--panel-border); color: var(--ink-soft); cursor: pointer; }
+  .mode-btn.active { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+
+  .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); cursor: pointer; }
+  .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
+
+  .pattern-grid-header { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; }
+  .select-all-btn { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--panel-border); background: var(--panel); font-weight: bold; cursor: pointer; }
+  .pattern-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 24px; }
+  .pattern-item { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; border: 2px solid var(--panel-border); border-radius: 10px; padding: 4px; cursor: pointer; transition: 0.1s; height: 60px; overflow: hidden; }
+  .pattern-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .pattern-item svg { pointer-events: none; }
+
+  .start-big-btn { width: 100%; font-weight: 700; font-size: 16px; padding: 16px; border-radius: var(--radius); background: var(--accent); color: var(--panel); border: none; cursor: pointer; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(51,65,92,0.2); transition: filter 0.2s; }
+  .start-big-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .review-entry-btn{ width:100%; padding:14px; border-radius:999px; font-weight:700; font-size:15px; background:transparent; color:var(--ink); border:1px solid var(--ink); cursor:pointer; margin-bottom:20px; }
+  .review-entry-btn:hover, .review-entry-btn:active{ background:var(--ink); color:var(--panel); }
+
+  /* ================= 作答頁 (上下分層) ================= */
+  .practice-top-fixed { flex: 0 0 auto; padding: 12px 16px; background: var(--paper); z-index: 10; border-bottom: 1px solid var(--panel-border); box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+  .practice-bottom-scroll { flex: 1 1 auto; overflow-y: auto; padding: 16px; background: var(--panel); }
+
+  .top-bar-practice { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .practice-status-badge { font-family: var(--font-mono); font-size: 12px; background: var(--panel); border: 1px solid var(--panel-border); padding: 6px 12px; border-radius: 999px; color: var(--ink-soft); }
+  .score-box { text-align: right; font-family: var(--font-mono); }
+  .score-box .num { font-size: 18px; font-weight: 700; color: var(--accent); line-height: 1; }
+
+  .staff-scroll-container { width: 100%; background: #fff; border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 4px; box-shadow: inset 0 0 8px rgba(0,0,0,0.02); margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+  .staff-scroll-container::-webkit-scrollbar { height: 6px; }
+  .staff-scroll-container::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
+
+  .unified-action-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .action-btn, .play-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s; border: none; }
+  .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
+  .play-btn { background: var(--accent); color: var(--panel); }
+  .play-btn.sub-play { background: #6b7a99; font-size: 12px; padding: 10px 12px; }
+  .btn-submit { background: var(--accent); color: var(--panel); }
+  .play-btn:disabled, .action-btn:disabled, .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  .play-caption { font-size: 12px; color: var(--ink-soft); font-weight: 600; text-align: center; margin-top: 4px; }
+
+  .editor-tabs-container { display: flex; justify-content: center; align-items: center; margin-bottom: 14px; position: relative; }
+  .editor-tabs { display: inline-flex; background: var(--paper); border: 1px solid var(--panel-border); border-radius: 999px; padding: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+  .tab-btn { font-size: 13.5px; font-weight: 700; padding: 8px 22px; border-radius: 999px; border: none; background: transparent; color: var(--ink-soft); cursor: pointer; transition: all 0.15s; }
+  .tab-btn.active { background: var(--accent); color: var(--panel); box-shadow: 0 2px 8px rgba(51,65,92,0.25); }
+  .part-indicator { position: absolute; right: 0; font-family: var(--font-mono); font-size: 11px; font-weight: 700; background: #fff; padding: 4px 8px; border: 1px solid var(--accent-line); border-radius: 6px; color: var(--accent); }
+
+  .rhythm-keypad { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; padding-bottom: 40px; }
+  .rhythm-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 60px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); overflow: hidden; transition: all 0.1s; }
+  .rhythm-btn:active { transform: scale(0.94); border-color: var(--accent); }
+
+  .pitch-keypad { display: flex; flex-direction: column; gap: 8px; max-width: 500px; margin: 0 auto; padding-bottom: 40px; }
+  .pitch-row-acc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pitch-row-notes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pitch-row-oct { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .p-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; font-weight: 700; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); transition: 0.1s; }
+  .p-btn:active { transform: scale(0.95); border-color: var(--accent); }
+  .p-btn.acc-btn { height: 38px; font-size: 16px; background: var(--panel); }
+  .p-btn.acc-btn.active { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  .p-btn.note-btn { height: 55px; font-size: 18px; }
+  .p-btn.note-btn span { font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-top: 2px; }
+  .p-btn.oct-btn { height: 42px; font-size: 13px; background: var(--panel); }
+
+  .feedback-text { text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 6px; display: none; }
+  .feedback-text.correct { color: var(--correct); display: block; }
+  .feedback-text.wrong { color: var(--wrong); display: block; }
+  .answer-big-feedback{ font-family: var(--font-display); font-size: 22px; font-weight: 700; text-align:center; margin: 6px 0 14px; }
+  .answer-big-feedback.correct{ color: var(--correct); }
+  .answer-big-feedback.wrong{ color: var(--wrong); }
+
+  .review-section h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 12px; }
+  .review-item { background: #fff; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .review-label { font-size: 12px; font-weight: bold; color: var(--ink-soft); margin-bottom: 4px; }
+  .review-staff { background: var(--panel); border-radius: 8px; padding: 10px 4px; margin-bottom: 12px; border: 1px solid var(--hairline); width: 100%; overflow-x: auto; overflow-y: hidden; }
+
+  .loading-banner { text-align: center; font-size: 12px; color: var(--ink-soft); background: #fff; padding: 8px; border-radius: 8px; margin-bottom: 16px; }
+
+  @media (min-width: 768px) {
+    .wrap { border-left: 1px solid var(--hairline); border-right: 1px solid var(--hairline); background: var(--paper); box-shadow: 0 0 20px rgba(0,0,0,0.05); }
+    .practice-top-fixed { padding: 20px 40px; }
+    .practice-bottom-scroll { padding: 20px 40px; }
+    .rhythm-keypad { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 16px; }
+    .rhythm-btn { height: 75px; }
+    .pattern-item { height: 65px; }
+    .action-btn, .play-btn { font-size: 14px; padding: 12px 20px; }
+  }
+
+  @media (orientation: landscape) and (max-width: 900px) {
+    .practice-top-fixed { padding: 4px 10px; }
+    .top-bar-practice { margin-bottom: 4px; }
+    .score-box .num { font-size: 16px; }
+    .staff-scroll-container { margin-bottom: 4px; padding: 4px; }
+    .unified-action-row { margin-bottom: 4px; }
+    .play-caption { margin-top: 0; }
+    .rhythm-btn { height: 50px; }
+    .pattern-item { height: 45px; }
+    .p-btn.note-btn { height: 45px; }
+    .p-btn.acc-btn { height: 32px; }
+  }
+
+  /* ===== 玩法說明按鈕與彈窗 ===== */
+  .help-btn{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-body); font-size:13px; font-weight:600; color:var(--accent); background:#fff; border:1px solid var(--accent-line); padding:8px 14px; border-radius:999px; cursor:pointer; touch-action:manipulation; white-space:nowrap; }
+  .help-btn:hover, .help-btn:active{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .help-modal{ display:none; position:fixed; inset:0; z-index:1000; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .help-modal.open{ display:flex; align-items:flex-start; justify-content:center; }
+  .help-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; max-width:560px; width:100%; margin:auto; padding:24px 22px 22px; box-shadow:0 20px 50px rgba(0,0,0,0.28); position:relative; animation:helpIn .2s ease-out; }
+  @keyframes helpIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .help-box h2{ font-family:var(--font-display); font-size:22px; font-weight:600; margin:0 30px 6px 0; }
+  .help-box h3{ font-family:var(--font-body); font-size:13.5px; font-weight:700; color:var(--accent); margin:16px 0 5px; }
+  .help-box p{ font-size:13.5px; line-height:1.8; color:var(--ink); margin:0 0 8px; }
+  .help-box .help-lead{ color:var(--ink-soft); font-size:13px; margin-bottom:4px; }
+  .help-box b{ font-weight:700; }
+  .help-close{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:50%; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink); font-size:20px; line-height:1; cursor:pointer; }
+  .help-close:hover{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .help-common{ margin-top:18px; padding-top:14px; border-top:1px dashed var(--panel-border); }
+  .help-common h3{ color:var(--ink-soft); }
+  .help-common p{ font-size:12.5px; line-height:1.75; color:var(--ink-soft); }
+  .help-foot{ margin-top:16px; text-align:center; }
+  .help-foot button{ font-family:var(--font-body); font-weight:700; font-size:14px; padding:11px 30px; border-radius:999px; background:var(--accent); color:var(--panel); border:none; cursor:pointer; touch-action:manipulation; }
+
+  /* ===== 版面壓縮：比照四部和聲的密度（考試與練習皆適用） =====
+     重點：上方固定區可壓縮（flex:0 1 auto）、譜例設高度上限，
+     讓下方作答鍵盤拿到剩餘空間，不再被譜例擠扁。 */
+  /* 上方區不壓縮：播放列一定完整顯示；空間不足時由下方鍵盤區自行捲動 */
+  .practice-top-fixed { flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; overflow: visible; padding: 8px 10px; }
+  .practice-bottom-scroll { min-height: 0; }
+  /* 提示字沒有內容時不佔空間（播放中／播放完畢仍會顯示） */
+  .play-caption:empty { display: none; }
+  .top-bar-practice { margin-bottom: 6px; }
+  /* 不可壓縮：避免考試模式下外框被擠短而切到譜例；內容垂直置中，真的放不下才捲動 */
+  .staff-scroll-container { flex: 0 0 auto; min-height: 0; max-height: 46dvh; max-height: calc(var(--app-vh, 1vh) * 46); overflow-y: auto; display: flex; align-items: center; padding: 4px 3px; margin-bottom: 4px; }
+  .unified-action-row { margin-bottom: 4px; }
+  .play-caption { margin-top: 0; }
+  .practice-bottom-scroll { padding: 10px 10px 14px; }
+  @media (min-width: 768px) {
+    .practice-top-fixed { padding: 10px 24px; }
+    .practice-bottom-scroll { padding: 12px 24px 16px; }
+  }
+  @media (orientation: landscape) and (max-width: 900px) {
+    .staff-scroll-container { max-height: 52dvh; max-height: calc(var(--app-vh, 1vh) * 52); }
+  }
+
+  /* ===== 電腦版（螢幕寬 ≥1024px）：放寬版面，手機不受影響 ===== */
+  @media (min-width: 1024px) {
+    .staff-scroll-container { max-height: 60vh; max-height: calc(var(--app-vh, 1vh) * 60); padding: 14px 10px; margin-bottom: 12px; }
+    .practice-top-fixed { padding: 18px 28px; }
+    .top-bar-practice { margin-bottom: 14px; }
+    .unified-action-row { margin-bottom: 10px; gap: 12px; }
+    .practice-bottom-scroll { padding: 20px 28px 28px; }
+    .action-btn, .play-btn { font-size: 15px; padding: 13px 24px; }
+    .rhythm-btn { height: 84px; }
+    .rhythm-keypad { gap: 16px; }
+    .p-btn { font-size: 16px; }
+    .pattern-item { height: 72px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="loading-banner" id="loadingBanner">🎹 正在載入高音質鋼琴音色，請稍候…</div>
+
+  <div id="pageTpSettings" class="page-view active">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+        <button class="help-btn" onclick="openHelp('tp-helpModal')">❔ 玩法說明</button>
+        <button class="reset-cache-btn" onclick="forceResetCache()">🔄 重置快取</button>
+      </div>
+    </div>
+
+    <h1>兩聲部曲調 — 設定</h1>
+    <p class="subtitle">訓練大譜表雙軌聽寫，結合節奏與絕對音高，支援聲部孤立聆聽與臨時記號作答。</p>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">練習模式</div>
+        <div class="switch-btns" id="tp-modeSwitch">
+          <button class="mode-btn active" data-mode="practice">練習模式</button>
+          <button class="mode-btn" data-mode="test">測驗模式 (限制次數)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">拍號 (Meter)</div>
+        <div class="switch-btns" id="tp-meterSwitch">
+          <button class="mode-btn active" data-meter="2/4" data-type="simple">2/4</button>
+          <button class="mode-btn" data-meter="3/4" data-type="simple">3/4</button>
+          <button class="mode-btn" data-meter="4/4" data-type="simple">4/4</button>
+          <button class="mode-btn" data-meter="3/8" data-type="compound">3/8</button>
+          <button class="mode-btn" data-meter="6/8" data-type="compound">6/8</button>
+          <button class="mode-btn" data-meter="12/8" data-type="compound">12/8</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <div class="switch-group">
+        <div class="switch-group-label">小節數 (Bars)</div>
+        <select id="tp-barsSelect" class="select-box">
+          <option value="1">1 小節</option>
+          <option value="2" selected>2 小節</option>
+          <option value="3">3 小節</option>
+          <option value="4">4 小節 (上限)</option>
+        </select>
+      </div>
+      <div class="switch-group" id="testReplayWrapper" style="display:none;">
+        <div class="switch-group-label">限制重播次數</div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <select id="tp-testReplaySelect" class="select-box">
+            <option value="1">1 次</option>
+            <option value="2">2 次</option>
+            <option value="3" selected>3 次</option>
+            <option value="4">4 次</option>
+            <option value="5">5 次</option>
+            <option value="6">6 次</option>
+            <option value="custom">自定義...</option>
+          </select>
+          <input type="number" id="tp-testReplayInput" class="select-box" style="display:none; width: 75px; text-align: center; cursor: text;" min="1" max="20" value="10" placeholder="次數">
+        </div>
+      </div>
+      <div class="switch-group" style="flex:1;">
+        <div class="switch-group-label">播放速度: <span id="bpmSym">♩</span> = <span id="bpmVal">80</span> BPM</div>
+        <input type="range" id="tp-bpm" class="bpm-slider" min="40" max="160" value="80" oninput="document.getElementById('bpmVal').innerText = this.value">
+      </div>
+    </div>
+
+    <div class="pattern-grid-header">
+      <div class="switch-group-label">勾選出題節奏型 (以 1 拍為單位，無休止符)</div>
+      <button class="select-all-btn" id="selectAllBtn">☑️ 全選 / 全不選</button>
+    </div>
+    <div class="pattern-grid" id="settingsPatternGrid"></div>
+
+    <button class="start-big-btn" id="tp-enterBtn" disabled>🎯 開始兩聲部訓練 →</button>
+    <button class="review-entry-btn" onclick="showPage('tp-review')">📕 錯題本（<span id="tp-reviewCount">0</span> 題）</button>
+  </div>
+
+  <div id="pageTpPractice" class="page-view">
+    <div class="practice-top-fixed">
+      <div class="top-bar-practice">
+        <button class="nav-back-btn" style="margin:0;" onclick="showPage('tp-settings')">← 返回設定頁</button>
+        <span class="practice-status-badge" id="tp-statusBadge">大譜表｜2/4拍｜2小節</span>
+        <div class="score-box"><div class="num" id="tp-scoreNum">0/0</div></div>
+      </div>
+
+      <div class="staff-scroll-container" id="staffContainerOuter" style="min-height: 200px;">
+        <div id="staffInnerWrapper" style="margin: 0 auto; display: block; position: relative; width: max-content; min-width: 100%;">
+          <div id="tp-staff-svg" style="position: relative; display: inline-block; width: 100%;"></div>
+        </div>
+      </div>
+
+      <!-- 播放與編輯整合成一列，節省高度 -->
+      <div class="unified-action-row" id="tp-editBtns">
+        <button class="play-btn" id="tp-playBtn-both" disabled>▶ 雙聲部</button>
+        <button class="play-btn sub-play" id="tp-playBtn-top" disabled>高音</button>
+        <button class="play-btn sub-play" id="tp-playBtn-bot" disabled>低音</button>
+        <button class="action-btn" id="tuningABtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <button class="action-btn" id="tp-backspaceBtn">⌫ 退格</button>
+        <button class="action-btn" id="tp-clearBtn">🗑️ 清空</button>
+        <button class="action-btn btn-submit" id="tp-submitBtn" disabled>✔ 提交</button>
+      </div>
+      <div class="play-caption" id="tp-playCaption"></div>
+    </div>
+
+    <div class="practice-bottom-scroll">
+      <div class="editor-tabs-container">
+        <div class="editor-tabs">
+          <button class="tab-btn active" id="tab-rhythm" onclick="tpModule.switchTab('rhythm')">🎵 1. 編輯節奏</button>
+          <button class="tab-btn" id="tab-pitch" onclick="tpModule.switchTab('pitch')">🎹 2. 編輯音高</button>
+        </div>
+        <div class="part-indicator" id="partIndicator" style="display:none;">目前編輯：高音譜表</div>
+      </div>
+
+      <div id="panel-rhythm">
+        <div class="rhythm-keypad" id="tp-keypad"></div>
+      </div>
+
+      <div id="panel-pitch" style="display:none;">
+        <div class="pitch-keypad">
+          <div class="pitch-row-acc">
+            <button class="p-btn acc-btn" id="acc-b" onclick="tpModule.setAccidental('b')">♭ 降</button>
+            <button class="p-btn acc-btn active" id="acc-n" onclick="tpModule.setAccidental('n')">♮ 還原</button>
+            <button class="p-btn acc-btn" id="acc-s" onclick="tpModule.setAccidental('#')">♯ 升</button>
+          </div>
+          <div class="pitch-row-notes">
+            <button class="p-btn note-btn" onclick="tpModule.inputPitch('C')">C<span>Do</span></button>
+            <button class="p-btn note-btn" onclick="tpModule.inputPitch('D')">D<span>Re</span></button>
+            <button class="p-btn note-btn" onclick="tpModule.inputPitch('E')">E<span>Mi</span></button>
+            <button class="p-btn note-btn" onclick="tpModule.inputPitch('F')">F<span>Fa</span></button>
+            <button class="p-btn note-btn" onclick="tpModule.inputPitch('G')">G<span>Sol</span></button>
+            <button class="p-btn note-btn" onclick="tpModule.inputPitch('A')">A<span>La</span></button>
+            <button class="p-btn note-btn" onclick="tpModule.inputPitch('B')">B<span>Ti</span></button>
+            <button class="p-btn note-btn" onclick="tpModule.inputPitch('C_high')">C<span>高Do</span></button>
+          </div>
+          <div class="pitch-row-oct">
+            <button class="p-btn oct-btn" onclick="tpModule.shiftOctave(-1)">▼ 低八度 <span id="oct-label-low"></span></button>
+            <button class="p-btn oct-btn" onclick="tpModule.shiftOctave(1)">▲ 高八度 <span id="oct-label-high"></span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 【兩聲部】解答頁（提交作答後） -->
+  <div id="pageTpAnswer" class="page-view">
+    <div class="top-bar-practice" style="margin-bottom:14px;">
+      <button class="nav-back-btn" style="margin:0;" onclick="showPage('tp-practice')">← 返回作答</button>
+      <span class="practice-status-badge" id="tp-ansBadge">解答對照</span>
+      <div class="score-box"><div class="num" id="tp-ansScore">0/0</div></div>
+    </div>
+    <div id="tp-ansFeedback" class="answer-big-feedback"></div>
+    <div class="unified-action-row" style="margin-bottom:14px;">
+      <button class="action-btn" id="tp-ansPlayUser" style="color:var(--wrong); border-color:var(--wrong);">🔊 聽你的作答</button>
+      <button class="play-btn" id="tp-ansPlayCorrect">🔁 聽正解(雙軌)</button>
+    </div>
+    <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+    <div class="review-staff"><div id="tp-ansUser"></div></div>
+    <div class="review-label" style="margin-top:8px;">正確解答：</div>
+    <div class="review-staff"><div id="tp-ansCorrect"></div></div>
+    <div class="unified-action-row" style="margin-top:18px;">
+      <button class="action-btn btn-submit" id="tp-ansNextBtn" style="flex:1; padding:14px;">下一題 →</button>
+    </div>
+    <div class="unified-action-row" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+    </div>
+  </div>
+
+  <!-- 【兩聲部】錯題本頁 -->
+  <div id="pageTpReview" class="page-view">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <button class="reset-cache-btn" id="tp-clearReviewBtn">🗑️ 清空錯題本</button>
+    </div>
+    <h1>錯題本</h1>
+    <p class="subtitle">收錄答錯的兩聲部題，重整或關閉後仍會保留。可分別聆聽你的作答與正解，並對照紅色標錯音符。</p>
+    <div id="tp-reviewList"></div>
+    <p id="tp-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
+  </div>
+</div>
+
+<script src="exam-common.js"></script>
+<script>
+/* ===== 統一錯題本儲存（六個練習共用，寫入 localStorage，供 index 總覽聚合） ===== */
+window.REVIEW_STORE = {
+  PREFIX: 'earTrainer.review.',
+  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行' },
+  TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html' },
+  load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
+  save(type, arr){ try { localStorage.setItem(this.PREFIX+type, JSON.stringify(arr)); } catch(e){} },
+  add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); this.save(type,a); return a; },
+  clear(type){ this.save(type, []); },
+  count(type){ return this.load(type).length; }
+};
+
+function forceResetCache() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(r => r.forEach(x => x.unregister()));
+  if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
+  alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
+}
+function showPage(pageId) {
+  if (window.tpStopAll) window.tpStopAll();
+  document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+  if (pageId === 'tp-settings') { document.getElementById('pageTpSettings').classList.add('active'); if(window.tpModule) window.tpModule.refreshReviewCount(); }
+  else if (pageId === 'tp-practice') document.getElementById('pageTpPractice').classList.add('active');
+  else if (pageId === 'tp-answer') document.getElementById('pageTpAnswer').classList.add('active');
+  else if (pageId === 'tp-review') { document.getElementById('pageTpReview').classList.add('active'); if(window.tpModule) window.tpModule.renderReviewPage(); }
+}
+
+(function(){
+  const SIMPLE_ORDER = ['4', '2-2', '1-1-1-1', '2-1-1', '1-1-2', '1-2-1', '3-1', '1-3', '3tuplet'];
+  const COMPOUND_ORDER = [
+    '6', '4-2', '2-4', '4-1-1', '1-1-4', '2-2-2', '2-2-1-1', '2-1-1-2',
+    '1-1-2-2', '2-1-1-1-1', '1-1-2-1-1', '1-1-1-1-2', '1-1-1-1-1-1', '3-1-1-1', '1-1-1-3', '1-3-1-1',
+    '1-1-3-1', '3-1-2', '3-2-1', '2-3-1', '2-1-3', '1-3-2', '1-2-3', '4~1-1',
+    '1-1~4', '3-3', '2-1-2-1', '1-2-1-2', '1-2-2-1', '1-1~3-1', '1-2-1-1-1', '1-1-1-2-1'
+  ];
+
+  function parsePatternId(id) {
+    if (id === '3tuplet') {
+      return { lengths: [4/3, 4/3, 4/3], tieNext: [false, false, false], isTuplet: true };
+    }
+    let lengths = []; let tieNext = [];
+    let tokens = id.split(/([-\~])/);
+    for (let i = 0; i < tokens.length; i += 2) {
+      lengths.push(Number(tokens[i]));
+      if (i + 1 < tokens.length) tieNext.push(tokens[i + 1] === '~');
+      else tieNext.push(false);
+    }
+    return { lengths, tieNext, isTuplet: false };
+  }
+
+  const ALL_BLOCKS = {};
+  SIMPLE_ORDER.forEach(id => { ALL_BLOCKS[id] = { id, ...parsePatternId(id), type: 'simple', beats: 1 }; });
+  COMPOUND_ORDER.forEach(id => { ALL_BLOCKS[id] = { id, ...parsePatternId(id), type: 'compound', beats: 1 }; });
+
+  const VF = Vex.Flow;
+
+  function createEnhancedTie(firstNote, lastNote) {
+    if (typeof firstNote.setExtraRightPx === 'function') firstNote.setExtraRightPx(30);
+    return new VF.StaveTie({ first_note: firstNote, last_note: lastNote, first_indices: [0], last_indices: [0] }).setDirection(1);
+  }
+
+  const EXTRA_SPACING_IDS = ['4-1-1', '1-1-4', '4~1-1', '1-1~4'];
+  const NOTE_TO_SEMI = { 'C':0, 'D':2, 'E':4, 'F':5, 'G':7, 'A':9, 'B':11 };
+
+  function getPitchFromObj(pObj) {
+    if(!pObj) return 69;
+    let midi = (pObj.oct + 1) * 12 + NOTE_TO_SEMI[pObj.step];
+    if(pObj.acc === '#') midi += 1;
+    else if(pObj.acc === 'b') midi -= 1;
+    return midi;
+  }
+
+  function getVexKey(pObj, clef) {
+    if(!pObj) return clef === 'treble' ? 'a/4' : 'c/3';
+    return `${pObj.step.toLowerCase()}/${pObj.oct}`;
+  }
+
+  function applyAccidental(note, pObj, measureAccState) {
+    if(!pObj) return;
+    let step = pObj.step.toUpperCase();
+    let acc = pObj.acc || 'n';
+    let needsAcc = false;
+
+    if (acc === 'n') {
+      if (measureAccState[step] && measureAccState[step] !== 'n') needsAcc = true;
+    } else {
+      if (measureAccState[step] !== acc) needsAcc = true;
+    }
+
+    if (needsAcc) {
+      note.addAccidental(0, new VF.Accidental(acc));
+      measureAccState[step] = acc;
+    }
+  }
+
+  function getVexNotes(block, isWrongArray, pitchArray, startIndex, clef, activeNoteIdx = -1, measureAccState = {}) {
+    let notes = []; let ties = []; let tuplet = null;
+    let lengths = block.lengths; let tieNext = block.tieNext || [];
+    let noteCount = lengths.length;
+
+    if (block.isTuplet) {
+      for(let i=0; i<3; i++) {
+        let pObj = pitchArray ? pitchArray[startIndex + i] : null;
+        let n = new VF.StaveNote({ clef: clef, keys: [getVexKey(pObj, clef)], duration: '8', auto_stem: true });
+        applyAccidental(n, pObj, measureAccState);
+        if(isWrongArray && isWrongArray[i]) n.setStyle({ fillStyle: 'var(--wrong)', strokeStyle: 'var(--wrong)' });
+        if((startIndex + i) === activeNoteIdx) n.setStyle({ fillStyle: 'var(--accent)', strokeStyle: 'var(--accent)' });
+        notes.push(n);
+      }
+      tuplet = new VF.Tuplet(notes, { num_notes: 3, notes_occupied: 2, ratioed: false });
+      let beams = [new VF.Beam(notes, true)];
+      return { notes, ties, beams, tuplet, noteCount: 3 };
+    }
+
+    let needsExtraSpacing = EXTRA_SPACING_IDS.includes(block.id);
+    lengths.forEach((len, idx) => {
+      let pObj = pitchArray ? pitchArray[startIndex + idx] : null;
+      let n1;
+      if(len===1) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'16', auto_stem: true });
+      else if(len===2) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'8', auto_stem: true });
+      else if(len===3) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'8', auto_stem: true }).addDot(0);
+      else if(len===4) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true });
+      else if(len===6) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true }).addDot(0);
+
+      applyAccidental(n1, pObj, measureAccState);
+
+      if(isWrongArray && isWrongArray[idx]) n1.setStyle({ fillStyle: 'var(--wrong)', strokeStyle: 'var(--wrong)' });
+      if((startIndex + idx) === activeNoteIdx) n1.setStyle({ fillStyle: 'var(--accent)', strokeStyle: 'var(--accent)' });
+      if(needsExtraSpacing && typeof n1.setExtraRightPx === 'function') n1.setExtraRightPx(25);
+      notes.push(n1);
+    });
+
+    for(let idx = 0; idx < tieNext.length; idx++) {
+      if(tieNext[idx] && idx + 1 < notes.length) ties.push(createEnhancedTie(notes[idx], notes[idx + 1]));
+    }
+
+    const beamNotes = notes.filter(n => n.duration.includes('8') || n.duration.includes('16'));
+    const beams = beamNotes.length > 1 ? [new VF.Beam(beamNotes, true)] : [];
+    return { notes, ties, beams, tuplet, noteCount };
+  }
+
+  function drawMiniRhythm(container, blockId) {
+    try {
+      container.innerHTML = ''; const block = ALL_BLOCKS[blockId];
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(260, 110);
+      const svg = container.querySelector('svg');
+      svg.setAttribute('viewBox', '0 20 260 65'); svg.style.width = '100%'; svg.style.height = '100%';
+      const ctx = renderer.getContext(); ctx.scale(1.25, 1.25);
+      const stave = new VF.Stave(5, 5, 200).setContext(ctx).draw();
+      const { notes, ties, beams, tuplet } = getVexNotes(block, null, null, 0, 'treble', -1, {});
+      VF.Formatter.FormatAndDraw(ctx, stave, notes);
+      beams.forEach(b => b.setContext(ctx).draw()); ties.forEach(t => t.setContext(ctx).draw()); if(tuplet) tuplet.setContext(ctx).draw();
+    } catch(e) {}
+  }
+
+  // 繪製大譜表；靜態渲染（解答頁 / 錯題本）時透過 ctxOverride 指定該題自身的拍號、小節設定
+  function renderGrandStaff(containerId, uSeqT, uSeqB, uPitchT, uPitchB, interactive, cSeqT, cSeqB, cPitchT, cPitchB, activeTab, activePart, activeSlot, activeNote, ctxOverride) {
+    try {
+      const container = document.getElementById(containerId); if (!container) return;
+      const cfg = ctxOverride || { barsCount: tpModule.barsCount, beatsPerBar: tpModule.beatsPerBar, meter: tpModule.meter, meterType: tpModule.meterType };
+      const outerContainer = document.getElementById('staffContainerOuter');
+      const innerWrapper = document.getElementById('staffInnerWrapper');
+      let currentScrollLeft = 0;
+      if (outerContainer && interactive && innerWrapper) {
+        currentScrollLeft = outerContainer.scrollLeft;
+        innerWrapper.style.minWidth = innerWrapper.scrollWidth + 'px';
+      }
+      container.innerHTML = '';
+
+      const minMeasureWidth = 240;
+      const requiredWidth = (minMeasureWidth * cfg.barsCount) + 80;
+      const totalWidth = requiredWidth;
+      const usableWidth = totalWidth - 30;
+
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(totalWidth, 215);
+      const ctx = renderer.getContext();
+      let xPos = 25;
+      const barWidth = (usableWidth - 60) / cfg.barsCount;
+
+      let buildBars = (seq) => {
+        let bs = []; let cb = []; let cbeats = 0;
+        seq.forEach(id => {
+          cb.push(id); let b = id === 'placeholder' ? 1 : ALL_BLOCKS[id].beats; cbeats += b;
+          if(cbeats >= cfg.beatsPerBar) { bs.push(cb); cb = []; cbeats = 0; }
+        });
+        while(bs.length < cfg.barsCount) bs.push([]);
+        return bs;
+      };
+
+      let barsTop = buildBars(uSeqT); let barsBot = buildBars(uSeqB);
+      let gBeatTop = 0; let gNoteTop = 0; let gBeatBot = 0; let gNoteBot = 0;
+      let slotTops = []; let noteTops = []; let slotBots = []; let noteBots = [];
+
+      for(let b = 0; b < cfg.barsCount; b++) {
+        const isFirst = (b === 0); const sWidth = isFirst ? barWidth + 60 : barWidth;
+        const staveT = new VF.Stave(xPos, 15, sWidth);
+        const staveB = new VF.Stave(xPos, 105, sWidth);
+        if(isFirst) {
+            staveT.addClef('treble').addTimeSignature(cfg.meter);
+            staveB.addClef('bass').addTimeSignature(cfg.meter);
+        }
+        staveT.setContext(ctx).draw(); staveB.setContext(ctx).draw();
+
+        if(isFirst) {
+            new VF.StaveConnector(staveT, staveB).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();
+            new VF.StaveConnector(staveT, staveB).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(ctx).draw();
+        }
+
+        let processVoice = (barKeys, clef, gBeat, gNote, pArray, cSeq, cPitch, isTop) => {
+            let bNotes = []; let bBeams = []; let bTies = []; let bTuplets = [];
+            let mAcc = {};
+            let filledBeats = barKeys.reduce((acc, k) => acc + (k === 'placeholder' ? 1 : ALL_BLOCKS[k].beats), 0);
+            while(filledBeats < cfg.beatsPerBar) { barKeys.push('placeholder'); filledBeats++; }
+
+            barKeys.forEach(id => {
+                if (id !== 'placeholder') {
+                    const block = ALL_BLOCKS[id];
+                    let isWrongArr = Array(block.lengths.length).fill(false);
+                    if(cSeq && cPitch) {
+                        if(cSeq[gBeat] !== id) isWrongArr.fill(true);
+                        else {
+                            for(let k = 0; k < block.lengths.length; k++) {
+                                let pU = getPitchFromObj(pArray[gNote + k]);
+                                let pC = getPitchFromObj(cPitch[gNote + k]);
+                                if(pU !== pC) isWrongArr[k] = true;
+                            }
+                        }
+                    }
+                    let hlNoteIdx = (interactive && activeTab === 'pitch' && ((isTop && activePart === 'top') || (!isTop && activePart === 'bottom'))) ? activeNote : -1;
+                    const { notes, ties, beams, tuplet, noteCount } = getVexNotes(block, isWrongArr, pArray, gNote, clef, hlNoteIdx, mAcc);
+                    bNotes.push(...notes); bBeams.push(...beams); bTies.push(...ties); if(tuplet) bTuplets.push(tuplet);
+                    if(isTop) { slotTops[gBeat] = notes[0]; notes.forEach(n => noteTops.push(n)); }
+                    else { slotBots[gBeat] = notes[0]; notes.forEach(n => noteBots.push(n)); }
+                    gNote += noteCount;
+                } else {
+                    let ghostKey = clef === 'treble' ? 'a/4' : 'c/3';
+                    let ghost = new VF.StaveNote({ clef: clef, keys:[ghostKey], duration: 'qr' });
+                    if(cfg.meterType === 'compound') ghost.addDot(0);
+                    ghost.setStyle({ fillStyle: '#e0e0e0', strokeStyle: '#e0e0e0' });
+                    bNotes.push(ghost);
+                    if(isTop) { slotTops[gBeat] = ghost; noteTops.push(ghost); }
+                    else { slotBots[gBeat] = ghost; noteBots.push(ghost); }
+                    gNote += 1;
+                }
+                gBeat++;
+            });
+            return { bNotes, bBeams, bTies, bTuplets, nGBeat: gBeat, nGNote: gNote };
+        };
+
+        let resT = processVoice(barsTop[b], 'treble', gBeatTop, gNoteTop, uPitchT, cSeqT, cPitchT, true);
+        gBeatTop = resT.nGBeat; gNoteTop = resT.nGNote;
+        if(resT.bNotes.length > 0) {
+            VF.Formatter.FormatAndDraw(ctx, staveT, resT.bNotes);
+            resT.bBeams.forEach(bm => bm.setContext(ctx).draw()); resT.bTies.forEach(t => t.setContext(ctx).draw()); resT.bTuplets.forEach(tp => tp.setContext(ctx).draw());
+        }
+
+        let resB = processVoice(barsBot[b], 'bass', gBeatBot, gNoteBot, uPitchB, cSeqB, cPitchB, false);
+        gBeatBot = resB.nGBeat; gNoteBot = resB.nGNote;
+        if(resB.bNotes.length > 0) {
+            VF.Formatter.FormatAndDraw(ctx, staveB, resB.bNotes);
+            resB.bBeams.forEach(bm => bm.setContext(ctx).draw()); resB.bTies.forEach(t => t.setContext(ctx).draw()); resB.bTuplets.forEach(tp => tp.setContext(ctx).draw());
+        }
+        xPos += sWidth;
+      }
+
+      if(interactive && tpModule.hasPlayed) {
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute'; overlay.style.top = '0'; overlay.style.left = '0';
+        overlay.style.width = '100%'; overlay.style.height = '100%'; overlay.style.pointerEvents = 'none';
+        container.appendChild(overlay);
+
+        let drawHitboxes = (itemArr, isTopStave, type) => {
+           let sName = isTopStave ? 'top' : 'bottom';
+           for(let i = 0; i < itemArr.length; i++) {
+               if(type === 'note' && tpModule.isNoteTiedToPrevious(sName, i)) continue;
+
+               let fn = itemArr[i]; let stave = fn.getStave(); if(!stave) continue;
+               let nx = typeof fn.getAbsoluteX === 'function' ? fn.getAbsoluteX() : stave.getX() + fn.getTickContext().getX();
+
+               let x, y, h, w;
+               if(type === 'slot') {
+                   x = nx - 12; y = stave.getYForLine(0) - 10; h = 80; w = 30;
+                   let nn = itemArr[i+1];
+                   if(nn && nn.getStave() === stave) { w = (typeof nn.getAbsoluteX === 'function' ? nn.getAbsoluteX() : stave.getX() + nn.getTickContext().getX()) - nx; }
+                   else { w = stave.getX() + stave.getWidth() - nx + 10; }
+               } else {
+                   x = nx - 8; y = stave.getYForLine(0) - 10; h = 80; w = 22;
+                   let nn = null;
+                   for(let nextI = i + 1; nextI < itemArr.length; nextI++) {
+                       if(!tpModule.isNoteTiedToPrevious(sName, nextI)) { nn = itemArr[nextI]; break; }
+                   }
+                   if(nn && nn.getStave() === stave) { w = (typeof nn.getAbsoluteX === 'function' ? nn.getAbsoluteX() : stave.getX() + nn.getTickContext().getX()) - nx; }
+                   else w = 26;
+               }
+
+               let slot = document.createElement('div'); slot.id = `tp-${type}-${sName}-${i}`;
+               slot.style.position = 'absolute'; slot.style.left = x + 'px'; slot.style.top = y + 'px';
+               slot.style.width = Math.max(w, 18) + 'px'; slot.style.height = h + 'px';
+               slot.style.cursor = 'pointer'; slot.style.pointerEvents = 'auto'; slot.style.borderRadius = '6px'; slot.style.transition = 'all 0.1s';
+
+               if(sName === activePart && i === (type==='slot'?activeSlot:activeNote) && ((type==='slot'&&activeSlot!==-1) || (type==='note'&&activeNote!==-1))) {
+                   slot.style.border = '2px solid var(--accent)'; slot.style.backgroundColor = 'var(--accent-soft)'; slot.style.zIndex = '10';
+               } else if(type==='note' && sName === activePart && tpModule.lastEditedNoteIdx[sName] === i) {
+                   /* 記號會套用到的音 */
+                   slot.style.border = '2px dashed var(--accent-line)'; slot.style.zIndex = '5';
+               } else {
+                   slot.style.border = '1px dashed transparent'; slot.style.zIndex = '1';
+               }
+
+               slot.onclick = () => {
+                   tpModule.activePart = sName;
+                   if(type === 'slot') { tpModule.activeSlotIdx[sName] = i; }
+                   else { tpModule.activeNoteIdx[sName] = i; tpModule.lastEditedNoteIdx[sName] = null; }
+                   tpModule.updateUI();
+               };
+               overlay.appendChild(slot);
+           }
+        };
+
+        if(activeTab === 'rhythm') { drawHitboxes(slotTops, true, 'slot'); drawHitboxes(slotBots, false, 'slot'); }
+        else { drawHitboxes(noteTops, true, 'note'); drawHitboxes(noteBots, false, 'note'); }
+      }
+      if(outerContainer && interactive && innerWrapper) {
+        outerContainer.scrollLeft = currentScrollLeft;
+        innerWrapper.style.minWidth = '';
+      }
+    } catch(e) { console.error("Grand Staff Error:", e); }
+  }
+
+  // 靜態渲染包裝：解答頁與錯題本用該題自身的設定繪譜
+  function renderStaticGrand(containerId, sT, sB, pT, pB, cT, cB, cpT, cpB, item) {
+    renderGrandStaff(containerId, sT, sB, pT, pB, false, cT, cB, cpT, cpB, null, null, null, null, {
+      barsCount: item.barsCount, beatsPerBar: item.beatsPerBar, meter: item.meter, meterType: item.meterType
+    });
+  }
+
+  let audioCtx = null; let pianoInst = null; let pendingTimers = [];
+  function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+  window.tpStopAll = function() {
+    if(pianoInst) pianoInst.stop();
+    clearTimers(); tpModule.testSession.isRunning = false; tpModule.isPlaying = false; tpModule.updatePlayBtn();
+  };
+  function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }catch(e){} return audioCtx; }
+  window.loadPiano = function(){
+    const ctx = ensureAudio(); if(!ctx) return;
+    Soundfont.instrument(ctx, 'acoustic_grand_piano', { nameToUrl: function(){ return 'acoustic_grand_piano-mp3.js'; } }).catch(function(){ return Soundfont.instrument(ctx, 'acoustic_grand_piano'); }).then(inst => {
+      pianoInst = inst; document.getElementById('loadingBanner').style.display = 'none'; tpModule.updatePlayBtn();
+      if(window.EXAM && window.EXAM.isExamMode() && tpModule._examReady) tpModule._examReady();
+    }).catch(()=>{ document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>'; });
+  };
+
+  // 靜態播放：解答頁 / 錯題本用該題自身的拍號、速度與音高播放雙聲部（不動作答狀態）
+  function playStaticGrand(seqT, seqB, pitchT, pitchB, item) {
+    window.tpStopAll();
+    if(!pianoInst) return;
+    const ctx = ensureAudio(); let time = ctx.currentTime + 0.1;
+    let secPerUnit = 60 / item.bpm; let numerator = parseInt(item.meter.split('/')[0], 10);
+    let secPer16th = item.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+    let beatUnits = item.meterType === 'simple' ? 4 : 6;
+    for(let i=0; i<numerator; i++) {
+      let o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle';
+      o.frequency.value = (item.meterType === 'simple' ? i === 0 : i % 3 === 0) ? 1000 : 700;
+      g.gain.setValueAtTime(0.2, time + i * secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time + i * secPerUnit + 0.05);
+      o.connect(g); g.connect(ctx.destination); o.start(time + i * secPerUnit); o.stop(time + i * secPerUnit + 0.05);
+    }
+    time += numerator * secPerUnit;
+    let scheduleTrack = (seq, pitchArray) => {
+        let t = time; let noteIdx = 0;
+        seq.forEach(id => {
+          if(id === 'placeholder'){ t += beatUnits * secPer16th; noteIdx += 1; return; }
+          const block = ALL_BLOCKS[id]; const lengths = block.lengths; const tieNext = block.tieNext || [];
+          let i = 0;
+          while(i < lengths.length) {
+            let totalLen = lengths[i]; let isTied = tieNext[i]; let nextIdx = i + 1;
+            while(isTied && nextIdx < lengths.length) { totalLen += lengths[nextIdx]; isTied = tieNext[nextIdx]; nextIdx++; }
+            let midi = getPitchFromObj(pitchArray[noteIdx + i]);
+            pianoInst.play(midi, t, { duration: totalLen * secPer16th * 0.9, gain: 3.5 });
+            t += totalLen * secPer16th; i = nextIdx;
+          }
+          noteIdx += lengths.length;
+        });
+        return t;
+    };
+    let maxT = time;
+    let t1 = scheduleTrack(seqT, pitchT); if(t1 > maxT) maxT = t1;
+    let t2 = scheduleTrack(seqB, pitchB); if(t2 > maxT) maxT = t2;
+    tpModule.isPlaying = true; tpModule.updatePlayBtn();
+    const timerId = setTimeout(() => { tpModule.isPlaying = false; tpModule.updatePlayBtn(); }, (maxT-ctx.currentTime)*1000 + 100);
+    pendingTimers.push(timerId);
+  }
+
+  const tpModule = {
+    mode: 'practice', meter: '2/4', meterType: 'simple', barsCount: 2, beatsPerBar: 2, bpm: 80, totalBeats: 4,
+    selectedPatterns: new Set(),
+    questionSeq: { top: [], bottom: [] }, questionPitch: { top: [], bottom: [] },
+    userSeq: { top: [], bottom: [] }, userPitch: { top: [], bottom: [] },
+    isPlaying: false, hasPlayed: false, activeTab: 'rhythm',
+    activePart: 'top',
+    activeSlotIdx: { top: 0, bottom: 0 }, activeNoteIdx: { top: 0, bottom: 0 },
+    lastEditedNoteIdx: { top: null, bottom: null }, currentAccidental: 'n', currentOctave: 4,
+    score: { c:0, t:0 }, testSession: { isRunning: false, replaysLeft: 0, totalPlays: 0 }, _ansItem: null,
+
+    initSettings: function() {
+      const grid = document.getElementById('settingsPatternGrid'); grid.innerHTML = '';
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      this.selectedPatterns.clear();
+      order.forEach(id => {
+        this.selectedPatterns.add(id);
+        const item = document.createElement('div'); item.className = 'pattern-item selected';
+        const svgContainer = document.createElement('div'); item.appendChild(svgContainer);
+        item.onclick = () => {
+          if(this.selectedPatterns.has(id)) { this.selectedPatterns.delete(id); item.classList.remove('selected'); }
+          else { this.selectedPatterns.add(id); item.classList.add('selected'); }
+          document.getElementById('tp-enterBtn').disabled = this.selectedPatterns.size === 0;
+        };
+        grid.appendChild(item); setTimeout(() => drawMiniRhythm(svgContainer, id), 10);
+      });
+      document.getElementById('tp-enterBtn').disabled = false;
+    },
+
+    sanitizePitch: function(p) {
+      if (p.step === 'C' && p.acc === 'b') { p.step = 'B'; p.oct -= 1; p.acc = 'n'; }
+      if (p.step === 'B' && p.acc === '#') { p.step = 'C'; p.oct += 1; p.acc = 'n'; }
+      if (p.step === 'F' && p.acc === 'b') { p.step = 'E'; p.acc = 'n'; }
+      if (p.step === 'E' && p.acc === '#') { p.step = 'F'; p.acc = 'n'; }
+      if (p.step === 'D' && p.acc === 'b') { p.step = 'C'; p.acc = '#'; }
+      if (p.step === 'G' && p.acc === 'b') { p.step = 'F'; p.acc = '#'; }
+      if (p.step === 'A' && p.acc === '#') { p.step = 'B'; p.acc = 'b'; }
+      if (p.step === 'D' && p.acc === '#') { p.step = 'E'; p.acc = 'b'; }
+      return p;
+    },
+
+    generateTrack: function(isTop) {
+      let seq = []; let pitch = [];
+      const pool = Array.from(this.selectedPatterns);
+      const steps = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+      const accs = ['n', 'n', 'n', 'n', '#', 'b'];
+      let baseOct = isTop ? 4 : 3;
+      let lastStepIdx = 0; let lastOct = baseOct;
+      let tiedFromPrev = false;
+
+      for(let i=0; i<this.totalBeats; i++) {
+        let pat = pool[Math.floor(Math.random() * pool.length)];
+        seq.push(pat);
+        let block = ALL_BLOCKS[pat];
+        let numNotes = block.lengths.length;
+        for(let k=0; k<numNotes; k++) {
+          let newPitch;
+          if (tiedFromPrev) {
+             let prevPitch = pitch[pitch.length - 1];
+             newPitch = { step: prevPitch.step, oct: prevPitch.oct, acc: prevPitch.acc };
+          } else {
+             let stepIdx = (lastStepIdx + (Math.floor(Math.random() * 5) - 2) + 7) % 7;
+             let oct = lastOct;
+             if(stepIdx < lastStepIdx && Math.random() < 0.2) oct += 1;
+             if(stepIdx > lastStepIdx && Math.random() < 0.2) oct -= 1;
+             if(isTop) { oct = Math.max(4, Math.min(5, oct)); }
+             else { oct = Math.max(2, Math.min(3, oct)); }
+             let acc = accs[Math.floor(Math.random() * accs.length)];
+             newPitch = { step: steps[stepIdx], oct: oct, acc: acc };
+             newPitch = this.sanitizePitch(newPitch);
+          }
+          pitch.push(newPitch);
+          lastStepIdx = steps.indexOf(newPitch.step); lastOct = newPitch.oct;
+          tiedFromPrev = block.tieNext && block.tieNext[k];
+        }
+      }
+      return { seq, pitch };
+    },
+
+    generateQuestion: function() {
+      let tTrack = this.generateTrack(true);
+      this.questionSeq.top = tTrack.seq; this.questionPitch.top = tTrack.pitch;
+      let bTrack = this.generateTrack(false);
+      this.questionSeq.bottom = bTrack.seq; this.questionPitch.bottom = bTrack.pitch;
+    },
+
+    getTotalNoteCount: function(part) {
+      return this.userSeq[part].reduce((acc, id) => {
+        if(id === 'placeholder') return acc + 1;
+        return acc + ALL_BLOCKS[id].lengths.length;
+      }, 0);
+    },
+
+    isNoteTiedToNext: function(part, idx) {
+      if (idx < 0) return false;
+      let count = 0;
+      for(let b = 0; b < this.userSeq[part].length; b++) {
+        let blockId = this.userSeq[part][b];
+        if (blockId === 'placeholder') {
+          if (idx === count) return false;
+          count += 1; continue;
+        }
+        let block = ALL_BLOCKS[blockId];
+        if(idx >= count && idx < count + block.lengths.length) {
+          let currNoteInBeat = idx - count;
+          return block.tieNext && block.tieNext[currNoteInBeat];
+        }
+        count += block.lengths.length;
+      }
+      return false;
+    },
+
+    isNoteTiedToPrevious: function(part, idx) {
+      if (idx <= 0) return false;
+      return this.isNoteTiedToNext(part, idx - 1);
+    },
+
+    _noteCountOf: function(id) { return id === 'placeholder' ? 1 : ALL_BLOCKS[id].lengths.length; },
+
+    /* 依「拍」重建音高：改某一拍的節奏時只重建那一拍，其餘各拍原封不動。
+       儲存格式不變，計分／繪譜／錯題本／考試存檔皆不受影響。 */
+    rebuildUserPitchArray: function(part) {
+      let defOct = part === 'top' ? 4 : 3, defStep = part === 'top' ? 'A' : 'C';
+      let seqNow = this.userSeq[part];
+      if (!this._pitchSeqSnapshot) this._pitchSeqSnapshot = { top: null, bottom: null };
+      let seqPrev = this._pitchSeqSnapshot[part];
+      let newPitch = [];
+      if (Array.isArray(seqPrev) && seqPrev.length === seqNow.length) {
+        let oldOff = 0;
+        for (let b = 0; b < seqNow.length; b++) {
+          let oldN = this._noteCountOf(seqPrev[b]);
+          let newN = this._noteCountOf(seqNow[b]);
+          for (let k = 0; k < newN; k++) {
+            let src = (k < oldN) ? this.userPitch[part][oldOff + k] : null;
+            newPitch.push(src ? src : { step: defStep, oct: defOct, acc: 'n' });
+          }
+          oldOff += oldN;
+        }
+      } else {
+        let totalNotes = this.getTotalNoteCount(part);
+        for (let i = 0; i < totalNotes; i++) {
+          newPitch.push(this.userPitch[part][i] ? this.userPitch[part][i] : { step: defStep, oct: defOct, acc: 'n' });
+        }
+      }
+      this.userPitch[part] = newPitch;
+      this._pitchSeqSnapshot[part] = seqNow.slice();
+    },
+
+    /* 拍 ↔ 音 的對應（依聲部）：讓兩個分頁的游標互相同步 */
+    _firstNoteIdxOfBeat: function(part, beatIdx) {
+      let n = 0, seq = this.userSeq[part];
+      for (let i = 0; i < seq.length; i++) {
+        if (i === beatIdx) return n;
+        n += this._noteCountOf(seq[i]);
+      }
+      return Math.max(0, n - 1);
+    },
+    _beatIdxOfNote: function(part, noteIdx) {
+      let n = 0, seq = this.userSeq[part];
+      for (let i = 0; i < seq.length; i++) {
+        let c = this._noteCountOf(seq[i]);
+        if (noteIdx < n + c) return i;
+        n += c;
+      }
+      return Math.max(0, seq.length - 1);
+    },
+
+    switchTab: function(tab) {
+      let prevTab = this.activeTab;
+      this.activeTab = tab;
+      this.lastEditedNoteIdx = { top: null, bottom: null };
+      // 切換分頁時同步游標：看到的框就是接下來會生效的位置
+      if (tab === 'rhythm' && prevTab === 'pitch') {
+        ['top','bottom'].forEach(function(p){
+          if (this.activeNoteIdx[p] !== -1) this.activeSlotIdx[p] = this._beatIdxOfNote(p, this.activeNoteIdx[p]);
+        }, this);
+      } else if (tab === 'pitch' && prevTab === 'rhythm') {
+        this._pendingNoteFromSlot = { top: this.activeSlotIdx.top, bottom: this.activeSlotIdx.bottom };
+      }
+      document.getElementById('tab-rhythm').className = `tab-btn ${tab === 'rhythm' ? 'active' : ''}`;
+      document.getElementById('tab-pitch').className = `tab-btn ${tab === 'pitch' ? 'active' : ''}`;
+      document.getElementById('panel-rhythm').style.display = tab === 'rhythm' ? 'block' : 'none';
+      document.getElementById('panel-pitch').style.display = tab === 'pitch' ? 'block' : 'none';
+
+      if(tab === 'rhythm') {
+        if(this.activeSlotIdx[this.activePart] === -1) this.activeSlotIdx[this.activePart] = 0;
+      } else {
+        let defPat = this.meterType === 'simple' ? '4' : '6';
+        ['top', 'bottom'].forEach(p => {
+            for(let i = 0; i < this.userSeq[p].length; i++) { if(this.userSeq[p][i] === 'placeholder') this.userSeq[p][i] = defPat; }
+            this.rebuildUserPitchArray(p);
+
+            // 由節奏分頁切過來：框停在該拍的第一個音
+            if (this._pendingNoteFromSlot && this._pendingNoteFromSlot[p] !== null && this._pendingNoteFromSlot[p] !== undefined) {
+              this.activeNoteIdx[p] = this._firstNoteIdxOfBeat(p, this._pendingNoteFromSlot[p]);
+            }
+            let anIdx = this.activeNoteIdx[p];
+            if(anIdx < 0 || anIdx >= this.userPitch[p].length) this.activeNoteIdx[p] = 0;
+
+            let totalNotes = this.getTotalNoteCount(p);
+            while (this.activeNoteIdx[p] < totalNotes && this.isNoteTiedToPrevious(p, this.activeNoteIdx[p])) { this.activeNoteIdx[p]++; }
+            if (this.activeNoteIdx[p] >= totalNotes) this.activeNoteIdx[p] = -1;
+        });
+
+        this._pendingNoteFromSlot = null;
+        let cp = this.activePart;
+        let cIdx = this.activeNoteIdx[cp];
+        this.currentOctave = (cIdx !== -1 && this.userPitch[cp][cIdx]) ? this.userPitch[cp][cIdx].oct : (cp === 'top' ? 4 : 3);
+        this.updateOctaveLabels();
+      }
+      this.updateUI();
+    },
+
+    // 更新升降按鈕視覺狀態與「待套用」記號（先按記號、再輸入音名的舊行為用）
+    setPendingAccidental: function(acc) {
+      this.currentAccidental = acc;
+      document.getElementById('acc-b').className = `p-btn acc-btn ${acc === 'b' ? 'active' : ''}`;
+      document.getElementById('acc-n').className = `p-btn acc-btn ${acc === 'n' ? 'active' : ''}`;
+      document.getElementById('acc-s').className = `p-btn acc-btn ${acc === '#' ? 'active' : ''}`;
+    },
+
+    // 升降按鈕邏輯（依目前編輯的聲部 activePart）：
+    //  1) 剛輸入完一個音（lastEditedNoteIdx[p]）→ 直接修改那個音（事後修飾，不前進）。
+    //  2) 沒有剛輸入的音、但目前有選中的音（activeNoteIdx[p]，例如用點選跳過去的）→ 套用到該音一次，然後跳到下一個音。
+    //  3) 都沒有（焦點已到結尾）→ 暫存記號待下次輸入。
+    setAccidental: function(acc) {
+      let p = this.activePart;
+      let afterIdx = this.lastEditedNoteIdx[p];
+      if (afterIdx !== null && afterIdx !== -1 && this.userPitch[p][afterIdx]) {
+        this._applyAccidentalToIdx(p, afterIdx, acc);
+        this.setPendingAccidental('n');
+        this.updateUI();
+        return;
+      }
+      let selIdx = this.activeNoteIdx[p];
+      if (selIdx !== -1 && this.userPitch[p][selIdx]) {
+        this._applyAccidentalToIdx(p, selIdx, acc);
+        this.lastEditedNoteIdx[p] = selIdx; // 記住剛修飾的音，之後再按記號可再改同一音
+        // 修改既有音：框留在該音不移動，連按多次都改同一個音（所見即所改）
+        this.activeNoteIdx[p] = selIdx;
+        this.setPendingAccidental('n');
+        this.updateUI();
+        return;
+      }
+      this.setPendingAccidental(acc);
+    },
+
+    _applyAccidentalToIdx: function(p, idx, acc) {
+      let base = this.userPitch[p][idx];
+      // 作答輸入不做異名同音轉換：你按什麼就顯示什麼（A♯ 就是 A♯）。對錯以音高比對，不受拼法影響。
+      let np = { step: base.step, oct: base.oct, acc: acc };
+      this.userPitch[p][idx] = np;
+      let propagateIdx = idx;
+      while (this.isNoteTiedToNext(p, propagateIdx)) {
+        if (propagateIdx + 1 < this.userPitch[p].length) this.userPitch[p][propagateIdx + 1] = { step: np.step, oct: np.oct, acc: np.acc };
+        propagateIdx++;
+      }
+      this.currentOctave = np.oct; this.updateOctaveLabels();
+    },
+
+    updateOctaveLabels: function() {
+      document.getElementById('oct-label-low').textContent = `(Oct ${this.currentOctave - 1})`;
+      document.getElementById('oct-label-high').textContent = `(Oct ${this.currentOctave + 1})`;
+    },
+
+    shiftOctave: function(delta) {
+      this.currentOctave += delta;
+      if(this.currentOctave < 2) this.currentOctave = 2; if(this.currentOctave > 6) this.currentOctave = 6;
+      this.updateOctaveLabels();
+
+      let p = this.activePart;
+      let targetIdx = (this.lastEditedNoteIdx[p] !== null) ? this.lastEditedNoteIdx[p] : this.activeNoteIdx[p];
+
+      if(targetIdx !== -1 && this.userPitch[p][targetIdx]) {
+        this.userPitch[p][targetIdx].oct += delta;
+        if(this.userPitch[p][targetIdx].oct < 2) this.userPitch[p][targetIdx].oct = 2;
+        if(this.userPitch[p][targetIdx].oct > 6) this.userPitch[p][targetIdx].oct = 6;
+
+        let propagateIdx = targetIdx;
+        while(this.isNoteTiedToNext(p, propagateIdx)) {
+          if(propagateIdx + 1 < this.userPitch[p].length) { this.userPitch[p][propagateIdx + 1].oct = this.userPitch[p][targetIdx].oct; }
+          propagateIdx++;
+        }
+        this.updateUI();
+      }
+    },
+
+    inputPitch: function(stepInput) {
+      if(!this.hasPlayed) return;
+      let p = this.activePart;
+      if (this.activeNoteIdx[p] === -1) return;
+
+      let step = stepInput; let oct = this.currentOctave;
+      if(stepInput === 'C_high') { step = 'C'; oct += 1; }
+
+      this.userPitch[p][this.activeNoteIdx[p]] = { step: step, oct: oct, acc: this.currentAccidental };
+      this.currentOctave = oct; this.updateOctaveLabels();
+
+      let accToApply = this.currentAccidental;
+      if(this.currentAccidental !== 'n') this.setPendingAccidental('n');
+
+      let propagateIdx = this.activeNoteIdx[p];
+      while(this.isNoteTiedToNext(p, propagateIdx)) {
+        if(propagateIdx + 1 < this.userPitch[p].length) { this.userPitch[p][propagateIdx + 1] = { step: step, oct: oct, acc: accToApply }; }
+        propagateIdx++;
+      }
+
+      this.lastEditedNoteIdx[p] = this.activeNoteIdx[p];
+
+      let totalNotes = this.getTotalNoteCount(p);
+      let nextIdx = this.activeNoteIdx[p] + 1;
+
+      while (nextIdx < totalNotes && this.isNoteTiedToPrevious(p, nextIdx)) { nextIdx++; }
+      if(nextIdx < totalNotes) this.activeNoteIdx[p] = nextIdx; // 最後一格：框留在該音（不消失）
+
+      this.updateUI();
+    },
+
+    playSequence: function(mode, qTop, qBot, pTop, pBot, onEnd) {
+      if(!pianoInst || this.isPlaying) return;
+      this.isPlaying = true; this.updatePlayBtn();
+
+      // 播放／重播不移動作答框，維持在原本位置
+      this.updateUI();
+
+      const ctx = ensureAudio(); let time = ctx.currentTime + 0.1;
+      let secPerUnit = 60 / this.bpm; let numerator = parseInt(this.meter.split('/')[0], 10);
+      let secPer16th = this.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+
+      for(let i=0; i<numerator; i++) {
+        let o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle';
+        o.frequency.value = (this.meterType === 'simple' ? i === 0 : i % 3 === 0) ? 1000 : 700;
+        g.gain.setValueAtTime(0.2, time + i * secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time + i * secPerUnit + 0.05);
+        o.connect(g); g.connect(ctx.destination); o.start(time + i * secPerUnit); o.stop(time + i * secPerUnit + 0.05);
+      }
+      time += numerator * secPerUnit;
+
+      let scheduleTrack = (seq, pitchArray) => {
+          let t = time; let noteIdx = 0;
+          seq.forEach(id => {
+            const block = ALL_BLOCKS[id]; const lengths = block.lengths; const tieNext = block.tieNext || [];
+            let i = 0;
+            while(i < lengths.length) {
+              let totalLen = lengths[i]; let isTied = tieNext[i]; let nextIdx = i + 1;
+              while(isTied && nextIdx < lengths.length) { totalLen += lengths[nextIdx]; isTied = tieNext[nextIdx]; nextIdx++; }
+              let midi = getPitchFromObj(pitchArray[noteIdx + i]);
+              pianoInst.play(midi, t, { duration: totalLen * secPer16th * 0.9, gain: 3.5 });
+              t += totalLen * secPer16th; i = nextIdx;
+            }
+            noteIdx += lengths.length;
+          });
+          return t;
+      };
+
+      let maxT = time;
+      if (mode === 'both' || mode === 'top') { let t = scheduleTrack(qTop, pTop); if(t > maxT) maxT = t; }
+      if (mode === 'both' || mode === 'bottom') { let t = scheduleTrack(qBot, pBot); if(t > maxT) maxT = t; }
+
+      const timerId = setTimeout(() => { this.isPlaying = false; this.updatePlayBtn(); if(onEnd) onEnd(); }, (maxT-ctx.currentTime)*1000 + 100);
+      pendingTimers.push(timerId);
+    },
+
+    /* ===== 模擬測驗：考試模式 ===== */
+    examBootstrap: function() {
+      const EXm = window.EXAM; if(!EXm) return;
+      const KEY = EXm.currentSection(); if(KEY !== 'twopart') return;
+      const cfg = EXm.configFor(KEY) || {};
+      const self = this;
+
+      ensureAudio(); if(window.tpStopAll) window.tpStopAll();
+      this.mode = 'practice';
+      this.meter = cfg.meter || '4/4'; this.meterType = cfg.meterType || 'simple';
+      this.barsCount = cfg.bars || 2; this.bpm = cfg.bpm || 70;
+      this.beatsPerBar = parseInt(this.meter.split('/')[0], 10);
+      if(this.meterType === 'compound') this.beatsPerBar /= 3;
+      this.totalBeats = this.barsCount * this.beatsPerBar;
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      this.selectedPatterns = new Set(order);
+
+      const sd = EXm.sectionData(KEY, function(){
+        self.generateQuestion();
+        return { questions: { seq: JSON.parse(JSON.stringify(self.questionSeq)), pitch: JSON.parse(JSON.stringify(self.questionPitch)) }, labels: {} };
+      });
+      if(!sd) return;
+      this.questionSeq = JSON.parse(JSON.stringify(sd.questions.seq));
+      this.questionPitch = JSON.parse(JSON.stringify(sd.questions.pitch));
+      if(sd.answers && sd.answers.seq){
+        this.userSeq = JSON.parse(JSON.stringify(sd.answers.seq));
+        this.userPitch = JSON.parse(JSON.stringify(sd.answers.pitch || { top: [], bottom: [] }));
+      } else {
+        this.userSeq = { top: Array(this.totalBeats).fill('placeholder'), bottom: Array(this.totalBeats).fill('placeholder') };
+        this.userPitch = { top: [], bottom: [] }; this._pitchSeqSnapshot = null;
+      }
+      this.hasPlayed = !!sd.played;
+      this.activePart = 'top'; this.activeSlotIdx = { top:0, bottom:0 }; this.activeNoteIdx = { top:0, bottom:0 };
+      this.lastEditedNoteIdx = { top:null, bottom:null };
+
+      const badge = document.getElementById('tp-statusBadge');
+      if(badge) badge.textContent = `大譜表｜${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
+      const back = document.querySelector('#pageTpPractice .nav-back-btn'); if(back) back.style.display = 'none';
+      const sub = document.getElementById('tp-submitBtn'); if(sub) sub.style.display = 'none';
+      // 考試不提供單獨聆聽高音／低音
+      ['tp-playBtn-top','tp-playBtn-bot'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display='none'; });
+
+      this.renderKeypad(); showPage('tp-practice');
+      setTimeout(() => self.updateUI(), 150);
+
+      const host = document.getElementById('pageTpPractice');
+      const lockEl = document.querySelector('#pageTpPractice .practice-top-fixed');
+      if(lockEl && !lockEl.id) lockEl.id = 'exam-lockwrap';
+
+      const maxPlays = cfg.plays || 8;
+      let used = (sd.playCount || 0);
+      function headText(){ return '播放剩餘 <b>' + Math.max(0, maxPlays-used) + '</b> / ' + maxPlays + ' 次'; }
+      EXm.buildHeader(host, KEY, headText());
+
+      // 上下聲部各自逐拍計分，合計封頂 20
+      function saveNow(){
+        EXm.saveAnswers(KEY, { seq: JSON.parse(JSON.stringify(self.userSeq)), pitch: JSON.parse(JSON.stringify(self.userPitch)) });
+        const beats = []; let blank = 0;
+        ['top','bottom'].forEach(function(p){
+          let qOff = 0, uOff = 0;
+          const qSeq = self.questionSeq[p] || [], uSeq = self.userSeq[p] || [];
+          for(let i=0; i<qSeq.length; i++){
+            const qid = qSeq[i], uid = uSeq[i];
+            const qN = ALL_BLOCKS[qid] ? ALL_BLOCKS[qid].lengths.length : 0;
+            const uN = (uid && uid !== 'placeholder' && ALL_BLOCKS[uid]) ? ALL_BLOCKS[uid].lengths.length : 0;
+            if(!uid || uid === 'placeholder') blank++;
+            let wrong = 0; const n = Math.min(qN, uN);
+            for(let k=0; k<n; k++){
+              const qp = (self.questionPitch[p]||[])[qOff+k], up = (self.userPitch[p]||[])[uOff+k];
+              if(!up || !qp || getPitchFromObj(up) !== getPitchFromObj(qp)) wrong++;
+            }
+            beats.push({ rhythmOK: (uid === qid), sameCount: (uN === qN), wrongPitches: wrong });
+            qOff += qN; uOff += uN;
+          }
+        });
+        const max = EXm.SECTIONS[KEY].max;
+        const bad = beats.filter(function(b){ return !b.rhythmOK || b.wrongPitches>0; }).length;
+        EXm.saveResult(KEY, { score: EXm.scoreBeats(beats, max), max: max, unanswered: blank,
+          detail: [{ correct: bad===0, your: '有誤 '+bad+' 拍（上下聲部合計）', right: '共 '+beats.length+' 拍' }] });
+      }
+      saveNow();
+      const _origUpdateUI = this.updateUI.bind(this);
+      this.updateUI = function(){ _origUpdateUI(); saveNow(); };
+
+      const bBoth = document.getElementById('tp-playBtn-both');
+      const bTop = document.getElementById('tp-playBtn-top');
+      const bBot = document.getElementById('tp-playBtn-bot');
+      function refreshPlayBtn(){
+        const left = maxPlays - used;
+        if(self.isPlaying || self._examTuning){
+          bBoth.textContent = '🔊 播放中...'; bBoth.disabled = true; bTop.disabled = true; bBot.disabled = true; return;
+        }
+        const off = !pianoInst || left <= 0;
+        bBoth.disabled = off; bTop.disabled = off; bBot.disabled = off;
+        bBoth.textContent = left > 0 ? `▶ 雙聲部（剩餘 ${left} 次）` : '🚫 次數用盡';
+        EXm.buildHeader(host, KEY, headText());
+      }
+      this.updatePlayBtn = function(){ refreshPlayBtn(); };
+      this._examReady = refreshPlayBtn;
+      refreshPlayBtn();
+
+      function doPlay(playMode){
+        ensureAudio();
+        if(!pianoInst || self.isPlaying || self._examTuning || used >= maxPlays) return;
+        const firstTime = (used === 0);
+        used++;
+        const s = EXm.loadSession(); if(s && s.data && s.data[KEY]){ s.data[KEY].playCount = used; s.data[KEY].played = true; EXm.saveSession(s); }
+        self.hasPlayed = true; EXm.setPlaying(true);
+        function runSeq(){
+          self._examTuning = false;
+          self.playSequence(playMode, self.questionSeq.top, self.questionSeq.bottom, self.questionPitch.top, self.questionPitch.bottom, function(){
+            EXm.setPlaying(false); refreshPlayBtn();
+          });
+        }
+        if(firstTime){
+          self._examTuning = true; refreshPlayBtn();
+          pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: 3.5 });
+          const tid = setTimeout(runSeq, 2600); pendingTimers.push(tid);
+        } else runSeq();
+        refreshPlayBtn();
+      }
+      bBoth.onclick = function(){ doPlay('both'); };
+      bTop.onclick = function(){ doPlay('top'); };
+      bBot.onclick = function(){ doPlay('bottom'); };
+
+      EXm.guardVisibility(KEY, function(){ if(window.tpStopAll) window.tpStopAll(); self._examTuning=false; EXm.setPlaying(false); refreshPlayBtn(); });
+      EXm.buildBar(host, saveNow);
+    },
+
+    renderKeypad: function() {
+      const pad = document.getElementById('tp-keypad'); pad.innerHTML = '';
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      order.forEach(id => {
+        if(!this.selectedPatterns.has(id)) return;
+        const btn = document.createElement('div'); btn.className = 'rhythm-btn';
+        const svgDiv = document.createElement('div'); btn.appendChild(svgDiv);
+        btn.onclick = () => {
+          let p = this.activePart;
+          if(!this.hasPlayed || this.activeSlotIdx[p] === -1) return;
+          let reqBeats = ALL_BLOCKS[id].beats; let available = 0; let removeCount = 0;
+          for(let i = this.activeSlotIdx[p]; i < this.userSeq[p].length; i++) {
+            available += this.userSeq[p][i] === 'placeholder' ? 1 : ALL_BLOCKS[this.userSeq[p][i]].beats;
+            removeCount++; if(available >= reqBeats) break;
+          }
+          if(available >= reqBeats) {
+            this.userSeq[p].splice(this.activeSlotIdx[p], removeCount, id);
+            let overshot = available - reqBeats;
+            for(let k=0; k<overshot; k++) this.userSeq[p].splice(this.activeSlotIdx[p] + 1 + k, 0, 'placeholder');
+            this.rebuildUserPitchArray(p);
+            let nextSlot = this.activeSlotIdx[p] + 1;
+            if(nextSlot < this.userSeq[p].length) this.activeSlotIdx[p] = nextSlot; else this.activeSlotIdx[p] = this.userSeq[p].length - 1;
+            this.updateUI();
+          }
+        };
+        pad.appendChild(btn); setTimeout(() => drawMiniRhythm(svgDiv, id), 10);
+      });
+    },
+
+    updateUI: function() {
+      renderGrandStaff('tp-staff-svg', this.userSeq.top, this.userSeq.bottom, this.userPitch.top, this.userPitch.bottom, true, null, null, null, null, this.activeTab, this.activePart, this.activeSlotIdx[this.activePart], this.activeNoteIdx[this.activePart]);
+
+      // 提交鈕在播放後即可按；未填的格子會在提交時跳出提醒並計為錯誤
+      document.getElementById('tp-submitBtn').disabled = !this.hasPlayed;
+
+      document.getElementById('partIndicator').textContent = `目前編輯：${this.activePart === 'top' ? '高音' : '低音'}譜表`;
+
+      const containerOuter = document.getElementById('staffContainerOuter');
+      let targetEl = null;
+      if(this.activeTab === 'rhythm' && this.activeSlotIdx[this.activePart] !== -1) targetEl = document.getElementById(`tp-slot-${this.activePart}-${this.activeSlotIdx[this.activePart]}`);
+      else if(this.activeTab === 'pitch' && this.activeNoteIdx[this.activePart] !== -1) targetEl = document.getElementById(`tp-note-${this.activePart}-${this.activeNoteIdx[this.activePart]}`);
+
+      if(containerOuter && targetEl) {
+        const slotLeft = targetEl.offsetLeft; const slotWidth = targetEl.offsetWidth;
+        const containerWidth = containerOuter.clientWidth; const currentScroll = containerOuter.scrollLeft;
+        if(slotLeft < currentScroll || (slotLeft + slotWidth) > (currentScroll + containerWidth)) {
+          containerOuter.scrollTo({ left: slotLeft - (containerWidth / 2) + (slotWidth / 2), behavior: 'smooth' });
+        }
+      }
+
+      let p = this.activePart;
+      let cIdx = this.activeNoteIdx[p];
+      this.currentOctave = (cIdx !== -1 && this.userPitch[p][cIdx]) ? this.userPitch[p][cIdx].oct : (p === 'top' ? 4 : 3);
+      this.updateOctaveLabels();
+    },
+
+    updatePlayBtn: function() {
+      const b_both = document.getElementById('tp-playBtn-both');
+      const b_top = document.getElementById('tp-playBtn-top');
+      const b_bot = document.getElementById('tp-playBtn-bot');
+
+      if(this.isPlaying) {
+          b_both.textContent = '🔊 播放中...'; b_both.disabled = true;
+          b_top.disabled = true; b_bot.disabled = true;
+      } else {
+          if (this.mode === 'test') {
+              if (this.testSession.replaysLeft > 0) {
+                  b_both.textContent = `▶ 雙聲部 (剩 ${this.testSession.replaysLeft} 次)`;
+                  b_both.disabled = !pianoInst; b_top.disabled = !pianoInst; b_bot.disabled = !pianoInst;
+              } else {
+                  b_both.textContent = '🚫 次數用盡';
+                  b_both.disabled = true; b_top.disabled = true; b_bot.disabled = true;
+              }
+          } else {
+              b_both.textContent = '▶ 雙聲部';
+              b_both.disabled = !pianoInst; b_top.disabled = !pianoInst; b_bot.disabled = !pianoInst;
+          }
+      }
+    },
+
+    refreshReviewCount: function() {
+      const el = document.getElementById('tp-reviewCount'); if(el) el.textContent = window.REVIEW_STORE.count('twopart');
+    },
+
+    showAnswerPage: function(isCorrect) {
+      const item = {
+        cSeqT: [...this.questionSeq.top], cSeqB: [...this.questionSeq.bottom],
+        cPitchT: JSON.parse(JSON.stringify(this.questionPitch.top)), cPitchB: JSON.parse(JSON.stringify(this.questionPitch.bottom)),
+        uSeqT: [...this.userSeq.top], uSeqB: [...this.userSeq.bottom],
+        uPitchT: JSON.parse(JSON.stringify(this.userPitch.top)), uPitchB: JSON.parse(JSON.stringify(this.userPitch.bottom)),
+        meter: this.meter, meterType: this.meterType, barsCount: this.barsCount, beatsPerBar: this.beatsPerBar, bpm: this.bpm,
+        label: `大譜表・${this.meter}拍・${this.barsCount}小節`, correctText: '（兩聲部聽寫）', yourText: ''
+      };
+      this._ansItem = item;
+      document.getElementById('tp-ansBadge').textContent = isCorrect ? '✅ 答對了' : '📖 解答對照';
+      const fb = document.getElementById('tp-ansFeedback');
+      fb.textContent = isCorrect ? '🎉 完全正確！你擁有頂尖的雙聲部聽力！' : '❌ 某些音高或節奏有誤，來看看正解對照';
+      fb.className = 'answer-big-feedback ' + (isCorrect ? 'correct' : 'wrong');
+      document.getElementById('tp-ansScore').textContent = `${this.score.c}/${this.score.t}`;
+      if(!isCorrect){ window.REVIEW_STORE.add('twopart', item); this.refreshReviewCount(); }
+      showPage('tp-answer');
+      setTimeout(() => {
+        renderStaticGrand('tp-ansUser', item.uSeqT, item.uSeqB, item.uPitchT, item.uPitchB, item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, item);
+        renderStaticGrand('tp-ansCorrect', item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, null, null, null, null, item);
+      }, 60);
+    },
+
+    renderReviewPage: function() {
+      this.refreshReviewCount();
+      const list = document.getElementById('tp-reviewList'); const empty = document.getElementById('tp-reviewEmpty');
+      if(!list) return; list.innerHTML = '';
+      const items = window.REVIEW_STORE.load('twopart');
+      if(items.length === 0){ if(empty) empty.style.display = 'block'; return; }
+      if(empty) empty.style.display = 'none';
+      items.slice().reverse().forEach((item, ri) => {
+        const uid = item.id || ('t'+ri);
+        const box = document.createElement('div'); box.className = 'review-item';
+        box.innerHTML = `
+          <div style="font-size:13px; font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span style="color:var(--wrong);">❌ 錯題（${item.label || ''}）</span>
+            <div style="display:flex; gap:6px;">
+              <button class="select-all-btn tp-rev-user" style="color:var(--wrong); border-color:var(--wrong); background:rgba(166,73,59,0.09);">🔊 聽你的作答</button>
+              <button class="select-all-btn tp-rev-correct">🔁 聽正解(雙軌)</button>
+            </div>
+          </div>
+          <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+          <div class="review-staff"><div id="tp-rev-user-${uid}"></div></div>
+          <div class="review-label" style="margin-top:8px;">正確解答：</div>
+          <div class="review-staff"><div id="tp-rev-correct-${uid}"></div></div>
+        `;
+        list.appendChild(box);
+        box.querySelector('.tp-rev-user').onclick = () => playStaticGrand(item.uSeqT, item.uSeqB, item.uPitchT, item.uPitchB, item);
+        box.querySelector('.tp-rev-correct').onclick = () => playStaticGrand(item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, item);
+        setTimeout(() => {
+          renderStaticGrand(`tp-rev-user-${uid}`, item.uSeqT, item.uSeqB, item.uPitchT, item.uPitchB, item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, item);
+          renderStaticGrand(`tp-rev-correct-${uid}`, item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, null, null, null, null, item);
+        }, 50);
+      });
+    },
+
+    setupEvents: function() {
+      document.querySelectorAll('#tp-modeSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.mode = b.dataset.mode; document.querySelectorAll('#tp-modeSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+        document.getElementById('testReplayWrapper').style.display = this.mode === 'test' ? 'flex' : 'none';
+      });
+
+      document.getElementById('tp-testReplaySelect').onchange = (e) => {
+        document.getElementById('tp-testReplayInput').style.display = (e.target.value === 'custom') ? 'inline-block' : 'none';
+      };
+
+      document.querySelectorAll('#tp-meterSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.meter = b.dataset.meter; this.meterType = b.dataset.type;
+        document.querySelectorAll('#tp-meterSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+        document.getElementById('bpmSym').textContent = this.meterType === 'simple' ? '♩' : '♪';
+        this.initSettings();
+      });
+
+      document.getElementById('selectAllBtn').onclick = () => {
+        const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+        const items = document.querySelectorAll('.pattern-item');
+        if(this.selectedPatterns.size === order.length) { this.selectedPatterns.clear(); items.forEach(i => i.classList.remove('selected')); }
+        else { order.forEach(id => this.selectedPatterns.add(id)); items.forEach(i => i.classList.add('selected')); }
+        document.getElementById('tp-enterBtn').disabled = this.selectedPatterns.size === 0;
+      };
+
+      document.getElementById('tp-enterBtn').onclick = () => {
+        ensureAudio(); window.tpStopAll();
+
+        this.barsCount = parseInt(document.getElementById('tp-barsSelect').value, 10);
+        this.beatsPerBar = parseInt(this.meter.split('/')[0], 10);
+        if(this.meterType==='compound') this.beatsPerBar /= 3;
+        this.totalBeats = this.barsCount * this.beatsPerBar;
+        this.bpm = parseInt(document.getElementById('tp-bpm').value, 10);
+
+        if (this.mode === 'test') {
+            let selectVal = document.getElementById('tp-testReplaySelect').value;
+            let plays = 3;
+            if (selectVal === 'custom') {
+                let customVal = parseInt(document.getElementById('tp-testReplayInput').value, 10);
+                if (isNaN(customVal) || customVal < 1) customVal = 1;
+                if (customVal > 20) customVal = 20;
+                document.getElementById('tp-testReplayInput').value = customVal;
+                plays = customVal;
+            } else {
+                plays = parseInt(selectVal, 10);
+            }
+            this.testSession.totalPlays = plays;
+            this.testSession.replaysLeft = this.testSession.totalPlays;
+        }
+
+        document.getElementById('tp-statusBadge').textContent = `大譜表｜${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
+        this.userSeq.top = Array(this.totalBeats).fill('placeholder'); this.userSeq.bottom = Array(this.totalBeats).fill('placeholder');
+        this.userPitch.top = []; this.userPitch.bottom = []; this._pitchSeqSnapshot = null;
+        this.hasPlayed = false; this.activePart = 'top';
+        this.activeSlotIdx = { top: 0, bottom: 0 }; this.activeNoteIdx = { top: 0, bottom: 0 }; this.lastEditedNoteIdx = { top: null, bottom: null };
+
+        this.generateQuestion();
+        this.rebuildUserPitchArray('top'); this.rebuildUserPitchArray('bottom');
+
+        document.getElementById('tp-playCaption').textContent = '';
+
+        this.updatePlayBtn();
+        this.renderKeypad(); showPage('tp-practice');
+        this.switchTab('rhythm');
+        setTimeout(() => this.updateUI(), 150);
+      };
+
+      let handlePlay = (modeStr) => {
+          ensureAudio(); if(!pianoInst || this.isPlaying) return;
+          if(this.mode === 'test' && this.testSession.replaysLeft <= 0) return;
+
+          this.hasPlayed = true;
+          if (this.mode === 'test') this.testSession.replaysLeft--;
+
+          let captionMap = {'both': '雙軌', 'top': '高音孤立', 'bottom': '低音孤立'};
+          document.getElementById('tp-playCaption').textContent = `🔊 播放中 (${captionMap[modeStr]})...`;
+
+          this.playSequence(modeStr, this.questionSeq.top, this.questionSeq.bottom, this.questionPitch.top, this.questionPitch.bottom, () => {
+              document.getElementById('tp-playCaption').textContent = '✅ 播放完畢，請作答！';
+          });
+      };
+
+      document.getElementById('tp-playBtn-both').onclick = () => handlePlay('both');
+      document.getElementById('tp-playBtn-top').onclick = () => handlePlay('top');
+      document.getElementById('tp-playBtn-bot').onclick = () => handlePlay('bottom');
+
+      document.getElementById('tp-backspaceBtn').onclick = () => {
+        if(!this.hasPlayed) return;
+        let p = this.activePart;
+        if(this.activeTab === 'rhythm') {
+          let t = this.activeSlotIdx[p];
+          if(t === -1) { for(let i = this.userSeq[p].length - 1; i >= 0; i--) { if(this.userSeq[p][i] !== 'placeholder') { t = i; break; } } }
+          else { if(this.userSeq[p][t] === 'placeholder' && t > 0) { t--; while(t > 0 && this.userSeq[p][t] === 'placeholder') t--; } }
+          if(t >= 0 && this.userSeq[p][t] !== 'placeholder') {
+            let b = ALL_BLOCKS[this.userSeq[p][t]].beats; this.userSeq[p].splice(t, 1);
+            for(let k=0; k<b; k++) this.userSeq[p].splice(t, 0, 'placeholder');
+            this.activeSlotIdx[p] = t; this.rebuildUserPitchArray(p); this.updateUI();
+          }
+        } else {
+          if (this.activeNoteIdx[p] === -1) {
+             let prevIdx = this.userPitch[p].length - 1;
+             while (prevIdx >= 0 && this.isNoteTiedToPrevious(p, prevIdx)) prevIdx--;
+             if (prevIdx >= 0) this.activeNoteIdx[p] = prevIdx;
+             this.updateUI();
+          } else if(this.userPitch[p][this.activeNoteIdx[p]]) {
+             let defOct = p === 'top' ? 4 : 3; let defStep = p === 'top' ? 'A' : 'C';
+             this.userPitch[p][this.activeNoteIdx[p]] = { step: defStep, oct: defOct, acc: 'n' };
+             let propagateIdx = this.activeNoteIdx[p];
+             while(this.isNoteTiedToNext(p, propagateIdx)) {
+                if(propagateIdx + 1 < this.userPitch[p].length) { this.userPitch[p][propagateIdx + 1] = { step: defStep, oct: defOct, acc: 'n' }; }
+                propagateIdx++;
+             }
+             let prevIdx = this.activeNoteIdx[p] - 1;
+             while (prevIdx >= 0 && this.isNoteTiedToPrevious(p, prevIdx)) prevIdx--;
+             if(prevIdx >= 0) this.activeNoteIdx[p] = prevIdx;
+
+             this.lastEditedNoteIdx[p] = null;
+             this.updateUI();
+          }
+        }
+      };
+
+      document.getElementById('tp-clearBtn').onclick = () => {
+        if(!this.hasPlayed) return;
+        let p = this.activePart;
+        if(this.activeTab === 'rhythm') {
+          this.userSeq[p] = Array(this.totalBeats).fill('placeholder'); this.userPitch[p] = []; if(this._pitchSeqSnapshot) this._pitchSeqSnapshot[p] = null;
+          this.activeSlotIdx[p] = 0; this.activeNoteIdx[p] = 0;
+        } else {
+          this.userPitch[p] = []; if(this._pitchSeqSnapshot) this._pitchSeqSnapshot[p] = null; this.rebuildUserPitchArray(p); this.activeNoteIdx[p] = 0;
+        }
+        this.lastEditedNoteIdx[p] = null;
+        this.updateUI();
+      };
+
+      document.getElementById('tp-submitBtn').onclick = () => {
+        if(!this.hasPlayed) return;
+        // 未填提醒：仍可提交，但跳出確認（未填計為錯誤）
+        let emptyCount = this.userSeq.top.filter(x => x === 'placeholder').length + this.userSeq.bottom.filter(x => x === 'placeholder').length;
+        if(emptyCount > 0){
+          if(!window.confirm(`還有 ${emptyCount} 拍節奏未填寫（高音＋低音合計）。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
+        }
+        window.tpStopAll();
+        let isCorrect = true;
+        ['top', 'bottom'].forEach(p => {
+            if(JSON.stringify(this.userSeq[p]) !== JSON.stringify(this.questionSeq[p])) { isCorrect = false; }
+            else {
+              let tN = this.getTotalNoteCount(p);
+              for(let i = 0; i < tN; i++) {
+                if(getPitchFromObj(this.userPitch[p][i]) !== getPitchFromObj(this.questionPitch[p][i])) { isCorrect = false; break; }
+              }
+            }
+        });
+        this.score.t++; if(isCorrect) this.score.c++;
+        document.getElementById('tp-scoreNum').textContent = `${this.score.c}/${this.score.t}`;
+        this.showAnswerPage(isCorrect);
+      };
+
+      // 解答頁播放與下一題
+      document.getElementById('tp-ansPlayUser').onclick = () => { if(this._ansItem) playStaticGrand(this._ansItem.uSeqT, this._ansItem.uSeqB, this._ansItem.uPitchT, this._ansItem.uPitchB, this._ansItem); };
+      document.getElementById('tp-ansPlayCorrect').onclick = () => { if(this._ansItem) playStaticGrand(this._ansItem.cSeqT, this._ansItem.cSeqB, this._ansItem.cPitchT, this._ansItem.cPitchB, this._ansItem); };
+      document.getElementById('tp-ansNextBtn').onclick = () => {
+        ensureAudio(); window.tpStopAll();
+        this.userSeq.top = Array(this.totalBeats).fill('placeholder'); this.userSeq.bottom = Array(this.totalBeats).fill('placeholder');
+        this.userPitch.top = []; this.userPitch.bottom = []; this._pitchSeqSnapshot = null;
+        this.hasPlayed = false; this.activePart = 'top';
+        this.activeSlotIdx = { top: 0, bottom: 0 }; this.activeNoteIdx = { top: 0, bottom: 0 }; this.lastEditedNoteIdx = { top: null, bottom: null };
+        this.generateQuestion();
+        this.rebuildUserPitchArray('top'); this.rebuildUserPitchArray('bottom');
+        if (this.mode === 'test') { this.testSession.replaysLeft = this.testSession.totalPlays; }
+        document.getElementById('tp-playCaption').textContent = '';
+        this.updatePlayBtn();
+        this.renderKeypad();
+        this.switchTab('rhythm');
+        showPage('tp-practice');
+        setTimeout(() => this.updateUI(), 150);
+      };
+
+      document.getElementById('tp-clearReviewBtn').onclick = () => {
+        if(window.REVIEW_STORE.count('twopart') === 0) return;
+        if(window.confirm('確定要清空兩聲部曲調的錯題本嗎？此動作無法復原。')){ window.REVIEW_STORE.clear('twopart'); this.renderReviewPage(); this.refreshReviewCount(); }
+      };
+
+      window.addEventListener('resize', () => { if(document.getElementById('pageTpPractice').classList.contains('active')) this.updateUI(); });
+    }
+  };
+
+  window.tpModule = tpModule;
+  tpModule.initSettings(); tpModule.setupEvents(); tpModule.refreshReviewCount(); loadPiano();
+  if(window.EXAM && window.EXAM.isExamMode()){ tpModule.examBootstrap(); }
+
+  /* 「🎵 標準音 A」按鈕：隨時可按，播放 A4（440Hz）2 秒，不影響題目播放次數 */
+  (function(){
+    var btn = document.getElementById('tuningABtn'); if(!btn) return;
+    // 考試模式已於第一次播放前自動給標準音，不需要這顆按鈕
+    if(window.EXAM && window.EXAM.isExamMode()){ btn.style.display = 'none'; return; }
+    btn.onclick = function(){
+      try{
+        ensureAudio();
+        if(!pianoInst) return;
+        var ctx = ensureAudio();
+        pianoInst.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
+        var t = btn.textContent; btn.textContent = '🎵 A 響起…';
+        setTimeout(function(){ btn.textContent = t; }, 2000);
+      }catch(e){}
+    };
+  })();
+
+  // 由 index 錯題本總覽「跳回複習」進入時，直接開啟錯題本頁
+  if(location.hash === '#review') showPage('tp-review');
+})();
+</script>
+
+<script>
+  if('serviceWorker' in navigator){ window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js').catch(()=>{}); }); }
+</script>
+<!-- 玩法說明彈窗 -->
+<div class="help-modal" id="tp-helpModal" onclick="if(event.target===this) closeHelp('tp-helpModal')">
+  <div class="help-box">
+    <button class="help-close" onclick="closeHelp('tp-helpModal')" aria-label="關閉">×</button>
+    <h2>兩聲部曲調 — 玩法說明</h2>
+    <p class="help-lead">大譜表雙軌聽寫，同時寫出高音與低音兩個聲部的節奏與音高。</p>
+    <h3>設定</h3>
+    <p>可選拍號、小節數、速度與要出現的節奏型；測驗模式可限制重播次數。</p>
+    <h3>作答</h3>
+    <p>播放時可選「<b>雙聲部</b>」一起聽，或單獨聽「<b>高音</b>」「<b>低音</b>」孤立聲部。作答分「編輯節奏／編輯音高」兩個分頁，並可切換目前編輯的聲部（點譜上高音區或低音區即可切換）。音高輸入方式與單旋律相同：點到某個音後，直接按 ♯／♭／♮ 就會套用到該音並自動跳到下一個音（剛打完的音也能直接按記號修改），八度可事後微調。填完提交 → 解答頁雙譜對照、紅色標錯，可聆聽你的作答／正解雙軌。</p>
+    <div class="help-common">
+      <h3>共通規則（六個練習都適用）</h3>
+      <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>
+      <p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>
+      <p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>
+      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照與即時訂正。</p>
+    </div>
+    <div class="help-foot"><button onclick="closeHelp('tp-helpModal')">我知道了</button></div>
+  </div>
+</div>
+<script>
+function openHelp(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); }
+function closeHelp(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); }
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document.querySelectorAll('.help-modal.open').forEach(function(m){ m.classList.remove('open'); }); } });
+</script>
+<script>
+(function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+</script>
+<script>
+/* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */
+(function(){
+  function setPlayback(){ try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} }
+  setPlayback();
+  var SILENT="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+  var done=false;
+  function unlock(){ if(done) return; done=true; setPlayback();
+    try{ var a=new Audio(SILENT); a.setAttribute("playsinline",""); a.volume=0.02; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){}
+    document.removeEventListener("touchend",unlock,true); document.removeEventListener("click",unlock,true);
+  }
+  document.addEventListener("touchend",unlock,true);
+  document.addEventListener("click",unlock,true);
+})();
+</script>
+</body>
+</html>

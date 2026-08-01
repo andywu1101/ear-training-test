@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>音樂聽力練習 App - 主目錄</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="聽力訓練">
+<meta name="theme-color" content="#33415c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
+    --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
+    --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body{ margin:0; background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height:100vh; padding: 20px 16px 64px; }
+  .wrap{ max-width: 680px; margin: 0 auto; }
+
+  .page-view { display: none; animation: fadeIn 0.22s ease-out; }
+  .page-view.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .staff-header{ position: relative; height: 70px; margin-bottom: 20px; }
+  .staff-line{ position:absolute; left:0; right:0; height:1px; background: var(--hairline); }
+  .staff-line:nth-child(1){ top: 6px; } .staff-line:nth-child(2){ top: 22px; } .staff-line:nth-child(3){ top: 38px; }
+  .staff-line:nth-child(4){ top: 54px; } .staff-line:nth-child(5){ top: 70px; }
+  .clef-mark{ position:absolute; left: 8px; top: -14px; font-family: var(--font-display); font-size: 74px; font-weight: 400; color: var(--ink); opacity: 0.85; line-height: 1; user-select:none; }
+
+  h1{ font-family: var(--font-display); font-weight: 600; font-size: 30px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .subtitle{ color: var(--ink-soft); font-size: 14px; margin: 0 0 22px; line-height: 1.6; }
+
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 10px; }
+  .menu-card {
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
+    padding: 22px; cursor: default; transition: all 0.2s ease; display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; overflow: hidden; touch-action: manipulation; text-decoration: none; color: inherit;
+  }
+  .menu-card.active-feature {
+    cursor: pointer; border-color: var(--accent-line); box-shadow: 0 4px 16px rgba(51,65,92,0.06);
+  }
+  .menu-card.active-feature:hover, .menu-card.active-feature:active {
+    transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 8px 20px rgba(51,65,92,0.12);
+  }
+  .menu-card.disabled-feature { opacity: 0.55; }
+  .menu-card-num { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+  .menu-card-title { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--ink); margin: 0 0 8px; }
+  .menu-card-desc { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
+  .menu-badge { position: absolute; top: 18px; right: 18px; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; font-family: var(--font-mono); }
+  .badge-ready { background: var(--accent); color: var(--panel); }
+  .badge-review { background: var(--wrong); color: var(--panel); }
+  .badge-soon { background: var(--hairline); color: var(--ink-soft); }
+  .footer-note{ margin-top: 36px; font-size: 12px; color: var(--ink-soft); text-align:center; line-height:1.7; }
+
+  /* 錯題本總覽卡片（整合入口） */
+  .review-hub-card{ grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: var(--panel); cursor:pointer; }
+  .review-hub-card .menu-card-num{ color: #c9d2e6; }
+  .review-hub-card .menu-card-title{ color: var(--panel); }
+  .review-hub-card .menu-card-desc{ color: #d7dae0; }
+  .review-hub-card:hover, .review-hub-card:active{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(38,36,32,0.18); }
+
+  /* 總覽頁 */
+  .nav-back-btn{ display:inline-flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); padding:10px 18px; border-radius:999px; cursor:pointer; margin-bottom:20px; box-shadow:0 2px 4px rgba(38,36,32,0.04); }
+  .nav-back-btn:hover, .nav-back-btn:active{ border-color:var(--accent); background:var(--accent); color:var(--panel); }
+  .hub-total{ font-family:var(--font-mono); font-size:13px; color:var(--ink-soft); margin-bottom:18px; }
+  .hub-group{ background:var(--panel); border:1px solid var(--panel-border); border-radius:var(--radius); padding:18px; margin-bottom:16px; }
+  .hub-group-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .hub-group-title{ font-family:var(--font-display); font-size:18px; font-weight:600; }
+  .hub-count{ font-family:var(--font-mono); font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--wrong-soft); color:var(--wrong); border:1px solid rgba(166,73,59,0.3); }
+  .hub-count.zero{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-line); }
+  .hub-jump{ font-size:12.5px; font-weight:700; padding:8px 14px; border-radius:999px; border:1px solid var(--accent-line); color:var(--accent); background:#fff; text-decoration:none; cursor:pointer; }
+  .hub-jump:hover{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .hub-empty{ font-size:13px; color:var(--ink-soft); }
+  .hub-item{ font-size:13px; line-height:1.6; padding:8px 0; border-top:1px dashed var(--hairline); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .hub-item:first-child{ border-top:none; }
+  .hub-item .qa .wrong-ans{ color:var(--wrong); font-weight:600; }
+  .hub-item .qa .right-ans{ color:var(--correct); font-weight:600; }
+  .hub-item .qtime{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); white-space:nowrap; }
+  .hub-more{ font-size:12px; color:var(--ink-soft); margin-top:8px; }
+  .hub-clear-all{ font-family:var(--font-body); font-size:12px; font-weight:600; color:#8a6d20; background:#fff8e6; border:1px solid #ffd885; padding:8px 14px; border-radius:999px; cursor:pointer; margin-left:8px; }
+
+  /* ===== 封面頁 ===== */
+  .cover{ min-height: calc(100vh - 84px); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; position:relative; overflow:hidden; padding: 32px 8px; }
+  .cover-notes{ position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .cover-note{ position:absolute; font-family: var(--font-display); color: var(--accent); opacity:0.10; user-select:none; line-height:1; }
+  .cover-card{ position:relative; z-index:1; max-width: 540px; }
+  .cover-clef{ font-family: var(--font-display); font-size: 92px; color: var(--accent); opacity:0.9; line-height:1; margin-bottom: 2px; }
+  .cover-title{ font-family: var(--font-display); font-weight:600; font-size: 46px; margin: 0 0 6px; letter-spacing:-0.01em; }
+  .cover-sub{ font-family: var(--font-mono); font-size: 13px; letter-spacing:0.22em; color: var(--ink-soft); text-transform: uppercase; margin-bottom: 26px; }
+  .cover-msg{ font-size: 17px; line-height: 1.95; color: var(--ink); text-align:center; background: var(--panel); border:1px solid var(--panel-border); border-radius: var(--radius); padding: 22px 24px; margin: 0 auto 28px; box-shadow: 0 4px 16px rgba(51,65,92,0.06); }
+  .cover-start{ font-family: var(--font-body); font-weight:700; font-size: 18px; padding: 16px 44px; border-radius: 999px; background: var(--accent); color: var(--panel); border:none; cursor:pointer; box-shadow: 0 6px 20px rgba(51,65,92,0.25); transition: all .15s ease; display:inline-flex; align-items:center; gap:10px; touch-action: manipulation; }
+  .cover-start:hover, .cover-start:active{ filter:brightness(1.12); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(51,65,92,0.32); }
+  .cover-foot{ margin-top: 20px; font-size: 13.5px; color: var(--ink-soft); }
+  /* 封面作者列與小額贊助 */
+  .cover-author{ margin-top: 16px; font-size: 13.5px; color: var(--ink-soft); }
+  .cover-donate-wrap{ margin-top: 10px; }
+  /* 封面：網站介紹影片（外框樣式，與贊助鈕同尺寸但不搶焦點） */
+  .cover-intro-wrap{ margin-top: 10px; }
+  .intro-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:11px 26px; border-radius:999px; background:transparent; color:var(--accent); border:1px solid var(--accent-line); cursor:pointer; text-decoration:none; transition:all .15s ease; touch-action:manipulation; }
+  .intro-btn:hover, .intro-btn:active{ background:var(--accent); color:var(--panel); border-color:var(--accent); transform:translateY(-1px); }
+  /* 選單：標題下方的介紹短片連結 */
+  .intro-line{ font-size:13.5px; color:var(--ink-soft); margin:-14px 0 20px; }
+  .intro-line a{ color:var(--accent); font-weight:700; text-decoration:none; border-bottom:1px solid var(--accent-line); padding-bottom:1px; }
+  .intro-line a:hover, .intro-line a:active{ border-color:var(--accent); }
+  .donate-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:11px 26px; border-radius:999px; background:var(--wrong); color:var(--panel); border:none; cursor:pointer; box-shadow:0 4px 14px rgba(166,73,59,0.28); transition:all .15s ease; touch-action:manipulation; }
+  .donate-btn:hover, .donate-btn:active{ filter:brightness(1.08); transform:translateY(-1px); box-shadow:0 6px 18px rgba(166,73,59,0.34); }
+  /* 選單左上角回封面鈕 */
+  .cover-back-btn{ display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); padding:8px 14px; border-radius:999px; cursor:pointer; margin-bottom:16px; touch-action:manipulation; }
+  .cover-back-btn:hover, .cover-back-btn:active{ border-color:var(--accent); background:var(--accent); color:var(--panel); }
+  /* 選單裡的贊助卡（全寬、較矮、暖赤陶色） */
+  .donate-card{ grid-column: 1 / -1; background: var(--wrong-soft); border-color: rgba(166,73,59,0.35); cursor:pointer; padding:16px 22px; }
+  .donate-card:hover, .donate-card:active{ transform: translateY(-2px); border-color: var(--wrong); box-shadow: 0 8px 20px rgba(166,73,59,0.14); }
+  .donate-card .menu-card-title{ color: var(--wrong); margin:0 0 4px; font-size:18px; }
+  .donate-card .menu-card-desc{ color: var(--ink-soft); }
+  /* 贊助佔位彈窗 */
+  .donate-modal{ display:none; position:fixed; inset:0; z-index:1200; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; }
+  .donate-modal.open{ display:flex; align-items:center; justify-content:center; }
+  .donate-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; max-width:400px; width:100%; padding:30px 26px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.28); }
+  .donate-box .dico{ font-size:40px; line-height:1; }
+  .donate-box h3{ font-family:var(--font-display); font-size:23px; font-weight:600; margin:10px 0 8px; }
+  .donate-box p{ font-size:15px; color:var(--ink-soft); line-height:1.8; margin:0 0 18px; }
+  .donate-box .ok-btn{ font-family:var(--font-body); font-weight:700; font-size:15px; padding:11px 30px; border-radius:999px; background:var(--accent); color:var(--panel); border:none; cursor:pointer; touch-action:manipulation; }
+  .donate-links{ display:flex; flex-direction:column; gap:10px; margin:6px 0 14px; }
+  .donate-go, .donate-home{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family:var(--font-body); font-weight:700; font-size:15px; padding:13px 20px; border-radius:999px; text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
+  .donate-go{ background:var(--wrong); color:var(--panel); box-shadow:0 4px 14px rgba(166,73,59,0.28); }
+  .donate-go:hover, .donate-go:active{ filter:brightness(1.08); transform:translateY(-1px); }
+  .donate-home{ background:transparent; color:var(--ink); border:1px solid var(--panel-border); }
+  .donate-home:hover, .donate-home:active{ border-color:var(--accent); background:var(--accent-soft); }
+  .donate-dismiss{ font-family:var(--font-body); font-size:14px; color:var(--ink-soft); background:transparent; border:none; cursor:pointer; text-decoration:underline; touch-action:manipulation; }
+  .cover-author a{ color:var(--ink-soft); text-decoration:none; border-bottom:1px dashed var(--accent-line); padding-bottom:1px; transition:all .15s ease; }
+  .cover-author a:hover, .cover-author a:active{ color:var(--accent); border-color:var(--accent); }
+  /* 封面作者列（改為開啟彈窗） */
+  .author-link{ font:inherit; color:var(--ink-soft); background:none; border:none; border-bottom:1px dashed var(--accent-line); padding:0 0 1px; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
+  .author-link:hover, .author-link:active{ color:var(--accent); border-color:var(--accent); }
+  /* 彈窗項目（作者主頁 / 停用項） */
+  .author-item, .donate-item{ display:flex; align-items:center; justify-content:center; gap:9px; font-family:var(--font-body); font-weight:700; font-size:15.5px; padding:13px 18px; border-radius:14px; text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink); }
+  .author-item:hover, .author-item:active{ border-color:var(--accent); background:var(--accent-soft); }
+  .author-item .ai-ico{ display:inline-flex; align-items:center; }
+  .donate-item.disabled{ color:var(--ink-soft); background:var(--panel); border-style:dashed; opacity:0.6; cursor:not-allowed; }
+  /* 街口支付 QR 卡（整張可點） */
+  .jkopay-card{ display:block; text-decoration:none; border:1px solid var(--panel-border); border-radius:16px; overflow:hidden; background:#fff; cursor:pointer; transition:all .15s ease; }
+  .jkopay-card:hover, .jkopay-card:active{ border-color:var(--accent); box-shadow:0 6px 18px rgba(51,65,92,0.14); transform:translateY(-1px); }
+  .jkopay-card img{ display:block; width:100%; max-width:270px; margin:14px auto 6px; }
+  .jkopay-label{ display:block; font-family:var(--font-body); font-weight:700; font-size:15px; color:var(--panel); background:var(--accent); padding:11px; text-align:center; }
+  /* 可複製街口帳號 */
+  .jkopay-acct{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:14px; color:var(--ink-soft); margin:10px 0 2px; }
+  .jkopay-acct b{ color:var(--ink); font-family:var(--font-mono); letter-spacing:0.03em; }
+  .copy-btn{ font-family:var(--font-body); font-size:13px; font-weight:700; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:999px; padding:3px 12px; cursor:pointer; touch-action:manipulation; }
+  .copy-btn:hover, .copy-btn:active{ background:var(--accent); color:var(--panel); }
+  /* 付款說明、表單連結 */
+  .pay-note{ font-size:14px; color:var(--ink); line-height:1.8; margin:10px 2px 6px; text-align:center; }
+  .pay-note b{ color:var(--ink); }
+  .form-link{ display:block; font-size:14px; font-weight:700; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:12px; padding:11px 12px; text-align:center; text-decoration:none; margin-top:4px; }
+  .form-link:hover, .form-link:active{ background:var(--accent); color:var(--panel); }
+  /* 銀行轉帳 */
+  .bank-row{ display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 14px; font-size:15.5px; }
+  .bank-row .bk{ font-size:13px; color:var(--ink-soft); flex-shrink:0; width:34px; text-align:left; }
+  .bank-row b{ flex:1; font-family:var(--font-mono); letter-spacing:0.02em; text-align:left; }
+  /* 贊助者名單 */
+  .sponsor-list{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; padding:14px 10px; border:1px dashed var(--panel-border); border-radius:12px; }
+  .sponsor-list span{ font-size:15px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:999px; padding:7px 14px; }
+  @media (max-width:480px){ .cover-title{ font-size:34px; } .cover-clef{ font-size:76px; } .cover-msg{ font-size:15px; padding:18px 18px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- 封面頁 -->
+  <div id="pageCover" class="page-view active">
+    <div class="cover">
+      <div class="cover-notes" aria-hidden="true">
+        <span class="cover-note" style="top:8%; left:9%; font-size:72px;">♪</span>
+        <span class="cover-note" style="top:18%; right:11%; font-size:56px;">♫</span>
+        <span class="cover-note" style="top:52%; left:6%; font-size:48px;">♩</span>
+        <span class="cover-note" style="bottom:14%; left:16%; font-size:64px;">𝄞</span>
+        <span class="cover-note" style="bottom:9%; right:14%; font-size:50px;">♬</span>
+        <span class="cover-note" style="top:40%; right:8%; font-size:40px;">♪</span>
+      </div>
+      <div class="cover-card">
+        <div class="cover-clef">𝄞</div>
+        <h1 class="cover-title">音樂聽力練習</h1>
+        <div class="cover-sub">Ear Training</div>
+        <p class="cover-msg">這個工具永久免費，你可以自由使用，<br>也歡迎推薦給同學和老師。<br>如果它對你的教學或練習有幫助，<br>歡迎小額贊助支持後續開發與維護。</p>
+        <button class="cover-start" onclick="showMenu()">開始練習 →</button>
+        <div class="cover-foot">為音樂班、音樂系的學生與老師而做 🎵</div>
+        <div class="cover-author"><button type="button" class="author-link" onclick="showAuthor()">作者：伍祐恆 Heng_Heng Wu ▸</button></div>
+        <div class="cover-donate-wrap"><button class="donate-btn" onclick="showDonate()">❤ 小額贊助</button></div>
+        <div class="cover-intro-wrap"><a class="intro-btn" href="https://youtu.be/fF4-J2NGAnw" target="_blank" rel="noopener">▶ 網站介紹與說明</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主目錄 -->
+  <div id="pageMenu" class="page-view">
+    <button class="cover-back-btn" onclick="showCover()">← 封面</button>
+    <div class="staff-header">
+      <div class="clef-mark">𝄞</div>
+      <div class="staff-line"></div><div class="staff-line"></div><div class="staff-line"></div>
+      <div class="staff-line"></div><div class="staff-line"></div>
+    </div>
+
+    <h1>音樂聽力練習</h1>
+    <p class="subtitle">歡迎使用聽力訓練系統，請從下方目錄選擇今天要練習的項目：</p>
+    <p class="intro-line">首次使用？<a href="https://youtu.be/fF4-J2NGAnw" target="_blank" rel="noopener">▶ 先看介紹短片</a></p>
+
+    <div class="menu-grid">
+      <a href="interval-trainer.html" class="menu-card active-feature">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">01</div>
+          <h3 class="menu-card-title">音程練習</h3>
+          <p class="menu-card-desc">聽辨兩音之間的音程性質，涵蓋協和／不協和與超過八度的複音程，可單題或連續聽寫。</p>
+        </div>
+      </a>
+
+      <a href="chord-trainer.html" class="menu-card active-feature">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">02</div>
+          <h3 class="menu-card-title">和絃辨認</h3>
+          <p class="menu-card-desc">聽辨三和絃、七和絃到九和絃的性質與轉位，支援單題作答與整段連續聽寫。</p>
+        </div>
+      </a>
+
+      <a href="rhythm-trainer.html" class="menu-card active-feature">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">03</div>
+          <h3 class="menu-card-title">節奏練習</h3>
+          <p class="menu-card-desc">聽寫單／複拍子的常見節奏型，含預備拍與雙音顆粒訓練，逐格填出節奏。</p>
+        </div>
+      </a>
+
+      <a href="melody-trainer.html" class="menu-card active-feature">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">04</div>
+          <h3 class="menu-card-title">單旋律曲調</h3>
+          <p class="menu-card-desc">聽寫單旋律的節奏與音高，以臨時記號作答，鍛鍊樂句記憶與音感。</p>
+        </div>
+      </a>
+
+      <a href="two-part-trainer.html" class="menu-card active-feature">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">05</div>
+          <h3 class="menu-card-title">兩聲部曲調</h3>
+          <p class="menu-card-desc">大譜表雙軌聽寫，可分聲部聆聽，同時寫出高、低兩聲部的節奏與音高。</p>
+        </div>
+      </a>
+
+      <a href="four-part-trainer.html" class="menu-card active-feature">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">06</div>
+          <h3 class="menu-card-title">四部和聲進行</h3>
+          <p class="menu-card-desc">聽辨古典四部和聲，判斷調性、寫出低音線條與功能級數、轉位。</p>
+        </div>
+      </a>
+
+      <!-- 模擬測驗（全寬、置於贊助卡上方） -->
+      <a href="exam.html" class="menu-card active-feature" style="grid-column:1 / -1; border-color:var(--accent-line);">
+        <span class="menu-badge badge-ready" id="examCardBadge" style="display:none;"></span>
+        <div>
+          <div class="menu-card-num">★ 模擬測驗</div>
+          <h3 class="menu-card-title">📝 模擬測驗</h3>
+          <p class="menu-card-desc">六大項綜合、滿分 100 分的模擬考卷，一次交卷計分，並記錄長期進步曲線。<span id="examCardStat"></span></p>
+        </div>
+      </a>
+
+      <!-- 歡迎小額贊助（全寬、較矮） -->
+      <div class="menu-card donate-card" onclick="showDonate()">
+        <div>
+          <h3 class="menu-card-title">❤ 歡迎小額贊助</h3>
+          <p class="menu-card-desc">這個工具永久免費。如果它對你的教學或練習有幫助，歡迎小額贊助支持後續開發與維護。</p>
+        </div>
+      </div>
+
+      <!-- 整合錯題本入口 -->
+      <div class="menu-card review-hub-card" onclick="showHub()">
+        <span class="menu-badge badge-review" id="hubBadge">0 題</span>
+        <div>
+          <div class="menu-card-num">★ 錯題本</div>
+          <h3 class="menu-card-title">錯題本總覽</h3>
+          <p class="menu-card-desc">整合所有練習答錯的題目，一次檢視各項目的錯題數量與最近紀錄，並可跳回該練習複習。</p>
+        </div>
+      </div>
+    </div>
+    <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
+  </div>
+
+  <!-- 錯題本總覽 -->
+  <div id="pageHub" class="page-view">
+    <button class="nav-back-btn" onclick="showMenu()">← 回選單</button>
+    <h1>錯題本總覽</h1>
+    <p class="subtitle">這裡整合六項練習累積的錯題（儲存在本機瀏覽器）。點「跳回複習」會直接開啟該練習的錯題本。</p>
+    <div class="hub-total" id="hubTotal"></div>
+    <div id="hubGroups"></div>
+  </div>
+</div>
+
+<!-- 前往贊助彈窗（Portaly 尚未開放 / 街口支付 / 作者主頁入口） -->
+<div class="donate-modal" id="donateModal" onclick="if(event.target===this) closeDonate()">
+  <div class="donate-box">
+    <div class="dico">❤</div>
+    <h3>支持這個工具</h3>
+    <p>這個工具永久免費。你的支持會用於後續的開發與維護，感謝你 🙏</p>
+    <!-- 管道清單（日後要加新管道，在這裡多一顆按鈕即可） -->
+    <div class="donate-links" id="donateChannels">
+      <!-- Portaly 贊助頁審核中：通過後移除 disabled、改成 <a class="author-item" href="專屬贊助連結" target="_blank" rel="noopener"> -->
+      <span class="donate-item disabled">❤ Portaly 小額贊助（尚未開放）</span>
+      <button type="button" class="author-item" onclick="showPanel('Jko')"><span class="ai-ico">📱</span> 街口支付贊助</button>
+      <button type="button" class="author-item" onclick="showPanel('Bank')"><span class="ai-ico">🏦</span> 銀行轉帳贊助</button>
+      <button type="button" class="author-item" id="sponsorEntryBtn" style="display:none;" onclick="showPanel('Sponsors')"><span class="ai-ico">💛</span> 贊助者名單</button>
+    </div>
+
+    <!-- 街口支付明細（點上面按鈕才展開） -->
+    <div class="donate-links" id="donateJko" style="display:none;">
+      <a class="jkopay-card" href="https://service.jkopay.com/r/transfer?j=Transfer:902103863" target="_blank" rel="noopener">
+        <img src="jkopay-qr.png" alt="街口支付 QR 碼，Heng-Heng Music，帳號 902103863">
+        <span class="jkopay-label">開啟街口支付</span>
+      </a>
+      <div class="jkopay-acct">街口帳號 <b>902103863</b><button class="copy-btn" type="button" onclick="copyText(event,'902103863')">複製</button></div>
+      <p class="pay-note">此 QR 為 <b>TWQR 共通碼</b>，可用街口支付，或<b>任一家銀行的網銀 App</b> 掃描付款。</p>
+      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">📝 贊助完成後，歡迎填寫表單讓我知道 🙏</a>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+
+    <!-- 銀行轉帳明細 -->
+    <div class="donate-links" id="donateBank" style="display:none;">
+      <div class="bank-row"><span class="bk">銀行</span><b>中國信託（822）</b><button class="copy-btn" type="button" onclick="copyText(event,'822')">複製代號</button></div>
+      <div class="bank-row"><span class="bk">帳號</span><b>163540424795</b><button class="copy-btn" type="button" onclick="copyText(event,'163540424795')">複製</button></div>
+      <div class="bank-row"><span class="bk">戶名</span><b>伍○恆</b></div>
+      <p class="pay-note">轉帳僅需銀行代號與帳號；戶名供核對用。</p>
+      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">📝 贊助完成後，歡迎填寫表單讓我知道 🙏</a>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+
+    <!-- 贊助者名單（名單有人時才會出現入口） -->
+    <div class="donate-links" id="donateSponsors" style="display:none;">
+      <div id="sponsorList" class="sponsor-list"></div>
+      <p class="pay-note">每一位同意公開的贊助者，都會列在贊助者名單中，感謝你的支持 🙏</p>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+    <button type="button" class="author-item" style="width:100%; margin-bottom:12px;" onclick="closeDonate(); showAuthor();"><span class="ai-ico">🔗</span> 作者主頁</button>
+    <button class="donate-dismiss" onclick="closeDonate()">關閉</button>
+  </div>
+</div>
+
+<!-- 作者主頁彈窗（Portaly 主頁 / YouTube 頻道，可擴充） -->
+<div class="donate-modal" id="authorModal" onclick="if(event.target===this) closeAuthor()">
+  <div class="donate-box">
+    <div class="dico">🎼</div>
+    <h3>作者主頁</h3>
+    <p>伍祐恆 Heng_Heng Wu</p>
+    <div class="donate-links">
+      <a class="author-item" href="https://portaly.cc/heng-heng.music" target="_blank" rel="noopener"><span class="ai-ico">🔗</span> Portaly 主頁</a>
+      <a class="author-item" href="https://www.youtube.com/@HengHengWu" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#FF0000" d="M23 7.6a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.5A3 3 0 0 0 1 7.6 31.3 31.3 0 0 0 .5 12 31.3 31.3 0 0 0 1 16.4a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 23.5 12 31.3 31.3 0 0 0 23 7.6z"/><path fill="#fff" d="M9.75 15.5l6-3.5-6-3.5z"/></svg></span> YouTube 頻道</a>
+    </div>
+    <button class="donate-dismiss" onclick="closeAuthor()">關閉</button>
+  </div>
+</div>
+
+<script>
+/* 從練習頁返回時帶 #menu：直接顯示選單、跳過封面（封面只在首次啟動出現）。此段趁早執行，避免閃到封面。 */
+if (location.hash === '#menu') {
+  var _c = document.getElementById('pageCover'); var _m = document.getElementById('pageMenu');
+  if (_c) _c.classList.remove('active'); if (_m) _m.classList.add('active');
+}
+</script>
+<script src="exam-common.js"></script>
+<script>
+/* ===== 統一錯題本儲存（與各練習頁共用同一組 localStorage key） ===== */
+window.REVIEW_STORE = {
+  PREFIX: 'earTrainer.review.',
+  TYPES: ['interval','chord','rhythm','melody','twopart','fourpart'],
+  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行' },
+  TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html' },
+  load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
+  clear(type){ try { localStorage.setItem(this.PREFIX+type, '[]'); } catch(e){} },
+  count(type){ return this.load(type).length; },
+  total(){ return this.TYPES.reduce((a,t)=>a+this.count(t), 0); }
+};
+
+function fmtTime(ts){
+  if(!ts) return '';
+  try{
+    const d = new Date(ts); const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    const hh = String(d.getHours()).padStart(2,'0'); const mm = String(d.getMinutes()).padStart(2,'0');
+    if(sameDay) return `今天 ${hh}:${mm}`;
+    return `${d.getMonth()+1}/${d.getDate()} ${hh}:${mm}`;
+  }catch(e){ return ''; }
+}
+
+function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function showPageId(id){
+  document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function showMenu(){ showPageId('pageMenu'); updateHubBadge(); }
+function showHub(){ renderHub(); showPageId('pageHub'); }
+function showCover(){ showPageId('pageCover'); }
+/* ===================================================================
+ *  贊助者名單：要新增名字，複製下面一行、改成對方希望顯示的名稱即可。
+ *  （名單為空時，贊助彈窗不會出現「贊助者名單」按鈕）
+ *  例：  { name: '王小明' },
+ * =================================================================== */
+var SPONSORS = [
+  { name: 'Chu' },
+  { name: '葉○佳' },
+  // { name: '王小明' },   ← 要新增就複製這一行、拿掉前面的「//」、把名字改掉
+];
+
+/* 贊助彈窗的分頁切換：'' = 管道清單、'Jko' = 街口、'Bank' = 銀行、'Sponsors' = 名單 */
+function showPanel(which){
+  var ids = ['Jko','Bank','Sponsors'];
+  var ch = document.getElementById('donateChannels');
+  if(ch) ch.style.display = which ? 'none' : 'flex';
+  ids.forEach(function(k){
+    var el = document.getElementById('donate'+k);
+    if(el) el.style.display = (which === k) ? 'flex' : 'none';
+  });
+  if(which === 'Sponsors') renderSponsors();
+}
+function renderSponsors(){
+  var box = document.getElementById('sponsorList'); if(!box) return;
+  box.innerHTML = SPONSORS.map(function(s){ return '<span>'+escapeHtml(s.name)+'</span>'; }).join('');
+}
+function showDonate(){ showPanel(''); var m=document.getElementById('donateModal'); if(m) m.classList.add('open'); }
+function closeDonate(){ var m=document.getElementById('donateModal'); if(m) m.classList.remove('open'); }
+function showAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.add('open'); }
+function closeAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.remove('open'); }
+function _fallbackCopy(t){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){} }
+function copyText(e, text){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  var num=text; var btn = e && e.target;
+  function done(){ if(btn){ var t=btn.textContent; btn.textContent='已複製'; setTimeout(function(){ btn.textContent=t; }, 1400); } }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(num).then(done, function(){ _fallbackCopy(num); done(); }); }
+    else { _fallbackCopy(num); done(); }
+  }catch(_){ _fallbackCopy(num); done(); }
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDonate(); closeAuthor(); } });
+/* 贊助者名單：有人才顯示入口按鈕 */
+(function(){
+  try{
+    var b = document.getElementById('sponsorEntryBtn');
+    if(b && window.SPONSORS && SPONSORS.length) b.style.display = '';
+  }catch(e){}
+})();
+
+/* 模擬測驗卡片：顯示最佳／最近得分率 */
+(function(){
+  try{
+    if(!window.EXAM) return;
+    var st = window.EXAM.historyStats('standard'); if(!st) return;
+    var stat = document.getElementById('examCardStat'); if(stat) stat.textContent = ' ｜ 最近 '+st.last+'%';
+    var b = document.getElementById('examCardBadge'); if(b){ b.textContent = '最佳 '+st.best+'%'; b.style.display=''; }
+  }catch(e){}
+})();
+
+function updateHubBadge(){
+  const el = document.getElementById('hubBadge');
+  if(el) el.textContent = window.REVIEW_STORE.total() + ' 題';
+}
+
+function renderHub(){
+  const S = window.REVIEW_STORE;
+  document.getElementById('hubTotal').textContent = `目前共收錄 ${S.total()} 題錯題`;
+  const wrap = document.getElementById('hubGroups'); wrap.innerHTML = '';
+
+  S.TYPES.forEach(type => {
+    const items = S.load(type);
+    const group = document.createElement('div'); group.className = 'hub-group';
+    const head = document.createElement('div'); head.className = 'hub-group-head';
+
+    const titleWrap = document.createElement('div');
+    titleWrap.innerHTML = `<span class="hub-group-title">${S.TYPE_LABEL[type]}</span> <span class="hub-count ${items.length===0?'zero':''}">${items.length} 題</span>`;
+
+    const btnWrap = document.createElement('div');
+    const jump = document.createElement('a'); jump.className = 'hub-jump';
+    jump.href = S.TYPE_PAGE[type] + '#review'; jump.textContent = '跳回複習 →';
+    btnWrap.appendChild(jump);
+    if(items.length > 0){
+      const clr = document.createElement('button'); clr.className = 'hub-clear-all'; clr.textContent = '清空';
+      clr.onclick = () => { if(window.confirm(`確定要清空「${S.TYPE_LABEL[type]}」的錯題本嗎？`)){ S.clear(type); renderHub(); updateHubBadge(); } };
+      btnWrap.appendChild(clr);
+    }
+
+    head.appendChild(titleWrap); head.appendChild(btnWrap); group.appendChild(head);
+
+    if(items.length === 0){
+      const e = document.createElement('div'); e.className = 'hub-empty'; e.textContent = '尚未收錄錯題 🎵';
+      group.appendChild(e);
+    } else {
+      const recent = items.slice().reverse().slice(0, 5);
+      recent.forEach(it => {
+        const row = document.createElement('div'); row.className = 'hub-item';
+        let qa;
+        if(it.yourText){
+          qa = `你的答案：<span class="wrong-ans">${escapeHtml(it.yourText)}</span>　正解：<span class="right-ans">${escapeHtml(it.correctText || '')}</span>`;
+        } else {
+          qa = `${escapeHtml(it.label || it.correctText || '一題錯題')}`;
+        }
+        row.innerHTML = `<span class="qa">${qa}</span><span class="qtime">${fmtTime(it.ts)}</span>`;
+        group.appendChild(row);
+      });
+      if(items.length > recent.length){
+        const more = document.createElement('div'); more.className = 'hub-more';
+        more.textContent = `⋯ 還有 ${items.length - recent.length} 題，點「跳回複習」查看完整譜例與重播`;
+        group.appendChild(more);
+      }
+    }
+    wrap.appendChild(group);
+  });
+}
+
+updateHubBadge();
+
+// PWA Service Worker 註冊與自動更新邏輯
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) { refreshing = true; window.location.reload(); }
+    });
+  });
+}
+</script>
+<script>
+/* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */
+(function(){
+  function setPlayback(){ try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} }
+  setPlayback();
+  var SILENT="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+  var done=false;
+  function unlock(){ if(done) return; done=true; setPlayback();
+    try{ var a=new Audio(SILENT); a.setAttribute("playsinline",""); a.volume=0.02; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){}
+    document.removeEventListener("touchend",unlock,true); document.removeEventListener("click",unlock,true);
+  }
+  document.addEventListener("touchend",unlock,true);
+  document.addEventListener("click",unlock,true);
+})();
+</script>
+</body>
+</html>

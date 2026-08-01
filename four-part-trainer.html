@@ -1,0 +1,2775 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>四部和聲進行 - 音樂聽力練習</title>
+<!-- 可編輯工作檔（自 v30 的成品轉出，已含歷來所有修正）；自此不再使用打包補丁 -->
+
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="聽力訓練">
+<meta name="theme-color" content="#33415c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
+<script src="soundfont-player.min.js"></script>
+<script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
+<script src="vexflow-min.js"></script>
+<script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
+<style>
+  :root{
+    --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
+    --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
+    --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --correct-soft: rgba(75,122,91,0.10);
+    --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* 觸控裝置（iPhone 加入主畫面當 App）操作優化：
+     - 按鈕類元素禁止雙擊縮放、長按選取、callout 選單，點擊即時響應 */
+  button, .p-btn, .kb-btn, .action-btn, .play-btn, .tab-btn, .mode-btn, .inv-btn,
+  .note-btn, .acc-btn, .oct-btn, .nav-back-btn, .reset-cache-btn, .hitbox-top, .hitbox-bot, .chord-slot {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none; -moz-user-select: none; user-select: none;
+  }
+  /* 橫向捲動區維持 iOS 慣性捲動，並限定只能水平捲動不干擾頁面垂直捲動 */
+  .staff-scroll-container, .review-staff { touch-action: pan-x; -webkit-overflow-scrolling: touch; }
+  body{ margin:0; background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height:100vh; padding: 20px 16px 64px; }
+  /* 作答頁啟用時：body 不捲動、無多餘 padding，讓作答頁精準滿版 */
+  body.practice-locked{ height:100dvh; height:calc(var(--app-vh,1vh)*100); overflow:hidden; padding:0 8px; min-height:0; }
+  body.practice-locked .wrap{ height:100%; }
+  .wrap{ max-width: 820px; margin: 0 auto; display:flex; flex-direction:column; height:100%; }
+  .page-view { display: none; animation: fadeIn 0.22s ease-out; }
+  .page-view.active { display: block; }
+  /* 作答頁：鎖定為一個視窗高度、整頁不捲動。譜例區固定（不滑、不佔多餘空間），鍵盤區吸收剩餘空間並可內部捲動 */
+  .page-view.fpt-practice-layout.active {
+    display: flex; flex-direction: column;
+    height: 100dvh; height: calc(var(--app-vh, 1vh) * 100);
+    max-height: 100dvh; max-height: calc(var(--app-vh, 1vh) * 100);
+    overflow: hidden; padding-top: 8px;
+  }
+  .fpt-staff-area { flex: 0 1 auto; min-height: 0; max-height: 40dvh; max-height: calc(var(--app-vh, 1vh) * 40); display: flex; flex-direction: column; overflow: hidden; }
+  .fpt-staff-area .staff-scroll-container { flex: 0 1 auto; overflow-y: hidden; padding-top: 4px; margin-bottom: 4px; min-height: 0; }
+  .fpt-keyboard-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+  /* 播放按鈕吸附在鍵盤區最上緣：隨時可見可按、跨裝置一致、不受上層譜例高度影響 */
+  .fpt-play-sticky { position: sticky; top: 0; z-index: 20; background: var(--paper, #efeee6); padding: 6px 0 8px 0; margin-bottom: 4px; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .nav-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .nav-back-btn, .reset-cache-btn {
+    display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-body);
+    font-size: 13.5px; font-weight: 600; color: var(--ink); background: var(--panel);
+    border: 1px solid var(--panel-border); padding: 10px 18px; border-radius: 999px;
+    cursor: pointer; text-decoration: none; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(38,36,32,0.04);
+  }
+  .nav-back-btn:hover, .nav-back-btn:active { border-color: var(--accent); background: var(--accent); color: var(--panel); }
+  .reset-cache-btn { color: #8a6d20; border-color: #ffd885; background: #fff8e6; font-size:12px; padding: 8px 14px; }
+
+  h1{ font-family: var(--font-display); font-weight: 600; font-size: 28px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .subtitle{ color: var(--ink-soft); font-size: 13.5px; margin: 0 0 22px; line-height: 1.6; }
+
+  .switch-row{ display:flex; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .switch-group{ display:flex; flex-direction: column; gap: 8px; }
+  .switch-group-label{ font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); letter-spacing: 0.04em; font-weight: 700; }
+  .switch-btns{ display:flex; gap: 8px; flex-wrap: wrap; }
+  .mode-btn{ font-family: var(--font-body); font-size: 13px; font-weight: 600; padding: 9px 15px; border-radius: 10px; background: transparent; border: 1px solid var(--panel-border); color: var(--ink-soft); cursor:pointer; transition: all 0.15s ease; }
+  .mode-btn:hover{ border-color: var(--accent-line); color: var(--ink); }
+  .mode-btn.active{ background: var(--ink); border-color: var(--ink); color: var(--panel); }
+  .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); color: var(--ink); cursor: pointer; }
+  .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
+
+  .level-tabs{ display:flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .level-tab{ font-family: var(--font-body); font-size: 13px; font-weight: 600; padding: 9px 15px; background: transparent; border: 1px solid var(--panel-border); color: var(--ink-soft); border-radius: 999px; cursor:pointer; transition: all 0.15s ease; }
+  .level-tab:hover{ border-color: var(--accent-line); color: var(--ink); }
+  .level-tab.active{ background: var(--accent); border-color: var(--accent); color: var(--panel); }
+
+  .start-big-btn {
+    width: 100%; font-family: var(--font-body); font-weight: 700; font-size: 16px; padding: 16px;
+    border-radius: var(--radius); background: var(--accent); color: var(--panel); border: none;
+    cursor: pointer; transition: all 0.15s ease; box-shadow: 0 6px 20px rgba(51,65,92,0.25); margin-top: 12px;
+  }
+  .start-big-btn:hover, .start-big-btn:active { filter: brightness(1.12); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(51,65,92,0.35); }
+
+  /* 作答與樂譜區 */
+  .practice-top-fixed { background: var(--paper); z-index: 10; border-bottom: 1px solid var(--panel-border); padding-bottom: 16px; margin-bottom: 16px; }
+  /* 作答鎖定模式：譜例區更緊湊，盡量不佔空間、完整顯示，剩餘空間全給鍵盤 */
+  body.practice-locked .practice-top-fixed { padding-bottom: 6px; margin-bottom: 6px; }
+  body.practice-locked .top-bar-practice { margin-bottom: 6px; }
+  body.practice-locked .fpt-staff-area .staff-scroll-container { margin-bottom: 0; }
+  .top-bar-practice { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .practice-status-badge { font-family: var(--font-mono); font-size: 12px; background: var(--panel); border: 1px solid var(--panel-border); padding: 6px 12px; border-radius: 999px; color: var(--ink-soft); }
+  .score-box{ font-family: var(--font-mono); text-align:right; font-size: 18px; font-weight:700; color: var(--accent); }
+
+  .staff-scroll-container { width: 100%; background: #fff; border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 4px 0 4px; box-shadow: inset 0 0 8px rgba(0,0,0,0.02); margin-bottom: 12px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+  .staff-scroll-container::-webkit-scrollbar { height: 6px; }
+  .staff-scroll-container::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
+
+  .unified-action-row { display: flex; gap: 12px; justify-content: center; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .fpt-staff-area .unified-action-row .play-btn { padding: 9px 16px; font-size: 13.5px; box-shadow: 0 2px 8px rgba(51,65,92,0.18); }
+  /* 吸附列的播放按鈕：與「編輯低音/級數」分頁按鈕同大小同字體，改用圓角長方形，更省空間 */
+  .fpt-play-sticky .play-btn { font-size: 13px; font-weight: 700; padding: 8px 22px; border-radius: 10px; box-shadow: none; }
+  .fpt-play-sticky .play-btn:disabled { box-shadow: none; }
+  .action-btn, .play-btn { font-size: 14px; font-weight: 600; padding: 12px 20px; border-radius: 999px; cursor: pointer; transition: all 0.2s; border: none; }
+  .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
+  .play-btn { background: var(--accent); color: var(--panel); box-shadow: 0 4px 12px rgba(51,65,92,0.2); }
+  .play-btn:disabled, .action-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+  .play-caption { font-size: 13px; color: var(--ink-soft); font-weight: 600; text-align: center; }
+
+  /* 雙軌作答分頁 */
+  .editor-tabs-container { display: flex; justify-content: center; align-items: center; margin-bottom: 14px; }
+  .editor-tabs { display: inline-flex; background: var(--paper); border: 1px solid var(--panel-border); border-radius: 999px; padding: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+  .tab-btn { font-size: 13px; font-weight: 700; padding: 8px 22px; border-radius: 999px; border: none; background: transparent; color: var(--ink-soft); cursor: pointer; transition: all 0.15s; }
+  .tab-btn.active { background: var(--accent); color: var(--panel); box-shadow: 0 2px 8px rgba(51,65,92,0.25); }
+
+  /* 視覺焦點框 */
+  .active-note-box { position: absolute; border: 2px solid var(--accent); background: var(--accent-soft); border-radius: 8px; pointer-events: none; z-index: 1; transition: all 0.15s ease; }
+  .chord-slot {
+    background: var(--panel); border: 2px dashed var(--panel-border); border-radius: 8px; padding: 4px;
+    text-align: center; transition: all 0.1s; display:flex; flex-direction:column; justify-content:center; align-items:center;
+  }
+  .chord-slot.active-slot { border-style: solid; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft); transform: translateY(-2px); z-index: 5; }
+  .chord-slot.correct { border-style: solid; border-color: var(--correct); background: var(--correct-soft); }
+  .chord-slot.wrong { border-style: solid; border-color: var(--wrong); background: var(--wrong-soft); }
+  .slot-bar-num { font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft); margin-bottom: 4px; }
+  .slot-value { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--ink); min-height: 20px; }
+  
+  /* 全直行感應區 (上五線譜、下作答格) */
+  .hitbox-top { position: absolute; top: 0; height: 230px; cursor: pointer; z-index: 10; pointer-events: auto; }
+  .hitbox-top:hover { background: rgba(51,65,92,0.03); }
+  .hitbox-bot { position: absolute; top: 235px; height: 75px; cursor: pointer; z-index: 10; pointer-events: auto; }
+
+  /* 模組化作答鍵盤 */
+  .keyboard-panel { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+  .kb-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .kb-row:last-child { margin-bottom: 0; }
+  .kb-btn {
+    font-family: var(--font-body); font-size: 14px; font-weight: 700; padding: 10px 12px; border-radius: 8px;
+    background: #fff; border: 1px solid var(--panel-border); color: var(--ink); cursor: pointer; transition: all 0.1s; min-width: 44px; text-align: center;
+  }
+  .kb-btn:active { transform: scale(0.95); border-color: var(--accent); }
+  .kb-btn.active-toggle { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  .kb-btn.action-kb { background: var(--paper); color: var(--ink-soft); font-size: 12px; }
+
+  /* 音高鍵盤 (低音用) */
+  .pitch-keypad { display: flex; flex-direction: column; gap: 8px; max-width: 500px; margin: 0 auto; }
+  .pitch-row-acc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pitch-row-notes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pitch-row-oct { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .p-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; font-weight: 700; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); transition: 0.1s; }
+  .p-btn:active { transform: scale(0.95); border-color: var(--accent); }
+  .p-btn.acc-btn { height: 38px; font-size: 16px; background: var(--panel); }
+  .p-btn.acc-btn.active { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  .p-btn.note-btn { height: 50px; font-size: 18px; }
+  .p-btn.note-btn span { font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-top: 2px; }
+  .p-btn.oct-btn { height: 42px; font-size: 13px; background: var(--panel); }
+
+  .feedback-text { text-align: center; font-size: 15px; font-weight: 700; margin: 8px 0; display: none; }
+  .feedback-text.correct { color: var(--correct); display: block; }
+  .feedback-text.wrong { color: var(--wrong); display: block; }
+  .feedback-text.partial { color: #d97706; display: block; }
+
+  /* 訂正區 */
+  .review-section { padding: 16px 0; border-top: 1px dashed var(--panel-border); margin-top: 16px; display: none; }
+  .review-section h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 12px; }
+  .review-item { background: #fff; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .review-label { font-size: 12px; font-weight: bold; color: var(--ink-soft); margin-bottom: 4px; }
+  .review-staff { background: var(--panel); border-radius: 8px; padding: 10px 4px; margin-bottom: 12px; border: 1px solid var(--hairline); width: 100%; overflow-x: auto; overflow-y: hidden; }
+
+  .loading-banner { text-align: center; font-size: 12px; color: var(--ink-soft); background: #fff; padding: 8px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--panel-border); }
+  /* 提示字沒有內容時不佔空間 */
+  .play-caption:empty { display: none; }
+
+  /* ===== 電腦版（螢幕寬 ≥1024px）：不鎖視窗高度，改為正常捲動，版面更寬鬆 ===== */
+  @media (min-width: 1024px) {
+    body.practice-locked { height: auto; min-height: 100vh; overflow: visible; padding: 0 16px; }
+    body.practice-locked .wrap { height: auto; }
+    #pageFptPractice.fpt-practice-layout { height: auto; max-height: none; }
+    .fpt-staff-area { max-height: none; }
+    .fpt-staff-area .staff-scroll-container { overflow-y: visible; }
+    .fpt-keyboard-area { overflow-y: visible; }
+    .fpt-play-sticky { position: static; }
+    body.practice-locked .practice-top-fixed { padding-bottom: 16px; margin-bottom: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="loading-banner" id="loadingBanner">🎹 正在載入高音質鋼琴音色，請稍候…</div>
+
+  <!-- 【設定頁】 -->
+  <div id="pageFptSettings" class="page-view active">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <button class="reset-cache-btn" onclick="forceResetCache()">🔄 重置快取</button>
+    </div>
+    
+    <h1>四部和聲進行 — 設定</h1>
+    <p class="subtitle">挑戰最極致的大譜表對位聽覺！全音符 4/4 拍記譜，訓練對低音線條、古典功能級數與轉位的敏銳度。</p>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">練習模式</div>
+        <div class="switch-btns" id="fpt-modeSwitch">
+          <button class="mode-btn active" data-mode="practice">練習模式 (無限聆聽)</button>
+          <button class="mode-btn" data-mode="test">測驗模式 (限制次數)</button>
+        </div>
+      </div>
+      <div class="switch-group">
+        <div class="switch-group-label">調性選項</div>
+        <div class="switch-btns" id="fpt-keySwitch">
+          <button class="mode-btn active" data-key="mix">隨機 (24 大小調)</button>
+          <button class="mode-btn" data-key="major">僅大調</button>
+          <button class="mode-btn" data-key="minor">僅小調</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="switch-row" style="align-items:center;">
+      <div class="switch-group">
+        <div class="switch-group-label">小節數 (Bars)</div>
+        <select id="fpt-barsSelect" class="select-box">
+          <option value="6">6 小節</option>
+          <option value="8">8 小節</option>
+          <option value="10" selected>10 小節 (標準)</option>
+          <option value="12">12 小節 (長樂句)</option>
+        </select>
+      </div>
+      <div class="switch-group" id="testReplayWrapper" style="display:none;">
+        <div class="switch-group-label">測驗重播次數</div>
+        <select id="fpt-testReplaySelect" class="select-box">
+          <option value="2">2 次</option>
+          <option value="3" selected>3 次</option>
+          <option value="5">5 次</option>
+        </select>
+      </div>
+      <div class="switch-group" style="flex:1;">
+        <div class="switch-group-label">播放速度: <span id="bpmVal">64</span> BPM</div>
+        <input type="range" id="fpt-bpm" class="bpm-slider" min="40" max="120" value="64" oninput="document.getElementById('bpmVal').innerText = this.value">
+      </div>
+    </div>
+
+    <div class="switch-group-label" style="margin-bottom: 8px;">難度選擇</div>
+    <div class="level-tabs" id="fpt-levelTabs"></div>
+
+    <button class="start-big-btn" id="fpt-enterBtn" disabled>🎯 開始四部和聲訓練 →</button>
+    <button class="action-btn" id="fpt-reviewEntryBtn" style="width:100%; margin-top:12px; padding:14px; border-radius:999px;" onclick="showPage('fpt-review')">📕 錯題本 (<span id="fpt-reviewCount">0</span> 題)</button>
+  </div>
+
+  <!-- 【錯題紀錄頁】 -->
+  <div id="pageFptReview" class="page-view">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <button class="reset-cache-btn" id="fpt-clearReviewBtn">🗑️ 清空錯題本</button>
+    </div>
+    <h1>錯題本</h1>
+    <p class="subtitle">這裡收錄你答錯的題目，可以重播聆聽、對照正解，反覆複習加強。</p>
+    <div class="review-section" id="fpt-reviewSection" style="display:block;">
+      <div id="fpt-reviewList"></div>
+      <p id="fpt-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
+    </div>
+  </div>
+
+  <!-- 【作答與訓練頁】 -->
+  <div id="pageFptPractice" class="page-view fpt-practice-layout">
+    <div class="practice-top-fixed fpt-staff-area">
+      <div class="top-bar-practice">
+        <button class="nav-back-btn" style="margin:0;" onclick="showPage('fpt-settings')">← 返回設定頁</button>
+        <span class="practice-status-badge" id="fpt-statusBadge">Lv.1｜4小節｜大調｜64 BPM</span>
+        <div class="score-box" id="fpt-scoreNum">0/0</div>
+      </div>
+      
+      <!-- 樂譜與作答格容器 (作答階段只顯示低音譜表) -->
+      <div class="staff-scroll-container" id="staffContainerOuter" style="padding-bottom:2px;">
+        <div id="staffInnerWrapper" style="margin: 0 auto; display: block; position: relative; width: max-content; min-width: 100%; height: 178px;">
+          <div id="fpt-staff-svg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部作答分頁與鍵盤區（固定高度） -->
+    <div class="fpt-keyboard-area" style="padding: 0 4px;">
+      <!-- 播放按鈕：吸附在鍵盤區最上緣，隨時可見可按，不受上層譜例高度限制 -->
+      <div class="unified-action-row fpt-play-sticky">
+        <button class="play-btn" id="btn-play-all" disabled>🔊 完整四部 (SATB)</button>
+        <button class="play-btn" id="btn-play-arp" disabled>🎵 分解＋完整</button>
+        <button class="action-btn" id="tuningABtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+      </div>
+      <div class="editor-tabs-container">
+        <div class="editor-tabs">
+          <button class="tab-btn active" id="tab-bass" onclick="window.fptModule.switchTab('bass')">🎹 1. 編輯低音</button>
+          <button class="tab-btn" id="tab-chord" onclick="window.fptModule.switchTab('chord')">🔠 2. 編輯級數</button>
+        </div>
+      </div>
+      
+      <!-- 編輯低音專用面板 -->
+      <div class="keyboard-panel" id="panel-bass">
+        <div class="pitch-keypad">
+          <div class="pitch-row-acc">
+            <button class="p-btn acc-btn" id="acc-s" onclick="window.fptModule.handleKbInput('bass_acc', '#')">♯ 升</button>
+            <button class="p-btn acc-btn" id="acc-b" onclick="window.fptModule.handleKbInput('bass_acc', 'b')">♭ 降</button>
+            <button class="p-btn acc-btn" id="acc-n" onclick="window.fptModule.handleKbInput('bass_acc', 'n')">♮ 還原</button>
+            <button class="p-btn acc-btn active" id="acc-d" onclick="window.fptModule.handleKbInput('bass_acc', 'default')">復原<span style="font-size:11px;">回本調</span></button>
+          </div>
+          <div class="pitch-row-notes">
+            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('C')">C<span>Do</span></button>
+            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('D')">D<span>Re</span></button>
+            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('E')">E<span>Mi</span></button>
+            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('F')">F<span>Fa</span></button>
+            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('G')">G<span>Sol</span></button>
+            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('A')">A<span>La</span></button>
+            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('B')">B<span>Ti</span></button>
+            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('C_high')">C<span>高Do</span></button>
+          </div>
+          <div class="pitch-row-oct">
+            <button class="p-btn oct-btn" onclick="window.fptModule.handleKbInput('bass_oct', -1)">▼ 低八度 <span id="oct-label-low">(Oct 2)</span></button>
+            <button class="p-btn oct-btn" onclick="window.fptModule.handleKbInput('bass_oct', 1)">▲ 高八度 <span id="oct-label-high">(Oct 4)</span></button>
+          </div>
+          <div class="unified-action-row" style="margin-top:8px;">
+            <button class="action-btn" style="flex:1;" onclick="window.fptModule.handleKbInput('clearBass')">🗑️ 清空此格低音</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 編輯級數專用面板 -->
+      <div class="keyboard-panel" id="panel-chord" style="display:none;">
+        <div class="kb-row" id="kb-row-degrees">
+          <button class="kb-btn active-toggle" id="btn-case-switch">大寫 (A)</button>
+          <button class="kb-btn deg-btn" data-deg="1">I</button>
+          <button class="kb-btn deg-btn" data-deg="2">II</button>
+          <button class="kb-btn deg-btn" data-deg="3">III</button>
+          <button class="kb-btn deg-btn" data-deg="4">IV</button>
+          <button class="kb-btn deg-btn" data-deg="5">V</button>
+          <button class="kb-btn deg-btn" data-deg="6">VI</button>
+          <button class="kb-btn deg-btn" data-deg="7">VII</button>
+        </div>
+        <div class="kb-row" id="kb-row-inv">
+          <button class="kb-btn" id="btn-sev-switch" style="background:#f0eef9; border-color:#ccd;">7和絃 [關]</button>
+          <button class="kb-btn inv-btn" data-inv="">原位</button>
+          <button class="kb-btn inv-btn" id="inv-btn-1" data-inv="6">6</button>
+          <button class="kb-btn inv-btn" id="inv-btn-2" data-inv="64">64</button>
+          <button class="kb-btn inv-btn" id="inv-btn-3" data-inv="42" style="display:none;">42</button>
+        </div>
+        <!-- 變化和絃列：拿坡里六（Lv4 起）與增六三種（Lv5 起） -->
+        <div class="kb-row" id="kb-row-aug6" style="display:none;">
+          <button class="kb-btn deg-btn" id="btn-deg-N" style="display:none; background:#eef4f0; border-color:#bcd;" data-deg="N6">N6</button>
+          <button class="kb-btn aug6-btn" data-aug6="It6" style="background:#eef4f0; border-color:#bcd;">It+6</button>
+          <button class="kb-btn aug6-btn" data-aug6="Fr6" style="background:#eef4f0; border-color:#bcd;">Fr+6</button>
+          <button class="kb-btn aug6-btn" data-aug6="Ger6" style="background:#eef4f0; border-color:#bcd;">Ger+6</button>
+        </div>
+        <div class="kb-row">
+          <button class="kb-btn mod-btn" data-mod="°">° (減)</button>
+          <button class="kb-btn mod-btn" data-mod="ø">ø (半減)</button>
+          <button class="kb-btn mod-btn" data-mod="+">+ (增)</button>
+          <button class="kb-btn mod-btn" id="btn-slash" style="display:none;" data-mod="/">/ (副屬)</button>
+          <button class="kb-btn action-kb" id="kb-backspace">⌫ 退格</button>
+          <button class="kb-btn action-kb" id="kb-clear">🗑️ 清空此格</button>
+        </div>
+      </div>
+
+      <div class="unified-action-row" style="margin-bottom: 12px; margin-top: 8px;">
+        <button class="play-btn" id="fpt-submitBtn" style="flex:1; padding:14px; font-size:15px;">✔ 提交作答</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 【解答頁】 -->
+  <div id="pageFptAnswer" class="page-view">
+    <div class="top-bar-practice" style="margin-bottom:12px;">
+      <span class="practice-status-badge" id="fpt-answerBadge">解答</span>
+      <div class="score-box" id="fpt-scoreNumAns">0/0</div>
+    </div>
+
+    <div id="fpt-feedbackText" class="feedback-text"></div>
+
+    <div class="unified-action-row" style="margin-top:10px; margin-bottom:12px;">
+      <button class="play-btn" id="btn-play-all-ans" disabled>🔊 聽完整正解</button>
+      <button class="play-btn" id="btn-play-arp-ans" disabled>🎵 聽分解正解</button>
+    </div>
+
+    <div class="review-label">你的作答 (紅色為錯誤)：</div>
+    <div class="staff-scroll-container" id="ansUserScroll">
+      <div style="margin: 0 auto; display: block; position: relative; width: max-content; min-width: 100%; height: 320px;">
+        <div id="fpt-ansUser-svg"></div>
+      </div>
+    </div>
+
+    <div class="review-label" style="margin-top:8px;">標準正解：</div>
+    <div class="staff-scroll-container" id="ansCorrectScroll">
+      <div style="margin: 0 auto; display: block; position: relative; width: max-content; min-width: 100%; height: 320px;">
+        <div id="fpt-ansCorrect-svg"></div>
+      </div>
+    </div>
+
+    <div class="unified-action-row" style="margin-top:12px; margin-bottom: 24px;">
+      <button class="play-btn" id="fpt-nextBtn" style="flex:1; padding:14px; font-size:15px;">下一題 →</button>
+    </div>
+    <div class="unified-action-row" style="margin-top:10px; margin-bottom:24px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+    </div>
+  </div>
+</div>
+
+<script src="exam-common.js"></script>
+<script>
+function forceResetCache() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(r => r.forEach(x => x.unregister()));
+  if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
+  alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
+}
+function showPage(pageId) {
+  if (window.fptStopAll) window.fptStopAll();
+  document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+  // 僅作答頁鎖定 body（滿版不捲動）；其他頁面正常可捲動
+  document.body.classList.toggle('practice-locked', pageId === 'fpt-practice');
+  if (pageId === 'fpt-settings') document.getElementById('pageFptSettings').classList.add('active');
+  else if (pageId === 'fpt-practice') document.getElementById('pageFptPractice').classList.add('active');
+  else if (pageId === 'fpt-answer') document.getElementById('pageFptAnswer').classList.add('active');
+  else if (pageId === 'fpt-review') {
+    document.getElementById('pageFptReview').classList.add('active');
+    if (window.fptModule) window.fptModule.renderReviewPage();
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// 讓 CSS 的 100vh 在行動裝置（避開位址列）更準確
+function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight * 0.01 + 'px'); }
+window.addEventListener('resize', setVH); setVH();
+
+(function(){
+  const VF = Vex.Flow;
+  let audioCtx = null; let pianoInst = null; let pendingTimers = [];
+  function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+  window.fptStopAll = function() { 
+    if(pianoInst) pianoInst.stop(); 
+    clearTimers(); fptModule.isPlaying = false; fptModule.updatePlayBtns(); 
+  };
+  function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }catch(e){} return audioCtx; }
+  window.loadPiano = function(){
+    const ctx = ensureAudio(); if(!ctx) return;
+    Soundfont.instrument(ctx, 'acoustic_grand_piano', { nameToUrl: function(){ return 'acoustic_grand_piano-mp3.js'; } }).catch(function(){ return Soundfont.instrument(ctx, 'acoustic_grand_piano'); }).then(inst => {
+      pianoInst = inst; document.getElementById('loadingBanner').style.display = 'none'; fptModule.updatePlayBtns();
+    }).catch(()=>{ document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>'; });
+  };
+
+  const LEVELS = [
+    { id: 1, name: 'Lv.1 本調三和絃原位' },
+    { id: 2, name: 'Lv.2 三和絃所有轉位' },
+    { id: 3, name: 'Lv.3 三和絃＋七和絃全轉位' },
+    { id: 4, name: 'Lv.4 副屬和絃／拿坡里／變化和絃' },
+    { id: 5, name: 'Lv.5 增六和絃（義／法／德）' }
+  ];
+
+  // 24 大小調完整對應字典 (C=0 基準)
+  const ALL_KEYS = [
+    { name: 'C 大調', vfk: 'C',   off: 0,  isMin: false, sigs: [] },
+    { name: 'G 大調', vfk: 'G',   off: 7,  isMin: false, sigs: [['F','#']] },
+    { name: 'D 大調', vfk: 'D',   off: 2,  isMin: false, sigs: [['F','#'],['C','#']] },
+    { name: 'A 大調', vfk: 'A',   off: 9,  isMin: false, sigs: [['F','#'],['C','#'],['G','#']] },
+    { name: 'E 大調', vfk: 'E',   off: 4,  isMin: false, sigs: [['F','#'],['C','#'],['G','#'],['D','#']] },
+    { name: 'B 大調', vfk: 'B',   off: 11, isMin: false, sigs: [['F','#'],['C','#'],['G','#'],['D','#'],['A','#']] },
+    { name: 'F♯ 大調',vfk: 'F#',  off: 6,  isMin: false, sigs: [['F','#'],['C','#'],['G','#'],['D','#'],['A','#'],['E','#']] },
+    { name: 'D♭ 大調',vfk: 'Db',  off: 1,  isMin: false, sigs: [['B','b'],['E','b'],['A','b'],['D','b'],['G','b']] },
+    { name: 'A♭ 大調',vfk: 'Ab',  off: 8,  isMin: false, sigs: [['B','b'],['E','b'],['A','b'],['D','b']] },
+    { name: 'E♭ 大調',vfk: 'Eb',  off: 3,  isMin: false, sigs: [['B','b'],['E','b'],['A','b']] },
+    { name: 'B♭ 大調',vfk: 'Bb',  off: 10, isMin: false, sigs: [['B','b'],['E','b']] },
+    { name: 'F 大調', vfk: 'F',   off: 5,  isMin: false, sigs: [['B','b']] },
+    { name: 'a 小調', vfk: 'Am',  off: 9,  isMin: true,  sigs: [] },
+    { name: 'e 小調', vfk: 'Em',  off: 4,  isMin: true,  sigs: [['F','#']] },
+    { name: 'b 小調', vfk: 'Bm',  off: 11, isMin: true,  sigs: [['F','#'],['C','#']] },
+    { name: 'f♯ 小調',vfk: 'F#m', off: 6,  isMin: true,  sigs: [['F','#'],['C','#'],['G','#']] },
+    { name: 'c♯ 小調',vfk: 'C#m', off: 1,  isMin: true,  sigs: [['F','#'],['C','#'],['G','#'],['D','#']] },
+    { name: 'g♯ 小調',vfk: 'G#m', off: 8,  isMin: true,  sigs: [['F','#'],['C','#'],['G','#'],['D','#'],['A','#']] },
+    { name: 'd♯ 小調',vfk: 'D#m', off: 3,  isMin: true,  sigs: [['F','#'],['C','#'],['G','#'],['D','#'],['A','#'],['E','#']] },
+    { name: 'b♭ 小調',vfk: 'Bbm', off: 10, isMin: true,  sigs: [['B','b'],['E','b'],['A','b'],['D','b'],['G','b']] },
+    { name: 'f 小調', vfk: 'Fm',  off: 5,  isMin: true,  sigs: [['B','b'],['E','b'],['A','b'],['D','b']] },
+    { name: 'c 小調', vfk: 'Cm',  off: 0,  isMin: true,  sigs: [['B','b'],['E','b'],['A','b']] },
+    { name: 'g 小調', vfk: 'Gm',  off: 7,  isMin: true,  sigs: [['B','b'],['E','b']] },
+    { name: 'd 小調', vfk: 'Dm',  off: 2,  isMin: true,  sigs: [['B','b']] }
+  ];
+
+  // 依某調物件的調號（升降記號組合），找出共用同一調號的大調與關係小調兩個選項
+  function getRelativeKeyPair(keyObj) {
+    function sigKey(sigs) { return sigs.map(s => s[0] + s[1]).sort().join(','); }
+    let target = sigKey(keyObj.sigs);
+    return ALL_KEYS.filter(k => sigKey(k.sigs) === target);
+  }
+
+  // 12 Chromatic pitches mapping for 24 keys
+  function getSpellingByMidiAndKey(midi, keyName) {
+    const SPELL_MAP = {
+        'C 大調': ['c','c#','d','eb','e','f','f#','g','g#','a','bb','b'],
+        'G 大調': ['c','c#','d','d#','e','f','f#','g','g#','a','bb','b'],
+        'D 大調': ['c','c#','d','d#','e','f','f#','g','g#','a','bb','b'],
+        'A 大調': ['c','c#','d','d#','e','f','f#','g','g#','a','bb','b'],
+        'E 大調': ['c','c#','d','d#','e','e#','f#','g','g#','a','a#','b'],
+        'B 大調': ['b#','c#','d','d#','e','e#','f#','f##','g#','a','a#','b'],
+        'F♯ 大調':['b#','c#','c##','d#','e','e#','f#','f##','g#','g##','a#','b'],
+        'F 大調': ['c','db','d','eb','e','f','f#','g','ab','a','bb','b'],
+        'B♭ 大調':['c','db','d','eb','e','f','gb','g','ab','a','bb','b'],
+        'E♭ 大調':['c','db','d','eb','e','f','gb','g','ab','a','bb','cb'],
+        'A♭ 大調':['c','db','d','eb','fb','f','gb','g','ab','a','bb','cb'],
+        'D♭ 大調':['c','db','d','eb','fb','f','gb','g','ab','a','bb','cb'],
+        'a 小調': ['c','c#','d','eb','e','f','f#','g','g#','a','bb','b'],
+        'e 小調': ['c','c#','d','d#','e','f','f#','g','g#','a','a#','b'],
+        'b 小調': ['c','c#','d','d#','e','e#','f#','g','g#','a','a#','b'],
+        'f♯ 小調':['b#','c#','d','d#','e','e#','f#','g','g#','a','a#','b'],
+        'c♯ 小調':['b#','c#','d','d#','e','e#','f#','f##','g#','a','a#','b'],
+        'g♯ 小調':['b#','c#','c##','d#','e','e#','f#','f##','g#','a','a#','b'],
+        'd♯ 小調':['b#','c#','c##','d#','e','e#','f#','f##','g#','g##','a#','b'],
+        'd 小調': ['c','c#','d','eb','e','f','f#','g','g#','a','bb','b'],
+        'g 小調': ['c','c#','d','eb','e','f','f#','g','ab','a','bb','b'],
+        'c 小調': ['c','db','d','eb','e','f','f#','g','ab','a','bb','b'],
+        'f 小調': ['c','db','d','eb','e','f','gb','g','ab','a','bb','cb'],
+        'b♭ 小調':['c','db','d','eb','fb','f','gb','g','ab','a','bb','cb']
+    };
+    let map = SPELL_MAP[keyName] || SPELL_MAP['C 大調'];
+    let str = map[midi % 12];
+    let n = str[0];              // 第一個字元一定是音名字母（c/d/e/f/g/a/b）
+    let a = str.slice(1);        // 其餘（可能是 ''、'#'、'##'、'b'、'bb'）才是升降記號
+    // 正確八度：由「字母自然音 + 升降半音」反推，避免 B#/Cb/E#/Fb 等跨 C 分界的同音異名被畫錯八度
+    // （例如 c#小調導音 B#，音高等於 C，但字母是 B，須歸屬低一個八度）
+    let LS = { 'c':0,'d':2,'e':4,'f':5,'g':7,'a':9,'b':11 };
+    let accSemi = a === '##' ? 2 : a === '#' ? 1 : a === 'bb' ? -2 : a === 'b' ? -1 : 0;
+    let realOct = Math.round((midi - LS[n] - accSemi) / 12) - 1;
+    return { keyStr: `${n}${a}/${realOct}`, letter: n.toUpperCase(), acc: a };
+  }
+
+  // 增六和絃專用拼寫：修正 ♯4（升四級）與 ♭6（降六級）兩個特徵音的正確記譜。
+  // keyOffset = 該調主音的音級(0-11)。回傳與 getSpellingByMidiAndKey 相同格式，或 null（非特徵音則沿用預設）。
+  const LETTERS = ['C','D','E','F','G','A','B'];
+  const LETTER_SEMI = { 'C':0,'D':2,'E':4,'F':5,'G':7,'A':9,'B':11 };
+  function spellAug6Tone(midi, keyOffset, tonicLetterIdx) {
+    let pc = midi % 12;
+    let flat6 = (keyOffset + 8) % 12;   // ♭6
+    let sharp4 = (keyOffset + 6) % 12;  // ♯4
+    function build(letterIdx, targetPc) {
+      let letter = LETTERS[letterIdx];
+      let natural = LETTER_SEMI[letter];
+      let diff = ((targetPc - natural + 18) % 12) - 6; // -6..+5 範圍的升降半音數
+      let acc = diff === 2 ? '##' : diff === 1 ? '#' : diff === -1 ? 'b' : diff === -2 ? 'bb' : '';
+      // 正確八度：由「該字母自然音 + 升降」反推，避免 B#/Cb 等跨 C 分界的同音異名被畫錯八度
+      let realOct = Math.round((midi - natural - diff) / 12) - 1;
+      return { keyStr: `${letter.toLowerCase()}${acc}/${realOct}`, letter: letter, acc: acc };
+    }
+    if (pc === sharp4) {
+      // ♯4 = 第 4 級字母 + 升（第4級 = 主音字母往上數 3 個字母）
+      let idx = (tonicLetterIdx + 3) % 7;
+      return build(idx, pc);
+    }
+    if (pc === flat6) {
+      // ♭6 = 第 6 級字母 + 降（第6級 = 主音字母往上數 5 個字母）
+      let idx = (tonicLetterIdx + 5) % 7;
+      return build(idx, pc);
+    }
+    return null;
+  }
+
+  // 拿坡里六和絃 N6 專用拼寫：N6 = 降二級(♭II)大三和絃，三個音為 ♭2 - 4 - ♭6。
+  // 這些是調外變化音，直接依「正確的級數字母 + 升降」拼寫，繞過調性表的自然音拼法（如 B 大調誤拼成 B#、F##）。
+  function spellNapolitanTone(midi, keyOffset, tonicLetterIdx) {
+    let pc = midi % 12;
+    let flat2 = (keyOffset + 1) % 12;   // ♭2（拿坡里根音）
+    let deg4  = (keyOffset + 5) % 12;   // 4（拿坡里三音）
+    let flat6 = (keyOffset + 8) % 12;   // ♭6（拿坡里五音）
+    function build(letterIdx, targetPc) {
+      let letter = LETTERS[letterIdx];
+      let natural = LETTER_SEMI[letter];
+      let diff = ((targetPc - natural + 18) % 12) - 6;
+      let acc = diff === 2 ? '##' : diff === 1 ? '#' : diff === -1 ? 'b' : diff === -2 ? 'bb' : '';
+      let realOct = Math.round((midi - natural - diff) / 12) - 1;
+      return { keyStr: `${letter.toLowerCase()}${acc}/${realOct}`, letter: letter, acc: acc };
+    }
+    if (pc === flat2) return build((tonicLetterIdx + 1) % 7, pc); // ♭2 = 第2級字母 + 降
+    if (pc === deg4)  return build((tonicLetterIdx + 3) % 7, pc); // 4  = 第4級字母
+    if (pc === flat6) return build((tonicLetterIdx + 5) % 7, pc); // ♭6 = 第6級字母 + 降
+    return null;
+  }
+
+  // 副屬和絃 V(x)/target 專用拼寫：把 target 當暫時主音，其屬和絃為
+  //   根音(target上五度) - 大三度 - 完全五度 - 小七度，各音以「正確音程字母 + 升降」推算，
+  //   避免本調拼寫表把臨時導音（升音）誤拼成降記號等音（如 a 小調 D♯ 誤拼成 E♭）。
+  // targetDeg = 目標級數字串（如 'V','ii','IV'）；targetLetterIdx = 目標根音的字母索引(0-6)。
+  function spellSecondaryDominantTone(midi, targetRootPc, targetLetterIdx) {
+    let pc = midi % 12;
+    // 副屬和絃根音 = 目標根音往上完全五度；其字母 = 目標字母往上 4 個字母
+    let domRootPc = (targetRootPc + 7) % 12;
+    let domRootLetterIdx = (targetLetterIdx + 4) % 7;
+    let tones = [
+      { letterIdx: domRootLetterIdx,           tpc: domRootPc },              // 根音
+      { letterIdx: (domRootLetterIdx + 2) % 7, tpc: (domRootPc + 4) % 12 },   // 大三度（臨時導音）
+      { letterIdx: (domRootLetterIdx + 4) % 7, tpc: (domRootPc + 7) % 12 },   // 完全五度
+      { letterIdx: (domRootLetterIdx + 6) % 7, tpc: (domRootPc + 10) % 12 }   // 小七度
+    ];
+    function build(letterIdx, targetPc) {
+      let letter = LETTERS[letterIdx];
+      let natural = LETTER_SEMI[letter];
+      let diff = ((targetPc - natural + 18) % 12) - 6;
+      let acc = diff === 2 ? '##' : diff === 1 ? '#' : diff === -1 ? 'b' : diff === -2 ? 'bb' : '';
+      let realOct = Math.round((midi - natural - diff) / 12) - 1;
+      return { keyStr: `${letter.toLowerCase()}${acc}/${realOct}`, letter: letter, acc: acc };
+    }
+    for (let tn of tones) {
+      if (pc === tn.tpc) return build(tn.letterIdx, pc);
+    }
+    return null;
+  }
+
+  // 取得某和絃中某個音級(pc)的「字母索引」(0=C..6=B)，供增二度偵測。
+  // 依和絃類型使用對應的專用拼寫（增六/拿坡里/副屬），其餘用調性表。keyName 用於預設拼寫。
+  function letterIndexOfTone(pc, sym, keyOffset, keyName, tonicLetterIdx) {
+    const LI = { 'C':0,'D':1,'E':2,'F':3,'G':4,'A':5,'B':6 };
+    // 用一個落在該 pc 的 midi（任意八度，字母不受八度影響）
+    let midi = 60 + (pc % 12);
+    let ov = null;
+    if (sym === 'It6' || sym === 'Fr6' || sym === 'Ger6') ov = spellAug6Tone(midi, keyOffset, tonicLetterIdx);
+    else if (sym.includes('N')) ov = spellNapolitanTone(midi, keyOffset, tonicLetterIdx);
+    else if (sym.includes('/')) {
+      let tgt = sym.split('/')[1];
+      const DEG = {'I':[0,0],'i':[0,0],'ii':[1,2],'ii°':[1,2],'iii':[2,3],'III':[2,4],'IV':[3,5],'iv':[3,5],'V':[4,7],'v':[4,7],'vi':[5,9],'VI':[5,9],'vii':[6,11]};
+      let info = DEG[tgt];
+      if (info) ov = spellSecondaryDominantTone(midi, (keyOffset + info[1]) % 12, (tonicLetterIdx + info[0]) % 7);
+    }
+    if (!ov) ov = getSpellingByMidiAndKey(midi, keyName);
+    return LI[ov.letter];
+  }
+
+  function getAccidentalToDraw(spell, mAcc, keyObj) {
+    let keyId = spell.letter + spell.octave;
+    let currentAcc = mAcc[keyId];
+    if (currentAcc === undefined) {
+        let found = keyObj.sigs.find(s => s[0] === spell.letter);
+        currentAcc = found ? found[1] : '';
+    }
+    if (currentAcc !== spell.acc) {
+        mAcc[keyId] = spell.acc;
+        return spell.acc === '' ? 'n' : spell.acc;
+    }
+    return null;
+  }
+
+  function getDefaultAccidental(step, keyObj) {
+      let sig = keyObj.sigs.find(s => s[0] === step.toUpperCase());
+      return sig ? sig[1] : 'n';
+  }
+
+  // 升降記號 <-> 半音數（相對於白鍵自然音）
+  function accToSemi(acc) {
+    if (acc === '##') return 2;
+    if (acc === '#') return 1;
+    if (acc === 'bb') return -2;
+    if (acc === 'b') return -1;
+    return 0; // 'n' 或空字串
+  }
+  function semiToAcc(semi) {
+    if (semi >= 2) return '##';
+    if (semi === 1) return '#';
+    if (semi <= -2) return 'bb';
+    if (semi === -1) return 'b';
+    return 'n';
+  }
+  // 使用者明確點擊升降按鈕時的實際套用邏輯（四鍵版）：
+  //   '#'      = 在音符「目前」記號基礎上再升半音（已升高的音會變重升）
+  //   'b'      = 在音符「目前」記號基礎上再降半音（已降低的音會變重降）
+  //   'n'      = 強制絕對還原成自然音（取消所有升降）
+  //   'default'= 復原：忽略手動升降，回到調號原本該有的記號（本調音高）
+  // currentAcc 為該音符目前的記號（'', 'n', '#', '##', 'b', 'bb'）；輸入新音符時沒有既有記號，
+  //   則以調號預設值作為升降疊加的基準。
+  function resolveAccidental(pressedType, step, keyObj, currentAcc) {
+    if (pressedType === 'n') return 'n';
+    if (pressedType === 'default') return getDefaultAccidental(step, keyObj);
+    let baseAcc = (currentAcc === undefined || currentAcc === null)
+        ? getDefaultAccidental(step, keyObj)
+        : currentAcc;
+    let baseSemi = accToSemi(baseAcc);
+    let delta = pressedType === '#' ? 1 : -1;
+    let result = baseSemi + delta;
+    if (result > 2) result = 2;   // 上限重升
+    if (result < -2) result = -2; // 下限重降
+    return semiToAcc(result);
+  }
+
+  function normalizeChord(sym, isMinor) {
+    if (!sym) return '';
+    let s = sym.trim();
+    let upperS = s.toUpperCase();
+    // 增六和絃正規化（接受 It6/It+6/IT6 等變體）
+    if (/^IT/.test(upperS)) return 'It6';
+    if (/^FR/.test(upperS)) return 'Fr6';
+    if (/^GER/.test(upperS)) return 'Ger6';
+    if (upperS.includes('K64') || upperS.includes('CAD64')) s = s.replace(/K64|CAD64/ig, 'I64');
+    if (upperS === 'N' || upperS === 'N6' || upperS === 'BII6' || upperS === '♭II6') return 'N6';
+    if (isMinor) {
+        if (upperS.startsWith('V') || upperS.startsWith('VII')) s = s.replace(/[♮♯#]/g, '');
+    }
+    return s;
+  }
+
+  // 副屬和絃借用目標（相對主音的音級數字，0-11）
+  const SECDOM_TARGET_ROOT = {
+      'ii': 2, 'IV': 5, 'V': 7, 'vi': 9,           // 大調可借用目標
+      'iv': 5, 'VI': 8, 'III': 3                    // 小調可借用目標
+  };
+  function getSecondaryDominantPcs(targetDeg) {
+      let R = SECDOM_TARGET_ROOT[targetDeg];
+      if (R === undefined) return [7, 11, 2, 5];
+      let root = (R + 7) % 12;
+      return [root, (root + 4) % 12, (root + 7) % 12, (root + 10) % 12];
+  }
+
+  // ================= 和聲對位演算法引擎 (狀態機語法) =================
+  const HARMONY_ENGINE = {
+    getChordPcs: function(sym, isMinor) {
+      let is7th = /7|65|43|42/.test(sym);
+      if (sym.includes('N')) return [1, 5, 8]; // N: bII (1,5,8)
+      // 增六和絃（相對主音音級，低音固定 b6 = 8）：特徵音為增六度 b6→#4(=6)
+      //   It+6 = b6, 1, #4      → [8, 0, 6]（重根音 1）
+      //   Fr+6 = b6, 1, 2, #4   → [8, 0, 2, 6]
+      //   Ger+6 = b6, 1, b3, #4 → [8, 0, 3, 6]
+      if (sym === 'It6') return [8, 0, 6];
+      if (sym === 'Fr6') return [8, 0, 2, 6];
+      if (sym === 'Ger6') return [8, 0, 3, 6];
+      if (sym.includes('/')) {
+        let target = sym.split('/')[1];
+        return getSecondaryDominantPcs(target);
+      }
+      let clean = (sym.match(/^[a-zA-Z°]+/) || [''])[0];
+
+      let map = {};
+      if (!isMinor) {
+          map = {
+              'I': [0,4,7,11], 'ii': [2,5,9,0], 'iii': [4,7,11,2], 'IV': [5,9,0,4],
+              'V': [7,11,2,5], 'vi': [9,0,4,7], 'vii°': [11,2,5,9]
+          };
+      } else {
+          map = {
+              'i': [0,3,7,10], 'ii°': [2,5,8,0], 'III': [3,7,10,2], 'iv': [5,8,0,3],
+              'V': [7,11,2,5], 'VI': [8,0,3,7], 'vii°': [11,2,5,8]
+          };
+      }
+      let pcs = map[clean] || [0,4,7,11];
+      return is7th ? pcs : pcs.slice(0, 3);
+    },
+
+    generateSkeleton: function(bars, isMinor, levelId, densityScale) {
+      if (densityScale === undefined) densityScale = 1.0;
+      const TONIC = isMinor ? 'i' : 'I';
+      const SUBDOM = isMinor ? 'iv' : 'IV';
+
+      // 正向功能進行表：每個和絃 -> 下一個常見的和絃（依古典 T→S→D→T 功能邏輯）
+      const NEXT_MAJ = {
+          'I':   ['ii', 'IV', 'V', 'vi', 'iii', 'vi'],
+          'ii':  ['V', 'vii°', 'V'],
+          'iii': ['vi', 'IV'],
+          'IV':  ['V', 'ii', 'I', 'vii°'],
+          'V':   ['I', 'vi'],
+          'vi':  ['ii', 'IV', 'V', 'iii'],
+          'vii°':['I']
+      };
+      const NEXT_MIN = {
+          'i':   ['ii°', 'iv', 'V', 'VI', 'iv', 'VI'],
+          'ii°': ['V', 'vii°', 'V'],
+          'iv':  ['V', 'ii°', 'i', 'vii°'],
+          'V':   ['i', 'VI'],
+          'VI':  ['ii°', 'iv', 'V', 'ii°'],
+          'vii°':['i']
+      };
+      let nextMap = isMinor ? NEXT_MIN : NEXT_MAJ;
+
+      // 結尾盡量用 V 類（各種轉位）接 I；變格終止 IV-I 只保留極低機率（阿們終止另由套組處理）
+      let cadType = Math.random() < 0.97 ? 'auth' : 'plag';
+      let picardy = isMinor && levelId >= 4 && Math.random() < 0.2;
+
+      let seq = Array(bars).fill('');
+      seq[0] = TONIC;
+      seq[bars - 1] = isMinor ? (picardy ? 'I' : 'i') : 'I';
+      seq[bars - 2] = (cadType === 'auth') ? 'V' : SUBDOM;
+      // 屬前若空間足夠，倒數第三格用下屬功能鋪陳（S→D→T）
+      if (cadType === 'auth' && bars >= 6) {
+        seq[bars - 3] = (Math.random() < 0.5) ? (isMinor ? 'ii°' : 'ii') : SUBDOM;
+      }
+
+      // 正向填中段（從第 1 格推到接近終止式前），嚴格避免與前一格、前兩格、以及後方預置終止和絃造成來回擺盪
+      let fillEnd = (cadType === 'auth' && bars >= 6) ? bars - 4 : bars - 3;
+      let afterFill = seq[fillEnd + 1]; // 填充區之後第一個已預置的和絃（下屬或屬）
+      for (let i = 1; i <= fillEnd; i++) {
+        let prev = seq[i - 1];
+        let prev2 = seq[i - 2] || '';
+        let candidates = (nextMap[prev] || [isMinor ? 'iv' : 'IV', 'V']).slice();
+        // 過濾：不與前一格、前兩格相同（避免 X-Y-X 擺盪）
+        let filtered = candidates.filter(c => c !== prev && c !== prev2);
+        // 若這是填充區最後一格，額外避免與後方終止和絃相同（避免銜接處 Y-X-Y）
+        if (i === fillEnd && afterFill) {
+          let f2 = filtered.filter(c => c !== afterFill && !(nextMap[c] && !nextMap[c].includes(afterFill) && c === afterFill));
+          // 傾向選能順接到終止和絃的候選（其 next 清單包含 afterFill）
+          let leadsToCad = f2.filter(c => (nextMap[c] || []).includes(afterFill));
+          if (leadsToCad.length > 0) filtered = leadsToCad;
+          else if (f2.length > 0) filtered = f2;
+        }
+        if (filtered.length === 0) filtered = candidates.filter(c => c !== prev);
+        if (filtered.length === 0) filtered = candidates;
+        seq[i] = filtered[Math.floor(Math.random() * filtered.length)];
+      }
+
+      return this.dedupeAdjacent(this.applyLevelFeatures(seq, isMinor, levelId, densityScale), isMinor, levelId);
+    },
+
+    // 消除「完全一模一樣」的相鄰和絃（連轉位都相同，如 I-I、V7-V7）；同根音不同轉位（I-I6）保留
+    dedupeAdjacent: function(seq, isMinor, levelId) {
+      const n = seq.length;
+      for (let i = 1; i < n; i++) {
+        if (seq[i] !== seq[i - 1]) continue; // 只處理完全相同
+        if (seq[i] === 'It6' || seq[i] === 'Fr6' || seq[i] === 'Ger6') continue; // 增六不動
+        // 頭尾主和絃不動；其餘嘗試改成不同轉位或換和絃
+        let base = seq[i].replace(/[0-9]/g, '');
+        let is7 = /7|65|43|42/.test(seq[i]);
+        let hasSlashOrN = seq[i].includes('/') || seq[i].includes('N');
+        let alt = null;
+        if (hasSlashOrN) {
+          // 副屬/拿坡里若重複，改成後續的目標和絃本身即可（罕見）
+          alt = base;
+        } else if (is7) {
+          // 七和絃：換一個不同的轉位
+          let cur = seq[i].replace(base, '');
+          let opts = ['7', '65', '43', '42'].filter(x => x !== cur);
+          alt = base + opts[Math.floor(Math.random() * opts.length)];
+        } else {
+          // 三和絃：換一個不同的轉位（原位/6/64）
+          let cur = seq[i].replace(base, '');
+          let opts = (levelId >= 2 ? ['', '6', '64'] : ['']).filter(x => x !== cur);
+          if (opts.length === 0) opts = ['6'];
+          alt = base + opts[Math.floor(Math.random() * opts.length)];
+        }
+        // 若改完仍與前一格相同（例如原位三和絃在 Lv.1 無其他轉位可選），退而換成鄰近功能和絃
+        if (alt === seq[i - 1] || alt === seq[i]) {
+          let subs = isMinor ? { 'i':'VI','iv':'ii°','V':'V','VI':'iv','ii°':'iv','III':'i' }
+                             : { 'I':'vi','IV':'ii','V':'V','vi':'IV','ii':'IV','iii':'I' };
+          let repl = subs[base] || (isMinor ? 'iv' : 'IV');
+          alt = repl + (levelId >= 2 && Math.random() < 0.4 ? '6' : '');
+        }
+        seq[i] = alt;
+      }
+      // ii65（低音為七音）接 V7 時容易逼壞聲部：降回 ii7 原位（同功能、聲部更乾淨）。
+      // ii65 接 V 原位則沒問題，維持不變。
+      for (let i = 0; i < n - 1; i++) {
+        let base = seq[i].replace(/[0-9]/g, '');
+        let isII65 = (base === 'ii' || base === 'ii°') && /65/.test(seq[i]);
+        if (!isII65) continue;
+        let nb = seq[i + 1].replace(/[0-9]/g, '');
+        let nextIsV7 = (nb === 'V') && /7/.test(seq[i + 1]) && !seq[i + 1].includes('/');
+        if (nextIsV7) seq[i] = base + '7'; // ii65 → ii7 原位
+      }
+      return seq;
+    },
+
+    // 依照難度，在根音骨架上疊加轉位／固定套組／七和絃／副屬和絃／拿坡里，並保底至少出現一次該級別的新元素
+    applyLevelFeatures: function(seq, isMinor, levelId, densityScale) {
+      if (densityScale === undefined) densityScale = 1.0;
+      const n = seq.length;
+      const TONIC = isMinor ? 'I' : 'I'; // 皮卡第後最終小節可能已經是 'I'
+      const usedIdx = new Set([0, n - 1]); // 頭尾（起始主和絃、終止主和絃）不做額外裝飾
+
+      if (levelId === 1) return seq; // Lv.1：全部維持原位，不做任何裝飾
+
+      // ---------- Lv.2：三和絃所有轉位 + 四組固定套組 ----------
+      const BUNDLES = isMinor ? [
+        ['i','V64','i6'], ['i6','V64','i'], ['i64','V','i'], ['i','iv64','i'],
+        ['i','vii°6','i6'], ['i6','vii°6','i']
+      ] : [
+        ['I','V64','I6'], ['I6','V64','I'], ['I64','V','I'], ['I','IV64','I'],
+        ['I','vii°6','I6'], ['I6','vii°6','I']
+      ];
+      let hasLv2Feature = false;
+      if (n - 3 >= 3) {
+        let startMax = (n - 2) - 3; // 可放置套組的內部起點上限（保留頭尾兩小節）
+        if (startMax >= 1 && Math.random() < 0.22) {
+          let start = 1 + Math.floor(Math.random() * startMax);
+          let bundle = BUNDLES[Math.floor(Math.random() * BUNDLES.length)];
+          for (let k = 0; k < 3; k++) { seq[start + k] = bundle[k]; usedIdx.add(start + k); }
+          hasLv2Feature = true;
+        }
+      }
+      // 其餘未被套組佔用的中段三和絃，較高機率升級成第一轉位；第二轉位 64 僅少量（避免假套組特徵）
+      // vii° 排除在外：vii° 是減三和絃、含減五度，只以 vii°6 形式出現在 I–vii°6–I6 組合包內，其他位置不加轉位
+      for (let i = 1; i < n - 2; i++) {
+        if (usedIdx.has(i)) continue;
+        if (seq[i].replace(/[0-9]/g, '') === 'vii°') continue;
+        let r = Math.random();
+        if (r < 0.58) { seq[i] = seq[i] + '6'; hasLv2Feature = true; }
+        else if (r < 0.60) { seq[i] = seq[i] + '64'; hasLv2Feature = true; }
+      }
+      // 保底：Lv.2 至少要有一個轉位或固定套組
+      if (!hasLv2Feature) {
+        let candidates = [];
+        for (let i = 1; i < n - 2; i++) if (!usedIdx.has(i) && seq[i].replace(/[0-9]/g, '') !== 'vii°') candidates.push(i);
+        if (candidates.length > 0) {
+          let idx = candidates[Math.floor(Math.random() * candidates.length)];
+          seq[idx] = seq[idx] + '6';
+        }
+      }
+
+      if (levelId === 2) return seq;
+
+      // ---------- Lv.3／Lv.4：三和絃＋七和絃所有轉位 ----------
+      // Lv.4 大幅提高七和絃與轉位密度、盡量減少光禿禿的原位三和絃
+      let sevProb = ((levelId >= 4) ? 0.72 : 0.5) * densityScale;   // 升級成七和絃的機率
+      let invProb = (levelId >= 4) ? 0.95 : 0.75;  // 剩下的三和絃再加轉位的機率門檻
+      let hasLv3Feature = false;
+      if (seq[n - 2].replace(/[0-9]/g, '') === 'V' && Math.random() < (levelId >= 4 ? 0.85 : 0.75)) {
+        seq[n - 2] = 'V7';
+        hasLv3Feature = true;
+      }
+      for (let i = 1; i < n - 2; i++) {
+        if (usedIdx.has(i)) continue; // 固定套組的和絃不額外升級成七和絃，避免破壞慣用進行
+        let base = seq[i].replace(/[0-9]/g, '');
+        if (base === 'vii°') continue; // vii° 只以 vii°6 形式出現在組合包內，其他位置不升級/加轉位
+        let hadInv = /6|64/.test(seq[i]);
+        let r = Math.random();
+        if (r < sevProb) {
+          // 升級成七和絃（含各種轉位）
+          let variant = ['7', '65', '43', '42'][Math.floor(Math.random() * 4)];
+          seq[i] = base + variant;
+          hasLv3Feature = true;
+        } else if (r < invProb) {
+          // 保留三和絃但加轉位（Lv.4 幾乎一定加轉位，減少原位三和絃）。
+          // 以第一轉位 6 為主，大幅降低第二轉位 64（64 是「經過六四」等假套組特徵的主因）。
+          if (!hadInv) seq[i] = base + (Math.random() < 0.94 ? '6' : '64');
+        }
+      }
+      if (!hasLv3Feature) {
+        seq[n - 2] = seq[n - 2].replace(/[0-9]/g, '') + '7';
+      }
+
+      if (levelId === 3) return seq;
+
+      // ---------- Lv.4：副屬和絃／拿坡里六和絃／皮卡第三度 ----------
+      let hasLv4Feature = seq[n - 1] === 'I' && isMinor; // 皮卡第三度也算 Lv.4 專屬元素
+      const TARGETS = isMinor ? ['V', 'iv', 'VI'] : ['ii', 'IV', 'V', 'vi'];
+
+      let chromaticChoices = [];
+      for (let i = 1; i < n - 1; i++) {
+        if (usedIdx.has(i)) continue;
+        let nextBase = (seq[i + 1] || '').replace(/[0-9]/g, '');
+        if (TARGETS.includes(nextBase)) chromaticChoices.push(i);
+      }
+      // Lv.4 提高副屬和絃出現量：每個可銜接點都有較高機率插入（不再只插一個）
+      let secDomInserted = 0;
+      for (let idx of chromaticChoices) {
+        if (usedIdx.has(idx)) continue;
+        // 避免兩個副屬和絃緊鄰
+        if (usedIdx.has(idx - 1) || usedIdx.has(idx + 1)) continue;
+        if (Math.random() < 0.38) {
+          let target = seq[idx + 1].replace(/[0-9]/g, '');
+          let inv = ['7', '65', '43', '42'][Math.floor(Math.random() * 4)];
+          seq[idx] = 'V' + inv + '/' + target;
+          usedIdx.add(idx);
+          hasLv4Feature = true;
+          secDomInserted++;
+        }
+      }
+
+      // 拿坡里六和絃 N6：屬於下屬功能，古典上必須解決到屬功能 V。
+      // 只在「本格是下屬和絃(ii°/iv系列) 且 下一格是 V 級」的位置插入；沒有這種位置就不硬塞。
+      // 機率約 25%（設 0.28，因部分題目無銜接點而實際落點會略低）。
+      if (Math.random() < 0.28) {
+        // 先找現成的「下屬和絃 → V」銜接點
+        let n6spots = [];
+        for (let i = 1; i < n - 1; i++) {
+          if (usedIdx.has(i)) continue;
+          let base = seq[i].replace(/[0-9]/g, '');
+          let nextBase = (seq[i + 1] || '').replace(/[0-9]/g, '');
+          let isSubdom = base === (isMinor ? 'ii°' : 'ii') || base === (isMinor ? 'iv' : 'IV');
+          if (isSubdom && nextBase === 'V') n6spots.push(i);
+        }
+        if (n6spots.length > 0) {
+          let idx = n6spots[Math.floor(Math.random() * n6spots.length)];
+          seq[idx] = 'N6';
+          usedIdx.add(idx);
+          hasLv4Feature = true;
+        } else if (!hasLv4Feature) {
+          // 沒有現成銜接點，主動製造一組 N6 → V（挑一個非頭尾、下一格可改成 V 的位置）
+          for (let i = 1; i < n - 2; i++) {
+            if (usedIdx.has(i) || usedIdx.has(i + 1)) continue;
+            let nextBase = (seq[i + 1] || '').replace(/[0-9]/g, '');
+            // 下一格若本來就是 V，或可安全改成 V（避免破壞終止式主和絃）
+            if (nextBase === 'V' || (i + 1 < n - 1)) {
+              seq[i] = 'N6';
+              seq[i + 1] = 'V';
+              usedIdx.add(i); usedIdx.add(i + 1);
+              hasLv4Feature = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 下屬功能色彩強化：把未被使用的原位 ii/iv（小調 ii°/iv）較高機率升級成轉位或七和絃，
+      // 補足 N6 減少後的下屬色彩（ii6 / ii65 / iv7 等）。
+      for (let i = 1; i < n - 1; i++) {
+        if (usedIdx.has(i)) continue;
+        let base = seq[i].replace(/[0-9]/g, '');
+        let isSubdom = base === (isMinor ? 'ii°' : 'ii') || base === (isMinor ? 'iv' : 'IV');
+        if (!isSubdom) continue;
+        if (/6|64|7|65|43|42/.test(seq[i])) continue; // 已經是轉位/七和絃就跳過
+        let r = Math.random();
+        if (r < 0.4) seq[i] = base + '65';
+        else if (r < 0.6) seq[i] = base + '7';
+        else if (r < 0.85) seq[i] = base + '6';
+        // 其餘 15% 維持原位
+      }
+
+      // 假終止 V→vi / V→VI：中段主動製造，至少 30% 題目出現一次。
+      {
+        let submediant = isMinor ? 'VI' : 'vi';
+        let alreadyHas = false;
+        for (let i = 1; i < n - 2; i++) {
+          let a = seq[i].replace(/[0-9]/g, '');
+          let b = seq[i + 1].replace(/[0-9]/g, '');
+          if (a === 'V' && b === submediant) { alreadyHas = true; break; }
+        }
+        if (!alreadyHas && Math.random() < 0.5) {
+          // 優先找現成的中段 V 級位置
+          let vSpots = [];
+          for (let i = 1; i < n - 2; i++) {
+            if (usedIdx.has(i) || usedIdx.has(i + 1)) continue;
+            if (seq[i].replace(/[0-9]/g, '') === 'V' && i + 1 < n - 1) vSpots.push(i);
+          }
+          if (vSpots.length > 0) {
+            let idx = vSpots[Math.floor(Math.random() * vSpots.length)];
+            if (!/7|65|43|42/.test(seq[idx]) && Math.random() < 0.5) seq[idx] = 'V7';
+            seq[idx + 1] = submediant;
+            usedIdx.add(idx); usedIdx.add(idx + 1);
+          } else {
+            // 沒有現成 V：主動把中段一對相鄰、未被使用的格子改成 V(7)→vi/VI
+            let pairSpots = [];
+            for (let i = 1; i < n - 2; i++) {
+              if (usedIdx.has(i) || usedIdx.has(i + 1)) continue;
+              if (i + 1 < n - 1) pairSpots.push(i);
+            }
+            if (pairSpots.length > 0) {
+              let idx = pairSpots[Math.floor(Math.random() * pairSpots.length)];
+              seq[idx] = (Math.random() < 0.5) ? 'V7' : 'V';
+              seq[idx + 1] = submediant;
+              usedIdx.add(idx); usedIdx.add(idx + 1);
+            }
+          }
+        }
+      }
+
+      // 最終保底：無論如何都要有至少一個 Lv.4 專屬元素（強制製造借用和絃銜接）
+      if (!hasLv4Feature) {
+        // 找出所有「下一格正好是可借用目標」的位置，隨機挑一個插入副屬和絃
+        // 必須排除 usedIdx（組合包等已鎖定的格子）與其相鄰，避免破壞 I–vii°6–I6 等慣用進行
+        let spots = [];
+        for (let i = 1; i < n - 1; i++) {
+          if (usedIdx.has(i) || usedIdx.has(i + 1)) continue;
+          let nb = (seq[i + 1] || '').replace(/[0-9]/g, '');
+          if (TARGETS.includes(nb)) spots.push(i);
+        }
+        if (spots.length > 0) {
+          let idx = spots[Math.floor(Math.random() * spots.length)];
+          let target = seq[idx + 1].replace(/[0-9]/g, '');
+          let inv = ['7', '65', '43', '42'][Math.floor(Math.random() * 4)];
+          seq[idx] = 'V' + inv + '/' + target;
+          usedIdx.add(idx);
+        } else {
+          // 真的沒有現成銜接點，才強制造一組（位置也隨機化，且避開已鎖定格子）
+          let freePairs = [];
+          for (let i = 1; i < n - 2; i++) if (!usedIdx.has(i) && !usedIdx.has(i + 1)) freePairs.push(i);
+          if (freePairs.length > 0) {
+            let target = TARGETS[Math.floor(Math.random() * TARGETS.length)];
+            let pos = freePairs[Math.floor(Math.random() * freePairs.length)];
+            let inv = ['7', '65', '43', '42'][Math.floor(Math.random() * 4)];
+            seq[pos] = 'V' + inv + '/' + target;
+            seq[pos + 1] = target;
+            usedIdx.add(pos); usedIdx.add(pos + 1);
+          }
+        }
+      }
+
+      if (levelId < 5) return seq;
+
+      // ---------- Lv.5：在 Lv.4 基礎上，強制加入一個增六和絃（每題 100% 出現一次） ----------
+      // 增六取代 IV 類功能，一定解決到 V：義/法 直接接原位 V 或 V7；德國增六先接 I64 再到 V（避平行五）。
+      {
+        const TONIC_UP = isMinor ? 'i' : 'I';
+        let augType = ['It6', 'Fr6', 'Ger6'][Math.floor(Math.random() * 3)];
+        let placed = false;
+        if (augType === 'Ger6') {
+          let spots = [];
+          for (let i = 1; i <= n - 4; i++) {
+            if (usedIdx.has(i) || usedIdx.has(i + 1) || usedIdx.has(i + 2)) continue;
+            spots.push(i);
+          }
+          if (spots.length > 0) {
+            let idx = spots[Math.floor(Math.random() * spots.length)];
+            seq[idx] = 'Ger6'; seq[idx + 1] = TONIC_UP + '64'; seq[idx + 2] = 'V';
+            usedIdx.add(idx); usedIdx.add(idx + 1); usedIdx.add(idx + 2);
+            placed = true;
+          }
+        }
+        if (!placed) {
+          if (augType === 'Ger6') augType = (Math.random() < 0.5 ? 'It6' : 'Fr6');
+          let spots = [];
+          for (let i = 1; i <= n - 3; i++) {
+            if (usedIdx.has(i) || usedIdx.has(i + 1)) continue;
+            spots.push(i);
+          }
+          if (spots.length > 0) {
+            let idx = spots[Math.floor(Math.random() * spots.length)];
+            seq[idx] = augType;
+            seq[idx + 1] = (Math.random() < 0.5) ? 'V' : 'V7';
+            usedIdx.add(idx); usedIdx.add(idx + 1);
+            placed = true;
+          }
+        }
+        if (!placed && n >= 3) {
+          if (augType === 'Ger6') augType = 'It6';
+          seq[n - 3] = augType; seq[n - 2] = 'V';
+        }
+      }
+
+      return seq;
+    },
+
+    // 依和絃記號判斷低音應該落在和絃第幾個音（0=根音,1=三音,2=五音,3=七音）
+    getBassIndex: function(sym) {
+      if (sym === 'It6' || sym === 'Fr6' || sym === 'Ger6') return 0; // 增六低音固定 b6 (pcs[0])
+      if (/65/.test(sym)) return 1;
+      if (/43/.test(sym)) return 2;
+      if (/42/.test(sym)) return 3;
+      if (/64/.test(sym)) return 2;
+      if (sym.includes('N')) return 1; // 拿坡里六和絃固定第一轉位
+      if (/7/.test(sym)) return 0;
+      if (/6/.test(sym)) return 1;
+      return 0;
+    },
+
+    // 取得該和絃中「不可重複」的音級（導音；副屬和絃另計自己的臨時導音）
+    getNoDoublePcs: function(sym, isMinor, keyOffset) {
+      let rootLetters = (sym.match(/^[a-zA-Z°]+/) || [''])[0];
+      let noDouble = [];
+      let globalLeadingTone = (keyOffset + 11) % 12;
+      let pcsRaw = this.getChordPcs(sym, isMinor);
+      if (pcsRaw.map(p => (p + keyOffset) % 12).includes(globalLeadingTone)) {
+        noDouble.push(globalLeadingTone);
+      }
+      if (sym.includes('/')) {
+        // 副屬和絃自己的臨時導音（該和絃的三音）
+        noDouble.push((pcsRaw[1] + keyOffset) % 12);
+      }
+      return noDouble;
+    },
+
+    // 取得該和絃「優先重複」的音級（回傳 {pc, second} — 首選重複音級與次選，或 null）。
+    // 依古典重複音慣例區分主要/次要三和絃：
+    //   I6/V6(i6/V6)  → 重根音，次選五音
+    //   ii6/iv6/vi6/vii°6/N6 → 重三音（低音）
+    //   I64/中止六四  → 重五音（低音）
+    getPreferredDoublePc: function(sym, isMinor, keyOffset) {
+      let pcsRaw = this.getChordPcs(sym, isMinor);
+      let is7th = /7|65|43|42/.test(sym);
+      if (is7th) return null; // 七和絃四音齊全，不談重複
+      let rootLetters = (sym.match(/^[a-zA-Z°]+/) || [''])[0];
+      let root = (pcsRaw[0] + keyOffset) % 12;
+      let third = (pcsRaw[1] + keyOffset) % 12;
+      let fifth = (pcsRaw[2] + keyOffset) % 12;
+
+      if (sym.includes('N')) return { pc: third, second: null };  // N6 重三音
+      let figure = sym.replace(/^[a-zA-Z°]+/, '').split('/')[0];  // 數字部分
+
+      if (figure === '64') {
+        // 第二轉位（含中止六四 I64）：重複五音（低音）
+        return { pc: fifth, second: null };
+      }
+      if (figure === '6') {
+        // 第一轉位：主要三和絃(I/IV/V)重根音、可重五音；次要三和絃(ii/vi/vii°)重三音
+        let isMajorPrimary = (rootLetters === 'I' || rootLetters === 'i' ||
+                              rootLetters === 'IV' || rootLetters === 'iv' ||
+                              rootLetters === 'V');
+        if (isMajorPrimary) return { pc: root, second: fifth };   // I6/IV6/V6 重根音，次選五音
+        return { pc: third, second: null };                       // ii6/vi6/vii°6 重三音
+      }
+      return null;
+    },
+
+    generateLegalVoicings: function(sym, isMinor, keyOffset) {
+      let is7th = /7|65|43|42/.test(sym);
+      let isAug6 = (sym === 'It6' || sym === 'Fr6' || sym === 'Ger6');
+      let pcs = this.getChordPcs(sym, isMinor);
+      let bassPc = pcs[this.getBassIndex(sym)];
+      if (bassPc === undefined) bassPc = pcs[0];
+
+      // V7 原位（且僅原位）允許省略五音、改重複根音；其餘七和絃一律四音完整
+      let rootLetters = (sym.match(/^[a-zA-Z°]+/) || [''])[0];
+      let isDomV7Root = is7th && rootLetters === 'V' && !/6|65|43|42|64/.test(sym);
+      let fifthPc = pcs[2];
+
+      pcs = pcs.map(p => (p + keyOffset) % 12); 
+      bassPc = (bassPc + keyOffset) % 12;
+      fifthPc = (fifthPc + keyOffset) % 12;
+      let noDoublePcs = this.getNoDoublePcs(sym, isMinor, keyOffset);
+      let requiredPcs = pcs.slice(); // 這些和絃音都必須出現
+      // 增六：It6 重複根音(1)、四聲部三音；Fr6/Ger6 四音各一
+      let augRootPc = isAug6 ? (0 + keyOffset) % 12 : null; // 增六的「1」音
+
+      let voicings = [];
+      // 四聲部標準合唱音域 (MIDI)：S:C4-G5, A:G3-C5, T:C3-G4, B:F2-C4
+      const B_RANGE = [41, 60], T_RANGE = [48, 67], A_RANGE = [55, 72], S_RANGE = [60, 79];
+      for (let b = B_RANGE[0]; b <= B_RANGE[1]; b++) {
+        if (b % 12 !== bassPc) continue;
+        for (let t = Math.max(T_RANGE[0], b + 1); t <= Math.min(T_RANGE[1], b + 24); t++) {
+          if (!pcs.includes(t % 12)) continue;
+          for (let a = Math.max(A_RANGE[0], t + 1); a <= Math.min(A_RANGE[1], t + 12); a++) {
+            if (!pcs.includes(a % 12)) continue;
+            for (let s = Math.max(S_RANGE[0], a + 1); s <= Math.min(S_RANGE[1], a + 12); s++) {
+              if (!pcs.includes(s % 12)) continue;
+              let counts = {};
+              [b, t, a, s].forEach(x => { let p = x % 12; counts[p] = (counts[p] || 0) + 1; });
+              let presentPcs = Object.keys(counts).length;
+
+              if (isAug6) {
+                // 增六完整性：所有和絃音都必須出現；It6(3音)重複根音1、Fr6/Ger6(4音)各一
+                let missingCount = requiredPcs.filter(p => counts[p] === undefined).length;
+                if (missingCount !== 0) continue;
+                if (sym === 'It6') {
+                  // It6 只有 3 種音，第 4 個聲部必須是重複根音(1)，不可重複 b6 或 #4（特徵音不重複）
+                  if ((counts[augRootPc] || 0) < 2) continue;
+                }
+                // 特徵音 b6(低音) 與 #4 都不可重複（張力音）
+                let sharp4Pc = (6 + keyOffset) % 12;
+                let flat6Pc = (8 + keyOffset) % 12;
+                if ((counts[sharp4Pc] || 0) >= 2) continue;
+                if ((counts[flat6Pc] || 0) >= 2) continue;
+              } else if (is7th) {
+                // 七和絃完整性：四音必須全到；唯 V7 原位可省略五音（此時允許只有 3 種音）
+                let missing = requiredPcs.filter(p => !(p in counts) && !(counts[p] === undefined ? false : true));
+                let missingCount = requiredPcs.filter(p => counts[p] === undefined).length;
+                if (isDomV7Root) {
+                  // 允許：四音全到，或缺五音（且此時必然重複根音）
+                  let missingFifth = (counts[fifthPc] === undefined);
+                  if (missingCount === 0) { /* ok，四音全到 */ }
+                  else if (missingCount === 1 && missingFifth) { /* ok，僅省略五音 */ }
+                  else continue;
+                } else {
+                  if (missingCount !== 0) continue; // 其餘七和絃：任何和絃音缺一律淘汰
+                }
+              } else {
+                // 三和絃：預設三音齊全。例外——原位主和絃 I/i 允許省略五音、三倍根音
+                // （供 V7→I 完整解決，導音上行、七音下行時的標準寫法）。
+                let isRootTonicTriad = (rootLetters === 'I' || rootLetters === 'i') && !/6|64/.test(sym);
+                if (presentPcs < 3) {
+                  if (isRootTonicTriad && (counts[bassPc] || 0) >= 3 && (counts[(pcs[1]) % 12] || 0) >= 1) {
+                    // 允許：三倍根音 + 三音（省略五音）
+                  } else {
+                    continue;
+                  }
+                }
+              }
+
+              if (sym.includes('64') && (b%12 !== t%12 && b%12 !== a%12 && b%12 !== s%12)) continue;
+              if (sym.includes('N') && (b%12 !== t%12 && b%12 !== a%12 && b%12 !== s%12)) continue;
+              // vii°6 強制重複三音（=低音）：減三和絃的三音就是低音，重複它可自然避免減五度攤在兩聲部間
+              if (rootLetters === 'vii°' && /6/.test(sym) && !/7|65|43|42/.test(sym)) {
+                let thirdPc = (pcs[1]) % 12; // 三音（第一轉位的低音）
+                if ((counts[thirdPc] || 0) < 2) continue; // 沒有重複三音就淘汰
+              }
+              // 原位主和絃 I/i：硬性禁止重複五音（只能重根音，最穩定；I6 才可重五音）
+              if ((rootLetters === 'I' || rootLetters === 'i') && !/6|64|7|65|43|42/.test(sym)) {
+                if ((counts[fifthPc] || 0) >= 2) continue; // 重五音一律淘汰
+              }
+              if (noDoublePcs.some(p => (counts[p] || 0) >= 2)) continue; // 不重複導音
+              voicings.push([s, a, t, b]);
+            }
+          }
+        }
+      }
+      return voicings.slice(0, 120);
+    },
+
+    // 取得該和絃的導音音級與應解決到的音級（供聲部進行規則檢查用）
+    getResolutionMeta: function(sym, isMinor, keyOffset) {
+      let rootLetters = (sym.match(/^[a-zA-Z°]+/) || [''])[0];
+      let isDom = rootLetters === 'V' || rootLetters === 'vii°' || sym.includes('/');
+      let is7th = /7|65|43|42/.test(sym);
+      let pcsRaw = this.getChordPcs(sym, isMinor);
+      let pcs = pcsRaw.map(p => (p + keyOffset) % 12);
+
+      let leadingTonePc = null, resolvePc = null;
+      if (isDom) {
+        leadingTonePc = (rootLetters === 'vii°') ? pcs[0] : pcs[1];
+        resolvePc = (leadingTonePc + 1) % 12;
+      }
+      let seventhPc = is7th ? pcs[3] : null;
+
+      // 增六和絃特徵音解決：b6(低音) 下行半音、#4 上行半音，兩者一起收到 V 的根音(=屬音)
+      let aug6 = null;
+      if (sym === 'It6' || sym === 'Fr6' || sym === 'Ger6') {
+        let flat6Pc = (8 + keyOffset) % 12;
+        let sharp4Pc = (6 + keyOffset) % 12;
+        let dominantRootPc = (7 + keyOffset) % 12; // V 的根音 = 屬音
+        aug6 = { flat6Pc, sharp4Pc, resolveToPc: dominantRootPc };
+      }
+      return { leadingTonePc, resolvePc, seventhPc, aug6 };
+    },
+
+    solveVoiceLeading: function(degSeq, isMinor, keyOffset) {
+      let allVoicings = degSeq.map(sym => this.generateLegalVoicings(sym, isMinor, keyOffset));
+      if (allVoicings.some(v => v.length === 0)) return null; // 有和絃完全找不到可用聲位
+      let dp = allVoicings[0].map(v => ({ cost: 0, path: [v], last: v }));
+      // 供增二度偵測用：此調的名稱與主音字母索引
+      let _keyObj = (typeof ALL_KEYS !== 'undefined') ? ALL_KEYS.find(k => k.off === keyOffset && k.isMin === isMinor) : null;
+      let _keyName = _keyObj ? _keyObj.name : 'C 大調';
+      const _LI = { 'C':0,'D':1,'E':2,'F':3,'G':4,'A':5,'B':6 };
+      let _tonicLetterIdx = _keyObj ? _LI[(_keyObj.vfk || 'C')[0].toUpperCase()] : 0;
+      
+      for (let i = 1; i < degSeq.length; i++) {
+        let nextDp = []; let targetVoicings = allVoicings[i];
+        let prevSym = degSeq[i - 1]; let currSym = degSeq[i];
+        let prevBase = prevSym.replace(/[0-9]/g, ''); let currBase = currSym.replace(/[0-9]/g, '');
+        let isDeceptive = (prevBase === 'V' && (currBase === 'vi' || currBase === 'VI'));
+        let meta = this.getResolutionMeta(prevSym, isMinor, keyOffset);
+        // 當前和絃「優先重複」的音級（首選/次選）
+        let prefDbl = this.getPreferredDoublePc(currSym, isMinor, keyOffset);
+        if (isDeceptive && prefDbl === null) {
+          // 假終止：vi/VI 重複三音（三音 = 該和絃 pcs[1]，也就是調的主音）
+          let curPcs = this.getChordPcs(currSym, isMinor);
+          prefDbl = { pc: (curPcs[1] + keyOffset) % 12, second: null };
+        }
+
+        // 原則 1：ii 類 → V 類的反向進行判斷
+        let prevIsII = (prevBase === 'ii' || prevBase === 'ii°');
+        let currIsV = (currBase === 'V');
+        let iiToV = prevIsII && currIsV;
+        let iiToV_is7 = iiToV && /7|65|43|42/.test(prevSym) && /7|65|43|42/.test(currSym);
+        // ii7→V7 需保持的共同音三音（前和絃的三音 pc）
+        let iiSeventhCommonPc = null;
+        if (iiToV_is7) {
+          let iiPcs = this.getChordPcs(prevSym, isMinor);
+          iiSeventhCommonPc = (iiPcs[1] + keyOffset) % 12; // ii7 的三音 = V7 的七音，是共同保持音
+        }
+
+        // V7→I 省五重根優先：偵測 prevSym 是否為原位 V7、curr 是否為 I/i
+        // 若前一格 V7 用「省略五音、重複根音」的配置，給成本優惠（軟性優先，最順的解決法）
+        let prevIsDomV7Root = /^V/.test(prevBase) && /7/.test(prevSym) && !/6|65|43|42|64/.test(prevSym);
+        let currIsTonic = (currBase === 'I' || currBase === 'i');
+        let v7ToI = prevIsDomV7Root && currIsTonic;
+        let v7RootPc = null, v7FifthPc = null;
+        if (v7ToI) {
+          let vp = this.getChordPcs(prevSym, isMinor);
+          v7RootPc = (vp[0] + keyOffset) % 12;
+          v7FifthPc = (vp[2] + keyOffset) % 12;
+        }
+
+        for (let tv of targetVoicings) {
+          let bestCost = Infinity; let bestPath = null;
+          // 重複音偏好成本：重複到首選音=0；次選音=小懲罰；其他音=大懲罰（軟性引導）
+          let doublingPenalty = 0;
+          if (prefDbl !== null) {
+            let counts = {};
+            tv.forEach(x => { let p = x % 12; counts[p] = (counts[p] || 0) + 1; });
+            let doubledPc = Object.keys(counts).find(p => counts[p] >= 2);
+            if (doubledPc !== undefined) {
+              let dp2 = Number(doubledPc);
+              if (dp2 === prefDbl.pc) doublingPenalty = 0;
+              else if (prefDbl.second !== null && dp2 === prefDbl.second) doublingPenalty = 3;
+              else doublingPenalty = 10;
+            }
+          }
+          for (let prevNode of dp) {
+            let pv = prevNode.last;
+            // 防聲部超越
+            if (tv[0] < pv[1] || tv[1] < pv[2] || tv[2] < pv[3]) continue;
+            
+            // 上三聲部（S/A/T, index 0-2）跳進規則：
+            //   - 不可三全音、不可超過完全五度（7 半音）
+            //   - 四度(5)或五度(7)跳進後，下一步必須反向
+            let leapViolation = false;
+            let prevPrev = (prevNode.path.length >= 2) ? prevNode.path[prevNode.path.length - 2] : null;
+            for (let v = 0; v < 3; v++) {
+                let move = tv[v] - pv[v];
+                let leap = Math.abs(move);
+                if (leap === 6 || leap > 7) { leapViolation = true; break; } // 三全音 / 超過五度
+                // 四度或五度跳進後反向：檢查「前一步」是否為四/五度跳進，若是，這一步必須反向
+                if (prevPrev !== null) {
+                  let prevMove = pv[v] - prevPrev[v];
+                  let pl = Math.abs(prevMove);
+                  if (pl === 5 || pl === 7) {
+                    if (move !== 0 && Math.sign(move) === Math.sign(prevMove)) { leapViolation = true; break; }
+                  }
+                }
+            }
+            if (leapViolation) continue;
+
+            // 禁止增二度旋律進行：任一聲部移動 3 半音，若兩音拼寫為「相鄰字母」(二度關係)即為增二度，淘汰
+            let aug2 = false;
+            for (let v = 0; v < 4; v++) {
+              if (Math.abs(tv[v] - pv[v]) !== 3) continue; // 只有 3 半音移動才可能是增二度
+              let l1 = letterIndexOfTone(pv[v] % 12, prevSym, keyOffset, _keyName, _tonicLetterIdx);
+              let l2 = letterIndexOfTone(tv[v] % 12, currSym, keyOffset, _keyName, _tonicLetterIdx);
+              let gap = Math.abs(l1 - l2); gap = Math.min(gap, 7 - gap);
+              if (gap === 1) { aug2 = true; break; } // 字母相鄰 + 3半音 = 增二度
+            }
+            if (aug2) continue;
+
+            // 低音聲部（index 3）避免跳進超過完全五度，但保留合理大跳：
+            //   (a) 終止式 V→I 的低音四/五度跳
+            //   (b) 低音八度跳（同音名不同八度）——I64→V 的八度跳只允許下行（由高接低）
+            let bassLeap = Math.abs(tv[3] - pv[3]);
+            if (bassLeap === 6) continue; // 低音也不可三全音跳
+            if (bassLeap > 7) {
+              let isVtoI = (prevBase === 'V') && (currBase === 'I' || currBase === 'i');
+              let isOctaveJump = (bassLeap === 12) && (tv[3] % 12 === pv[3] % 12);
+              // I64→V 的八度跳：只允許低音下行（tv[3] < pv[3]，由高接低）
+              let prevIs64 = /64/.test(prevSym);
+              if (isOctaveJump && prevIs64 && currBase === 'V') {
+                if (tv[3] >= pv[3]) continue; // 上行八度跳不允許
+              }
+              if (!(isVtoI || isOctaveJump)) continue;
+            }
+            // 低音四/五度跳進後也必須反向（多用轉位讓低音級進、避免低音跳來跳去）
+            if (prevPrev !== null) {
+              let prevBassMove = pv[3] - prevPrev[3];
+              let pbl = Math.abs(prevBassMove);
+              let curBassMove = tv[3] - pv[3];
+              if ((pbl === 5 || pbl === 7) && curBassMove !== 0 && Math.sign(curBassMove) === Math.sign(prevBassMove)) continue;
+            }
+
+            // 防平行五度/八度 ＋ 外聲部隱伏五度/隱伏八度 ＋ 減五度→完全五度
+            let hasParallel = false;
+            for (let v1 = 0; v1 < 3; v1++) {
+              for (let v2 = v1 + 1; v2 < 4; v2++) {
+                let rawPrev = Math.abs(pv[v1] - pv[v2]);
+                let rawCurr = Math.abs(tv[v1] - tv[v2]);
+                let ivPrev = rawPrev % 12;
+                let ivCurr = rawCurr % 12;
+                let sameDir = (tv[v1] - pv[v1]) * (tv[v2] - pv[v2]) > 0;
+                if ((ivPrev === 7 && ivCurr === 7) || (ivPrev === 0 && ivCurr === 0)) {
+                  if (sameDir) { hasParallel = true; break; }
+                }
+                // 減五度(6)→完全五度(7) 同向進行：一律禁止（不分聲部）
+                if (ivPrev === 6 && ivCurr === 7 && sameDir) { hasParallel = true; break; }
+                // 外聲部（S=0, B=3）隱伏五度/隱伏八度：同向進行且到達完全協和音程，且高音（S）為跳進
+                if (v1 === 0 && v2 === 3 && (ivCurr === 7 || ivCurr === 0) && ivPrev !== ivCurr) {
+                  if (sameDir && Math.abs(tv[0] - pv[0]) > 2) { hasParallel = true; break; }
+                }
+              }
+              if (hasParallel) break;
+            }
+            if (hasParallel) continue;
+
+            // 假終止（V/V7 -> vi/VI）：外聲部不可同向擴大到完全音程
+            if (isDeceptive) {
+              if ((tv[3] - pv[3]) > 0 && (tv[0] - pv[0]) > 0) continue;
+            }
+
+            // 導音解決規則
+            if (meta.leadingTonePc !== null) {
+              let leadingViolation = false;
+              for (let v = 0; v < 4; v++) {
+                if (pv[v] % 12 !== meta.leadingTonePc) continue;
+                let nextPc = tv[v] % 12;
+                if (nextPc === meta.resolvePc) continue; // 正確上行解決到主音
+                if (isDeceptive) {
+                  // 假終止 V→vi/VI：導音「一定要」上行到主音，不允許任何例外
+                  leadingViolation = true; break;
+                }
+                if ((v === 1 || v === 2) && nextPc === meta.leadingTonePc) continue; // 一般情況內聲部可保留共同音
+                leadingViolation = true; break;
+              }
+              if (leadingViolation) continue;
+            }
+
+            // 七和絃的七音必須下行一步解決（允許同和絃延續保留）
+            if (meta.seventhPc !== null) {
+              let seventhViolation = false;
+              for (let v = 0; v < 4; v++) {
+                if (pv[v] % 12 !== meta.seventhPc) continue;
+                let nextPc = tv[v] % 12;
+                let downStep = ((meta.seventhPc - nextPc + 12) % 12);
+                if (downStep === 1 || downStep === 2) continue; // 下行一個半音或全音，視為級進解決
+                if (nextPc === meta.seventhPc) continue; // 同和絃延續保留
+                seventhViolation = true; break;
+              }
+              if (seventhViolation) continue;
+            }
+
+            // 增六和絃特徵音強制解決：b6 下行半音、#4 上行半音，一起收到 V 的根音(屬音)
+            if (meta.aug6 !== null) {
+              let aug6Violation = false;
+              for (let v = 0; v < 4; v++) {
+                let pPc = pv[v] % 12;
+                if (pPc === meta.aug6.flat6Pc) {
+                  // b6 必須下行半音到屬音
+                  if (!((pv[v] - tv[v]) === 1 && tv[v] % 12 === meta.aug6.resolveToPc)) { aug6Violation = true; break; }
+                }
+                if (pPc === meta.aug6.sharp4Pc) {
+                  // #4 必須上行半音到屬音
+                  if (!((tv[v] - pv[v]) === 1 && tv[v] % 12 === meta.aug6.resolveToPc)) { aug6Violation = true; break; }
+                }
+              }
+              if (aug6Violation) continue;
+            }
+
+            let dist = Math.abs(tv[0]-pv[0]) + Math.abs(tv[1]-pv[1]) + Math.abs(tv[2]-pv[2]) + Math.abs(tv[3]-pv[3]) * 0.5;
+            if (tv[0] === pv[0] || tv[1] === pv[1]) dist -= 2;
+            dist += doublingPenalty; // 重複音偏好
+
+            // V7→I 省五重根優先（軟性）：若前一格 V7 省略五音、重複根音，給成本優惠。
+            // 這會讓 V7 傾向省五重根配置，使 ii→V7 共同音自然保持、V7→I 無跳進。
+            if (v7ToI) {
+              let pcnt = {};
+              pv.forEach(x => { let p = x % 12; pcnt[p] = (pcnt[p] || 0) + 1; });
+              let omitsFifth = !(v7FifthPc in pcnt);
+              let doublesRoot = (pcnt[v7RootPc] || 0) >= 2;
+              if (omitsFifth && doublesRoot) dist -= 4; // 優惠，優先選省五重根的 V7 配置
+            }
+
+            // 原則 1（硬性）：ii 類 → V 類，上三聲部必須與低音反向，違反直接淘汰
+            if (iiToV) {
+              let bassDir = Math.sign(tv[3] - pv[3]); // 低音方向
+              if (bassDir !== 0) {
+                let viol = false;
+                for (let vv = 0; vv < 3; vv++) { // S/A/T 三個上聲部
+                  if (iiToV_is7 && pv[vv] % 12 === iiSeventhCommonPc && tv[vv] % 12 === iiSeventhCommonPc) {
+                    // ii7→V7：共同音三音保持不動，合規
+                    continue;
+                  }
+                  let vDir = Math.sign(tv[vv] - pv[vv]);
+                  // 保持不動（呆滯）或與低音同向 → 違反反向原則，淘汰
+                  if (vDir === 0 || vDir === bassDir) { viol = true; break; }
+                }
+                if (viol) continue;
+              }
+            }
+
+            if (prevNode.cost + dist < bestCost) {
+              bestCost = prevNode.cost + dist;
+              bestPath = prevNode.path.concat([tv]);
+            }
+          }
+          if (bestPath) nextDp.push({ cost: bestCost, path: bestPath, last: tv });
+        }
+        
+        // 找不到任何合規路徑：不再放行違規和絃，直接回傳 null，由出題流程換一組級數重新出題
+        if (nextDp.length === 0) return null;
+        dp = nextDp;
+      }
+      dp.sort((a,b) => a.cost - b.cost);
+      return dp[0] ? dp[0].path : null;
+    }
+  };
+
+  // ================= 主模組控制器 =================
+  const fptModule = {
+    mode: 'practice', keyPref: 'mix', bars: 10, bpm: 64, curLevel: LEVELS[0],
+    activeTab: 'bass', currentAccidental: 'n', accidentalExplicit: false, currentOctave: 3,
+    keyObj: null, questionSeq: [], questionVoicings: [], 
+    userSeq: [], userBass: [], userKeyAns: '',
+    isPlaying: false, hasPlayed: false, isSubmitted: false, 
+    activeSlot: 0, lastEditedBassSlot: null, lastEditedChordSlot: null,
+    pendingSlashSlot: null, pendingSlashStage: 0, _shouldFollowScroll: false,
+    score: { c: 0, t: 0 }, testSession: null, reviewItems: [],
+
+    init: function() {
+      this.renderLevelTabs();
+      this.setupEvents();
+      this.updateStartBtn();
+    },
+
+    renderLevelTabs: function() {
+      const wrap = document.getElementById('fpt-levelTabs'); wrap.innerHTML = '';
+      LEVELS.forEach(l => {
+        const btn = document.createElement('button'); btn.className = 'level-tab' + (l.id === this.curLevel.id ? ' active' : '');
+        btn.textContent = l.name;
+        btn.onclick = () => { this.curLevel = l; this.renderLevelTabs(); this.updateStartBtn(); };
+        wrap.appendChild(btn);
+      });
+    },
+
+    updateStartBtn: function() {
+      document.getElementById('fpt-enterBtn').disabled = false;
+    },
+
+    switchTab: function(tab) {
+      this.activeTab = tab;
+      document.getElementById('tab-bass').className = `tab-btn ${tab === 'bass' ? 'active' : ''}`;
+      document.getElementById('tab-chord').className = `tab-btn ${tab === 'chord' ? 'active' : ''}`;
+      document.getElementById('panel-bass').style.display = tab === 'bass' ? 'block' : 'none';
+      document.getElementById('panel-chord').style.display = tab === 'chord' ? 'block' : 'none';
+      this.updateOctaveLabels();
+      this.updateUI(); 
+    },
+
+    setAccidental: function(acc, explicit) {
+      this.currentAccidental = acc;
+      this.accidentalExplicit = (explicit === undefined) ? true : explicit;
+      document.getElementById('acc-s').className = `p-btn acc-btn ${acc === '#' ? 'active' : ''}`;
+      document.getElementById('acc-b').className = `p-btn acc-btn ${acc === 'b' ? 'active' : ''}`;
+      document.getElementById('acc-n').className = `p-btn acc-btn ${acc === 'n' ? 'active' : ''}`;
+      document.getElementById('acc-d').className = `p-btn acc-btn ${(acc === 'default' || acc === null) ? 'active' : ''}`;
+    },
+
+    updateOctaveLabels: function() {
+      document.getElementById('oct-label-low').textContent = `(Oct ${this.currentOctave - 1})`;
+      document.getElementById('oct-label-high').textContent = `(Oct ${this.currentOctave + 1})`;
+    },
+
+    inputBassPitch: function(stepInput) {
+      if (this.isSubmitted || !this.hasPlayed) return;
+      let step = stepInput; let oct = this.currentOctave;
+      if (stepInput === 'C_high') { step = 'C'; oct += 1; }
+      
+      // 調號智慧連動：沒有明確點選升降記號時（accidentalExplicit=false），嚴格套用調號預設值；
+      // 若明確按過 ♯／♭，以調號預設為基準疊加半音；♮ 強制還原；復原(default)回到調號值。
+      let defAcc = getDefaultAccidental(step, this.keyObj);
+      let appliedAcc = this.accidentalExplicit
+          ? resolveAccidental(this.currentAccidental, step, this.keyObj, defAcc)
+          : defAcc;
+
+      let noteToSemi = { 'C':0, 'D':2, 'E':4, 'F':5, 'G':7, 'A':9, 'B':11 };
+      let midi = (oct + 1) * 12 + noteToSemi[step] + accToSemi(appliedAcc);
+
+      this.userBass[this.activeSlot] = { midi: midi, step: step, acc: appliedAcc, oct: oct };
+      this.currentOctave = oct; this.updateOctaveLabels();
+      this.lastEditedBassSlot = this.activeSlot;
+      
+      // 每次輸入新音符後，重置回「復原/跟調號」模式，等待下一次明確選擇
+      this.setAccidental('default', false);
+      
+      if (this.activeSlot < this.bars - 1) { this.activeSlot++; this._shouldFollowScroll = true; }
+      this.updateUI();
+    },
+
+    handleKbInput: function(type, val) {
+      if (this.isSubmitted || !this.hasPlayed) return;
+      
+      // 事後修飾: 低音音高
+      if (this.activeTab === 'bass' && (type === 'bass_oct' || type === 'bass_acc' || type === 'clearBass')) {
+         let targetSlot = (this.lastEditedBassSlot !== null && !this.userBass[this.activeSlot]) ? this.lastEditedBassSlot : this.activeSlot;
+         
+         if (type === 'clearBass') {
+            this.userBass[targetSlot] = null;
+            if(targetSlot === this.lastEditedBassSlot) this.lastEditedBassSlot = null;
+         } else if (type === 'bass_acc' && !this.userBass[targetSlot]) {
+            // 該格尚未輸入音名：先記住這次明確選擇的升降記號，等點擊音名按鈕時套用
+            this.setAccidental(val, true);
+         } else if (this.userBass[targetSlot]) {
+            if (type === 'bass_oct') {
+                this.userBass[targetSlot].oct += val;
+                if (this.userBass[targetSlot].oct < 1) this.userBass[targetSlot].oct = 1;
+                if (this.userBass[targetSlot].oct > 5) this.userBass[targetSlot].oct = 5;
+                this.currentOctave += val;
+                if (this.currentOctave < 1) this.currentOctave = 1;
+                if (this.currentOctave > 5) this.currentOctave = 5;
+                this.updateOctaveLabels();
+            } else if (type === 'bass_acc') {
+                // 明確點擊升降記號按鈕修改既有音符：
+                //   ♯/♭ 以音符「當前記號」為基準疊加（重升 F 再按 ♭ 會回到升 F）
+                //   ♮ 強制自然音；復原(default) 回到本調該有的記號
+                let step0 = this.userBass[targetSlot].step;
+                let currAcc = this.userBass[targetSlot].acc;
+                let appliedAcc = resolveAccidental(val, step0, this.keyObj, currAcc);
+                this.userBass[targetSlot].acc = appliedAcc;
+                this.setAccidental(val, true);
+            }
+            // 重新計算 MIDI
+            let step = this.userBass[targetSlot].step;
+            let oct = this.userBass[targetSlot].oct;
+            let acc = this.userBass[targetSlot].acc;
+            let noteToSemi = { 'C':0, 'D':2, 'E':4, 'F':5, 'G':7, 'A':9, 'B':11 };
+            let midi = (oct + 1) * 12 + noteToSemi[step] + accToSemi(acc);
+            this.userBass[targetSlot].midi = midi;
+         }
+         this.updateUI();
+         return;
+      }
+      
+      // 級數輸入與修飾
+      if (type === 'aug6') {
+        // 增六和絃：直接寫入該格（It6/Fr6/Ger6），完成後自動跳下一格
+        // 若正在等待副屬第二級數，先取消該狀態
+        if (this.pendingSlashStage !== 0) { this.pendingSlashStage = 0; this.pendingSlashSlot = null; }
+        this.userSeq[this.activeSlot] = val;
+        this.lastEditedChordSlot = this.activeSlot;
+        if (this.activeSlot < this.bars - 1) { this.activeSlot++; this._shouldFollowScroll = true; }
+        this.updateUI();
+        return;
+      }
+
+      if (type === 'deg') {
+        let isUpper = document.getElementById('btn-case-switch').classList.contains('active-toggle');
+        let roman = (val === 'N' || val === 'N6') ? 'N6' : (isUpper ? ['I','II','III','IV','V','VI','VII'][val-1] : ['i','ii','iii','iv','v','vi','vii'][val-1]);
+
+        if (this.pendingSlashStage === 1) {
+          // 副屬和絃第一下：寫入斜線前的級數，等待第二下
+          this.userSeq[this.pendingSlashSlot] = roman + '/';
+          this.pendingSlashStage = 2;
+          this.activeSlot = this.pendingSlashSlot;
+        } else if (this.pendingSlashStage === 2) {
+          // 副屬和絃第二下：接上斜線後的級數，完成後自動跳下一格
+          this.userSeq[this.pendingSlashSlot] = (this.userSeq[this.pendingSlashSlot] || '') + roman;
+          this.lastEditedChordSlot = this.pendingSlashSlot;
+          let finishedSlot = this.pendingSlashSlot;
+          this.pendingSlashSlot = null;
+          this.pendingSlashStage = 0;
+          if (finishedSlot < this.bars - 1) { this.activeSlot = finishedSlot + 1; this._shouldFollowScroll = true; }
+          else this.activeSlot = finishedSlot;
+        } else {
+          this.userSeq[this.activeSlot] = roman;
+          this.lastEditedChordSlot = this.activeSlot;
+          if (this.activeSlot < this.bars - 1) { this.activeSlot++; this._shouldFollowScroll = true; }
+        }
+      } else if (['inv', 'mod', 'acc', 'back', 'clear'].includes(type)) {
+        // 目標格判斷：只要剛剛才用級數鍵寫過某格（lastEditedChordSlot 有效），修飾/斜線就作用在那一格，
+        // 不論游標是否已經自動往下跳、也不論下一格是否已有舊內容（修正回頭插入副屬和絃跑到別格的問題）。
+        let targetSlot = (this.lastEditedChordSlot !== null) ? this.lastEditedChordSlot : this.activeSlot;
+        let curr = this.userSeq[targetSlot] || '';
+
+        if (type === 'mod' && val === '/') {
+          let isContinuing = (this.lastEditedChordSlot !== null && targetSlot === this.lastEditedChordSlot);
+          if (isContinuing && curr) {
+            // 順著剛打完的和絃接下去：直接把 / 接在後面（例如 V7 -> V7/），等待輸入斜線後的級數
+            this.userSeq[targetSlot] = curr + '/';
+            this.pendingSlashSlot = targetSlot;
+            this.pendingSlashStage = 2;
+          } else {
+            // 回頭點選一個既有、不相關的舊格子（此時 lastEditedChordSlot 已被點選動作清為 null）：
+            // 清空並進入「等待兩個級數」模式
+            this.userSeq[targetSlot] = '';
+            this.pendingSlashSlot = targetSlot;
+            this.pendingSlashStage = 1;
+            this.lastEditedChordSlot = null;
+          }
+          this.activeSlot = targetSlot;
+          this.updateUI();
+          return;
+        }
+
+        if (type === 'clear') {
+          this.userSeq[targetSlot] = '';
+          if(targetSlot === this.lastEditedChordSlot) this.lastEditedChordSlot = null;
+          if (targetSlot === this.pendingSlashSlot) { this.pendingSlashSlot = null; this.pendingSlashStage = 0; }
+          this.updateUI();
+          return;
+        }
+
+        // 轉位(inv)、性質(mod：°/ø/+)、臨時記號(acc)、退格(back) 一律只作用在「斜線前」的和絃本身，
+        // 例如輸入 V7/V 時，7 要寫在 V 上而不是接在 /V 後面；沒有斜線的一般和絃則維持原行為。
+        let hasSlash = curr.includes('/');
+        let numerator = hasSlash ? curr.split('/')[0] : curr;
+        let denominator = hasSlash ? '/' + curr.split('/').slice(1).join('/') : '';
+        let isPendingHere = (this.pendingSlashSlot === targetSlot);
+
+        if (!numerator && !isPendingHere) return; // 完全沒東西可修飾
+        if (!numerator && isPendingHere && this.pendingSlashStage !== 2) return; // 分子還沒開始輸入
+
+        if (type === 'inv') {
+          let isSev = document.getElementById('btn-sev-switch').classList.contains('active-toggle');
+          let mappedInv = val;
+          if (isSev) {
+            if (val === '') mappedInv = '7';
+            else if (val === '6') mappedInv = '65';
+            else if (val === '64') mappedInv = '43';
+          }
+          numerator = numerator.replace(/[0-9]/g, '') + mappedInv;
+        } else if (type === 'mod' || type === 'acc') {
+          numerator = numerator + val;
+        } else if (type === 'back') {
+          numerator = numerator.slice(0, -1);
+        }
+
+        this.userSeq[targetSlot] = numerator + denominator;
+
+        // 若正在等待副屬和絃第二個級數，且分子被退格清空，退回「等待第一個級數」狀態
+        if (isPendingHere && this.pendingSlashStage === 2 && numerator === '') {
+          this.pendingSlashStage = 1;
+        }
+      }
+      this.updateUI();
+    },
+
+
+    generateQuestion: function() {
+      let poolKeys = [];
+      if (this.keyPref === 'major') poolKeys = ALL_KEYS.filter(k => !k.isMin);
+      else if (this.keyPref === 'minor') poolKeys = ALL_KEYS.filter(k => k.isMin);
+      else poolKeys = ALL_KEYS;
+
+      this.keyObj = poolKeys[Math.floor(Math.random() * poolKeys.length)];
+
+      // 找不到完全合規（無平行五八度、導音/七音正確解決、七和絃四音完整、低音不跳進...）的聲部路徑，
+      // 就換一組級數重新出題。若連續多次仍無解（多發生在 Lv.4 長樂句、七和絃過度堆疊時），
+      // 逐步降低七和絃密度；仍無解則短暫降一級難度求解，確保永遠出得了題。
+      let attempts = 0; let seq = null; let voicings = null;
+      let effLevel = this.curLevel.id;
+      while (attempts < 200 && !voicings) {
+        let densityScale = attempts < 40 ? 1.0 : (attempts < 80 ? 0.6 : (attempts < 120 ? 0.35 : 0.15));
+        seq = HARMONY_ENGINE.generateSkeleton(this.bars, this.keyObj.isMin, effLevel, densityScale);
+        voicings = HARMONY_ENGINE.solveVoiceLeading(seq, this.keyObj.isMin, this.keyObj.off);
+        attempts++;
+        if (!voicings && attempts % 15 === 0) {
+          this.keyObj = poolKeys[Math.floor(Math.random() * poolKeys.length)];
+          if (attempts >= 90 && effLevel > 1) effLevel--; // 最後手段：暫時降一級確保有解
+        }
+      }
+      this.questionSeq = seq;
+      this.questionVoicings = voicings;
+      
+      this.userSeq = Array(this.bars).fill('');
+      this.userBass = Array(this.bars).fill(null);
+      this.userKeyAns = '';
+      this.isSubmitted = false;
+      this.hasPlayed = false;
+      this.activeSlot = 0;
+      this.lastEditedBassSlot = null;
+      this.lastEditedChordSlot = null;
+      this.pendingSlashSlot = null;
+      this.pendingSlashStage = 0;
+      this._shouldFollowScroll = false;
+      this.currentAccidental = 'n'; this.accidentalExplicit = false;
+      
+      document.getElementById('fpt-statusBadge').textContent = `${this.curLevel.name}｜${this.bars}小節`;
+      let _cap = document.getElementById('fpt-playCaption'); if (_cap) _cap.textContent = '';
+      this.updateKeyboardVisibility();
+      this.updateUI();
+      this.updatePlayBtns();
+    },
+
+    /* ===== 模擬測驗：考試模式 ===== */
+    examBootstrap: function() {
+      const EXm = window.EXAM; if(!EXm) return;
+      const KEY = EXm.currentSection(); if(KEY !== 'fourpart') return;
+      const cfg = EXm.configFor(KEY) || {};
+      const self = this;
+
+      ensureAudio(); window.fptStopAll();
+      this.mode = 'practice';
+      this.bars = cfg.bars || 10;
+      this.bpm = cfg.bpm || 100;
+      this.keyPref = 'mix';                                   // 隨機 24 大小調
+      const lv = LEVELS.filter(function(l){ return l.id === (cfg.levelId || 4); })[0];
+      if(lv) this.curLevel = lv;                              // Lv.4：含副屬和絃
+
+      const sd = EXm.sectionData(KEY, function(){
+        self.generateQuestion();
+        return { questions: { seq: self.questionSeq.slice(), voicings: JSON.parse(JSON.stringify(self.questionVoicings)), keyObj: JSON.parse(JSON.stringify(self.keyObj)) }, labels: {} };
+      });
+      if(!sd) return;
+      this.questionSeq = sd.questions.seq.slice();
+      this.questionVoicings = JSON.parse(JSON.stringify(sd.questions.voicings));
+      this.keyObj = JSON.parse(JSON.stringify(sd.questions.keyObj));
+      const a = sd.answers || {};
+      this.userSeq = (a.seq && a.seq.length) ? a.seq.slice() : Array(this.bars).fill('');
+      this.userBass = (a.bass && a.bass.length) ? JSON.parse(JSON.stringify(a.bass)) : Array(this.bars).fill(null);
+      this.userKeyAns = a.keyAns || '';
+      this.isSubmitted = false; this.hasPlayed = !!sd.played;
+      this.activeSlot = 0; this.lastEditedBassSlot = null; this.lastEditedChordSlot = null;
+      this.pendingSlashSlot = null; this.pendingSlashStage = 0;
+      this.currentAccidental = 'n'; this.accidentalExplicit = false;
+
+      document.getElementById('fpt-statusBadge').textContent = `${this.curLevel.name}｜${this.bars}小節｜${this.bpm}BPM`;
+      this.updateKeyboardVisibility(); this.updateUI(); this.updatePlayBtns();
+      showPage('fpt-practice');
+      const back = document.querySelector('#pageFptPractice .nav-back-btn'); if(back) back.style.display = 'none';
+      const sub = document.getElementById('fpt-submitBtn'); if(sub) sub.style.display = 'none';
+
+      const host = document.getElementById('pageFptPractice');
+      const lockEl = host ? host.querySelector('.fpt-staff-area') : null;
+      if(lockEl && !lockEl.id) lockEl.id = 'exam-lockwrap';
+
+      const maxPlays = cfg.plays || 6;
+      let used = (sd.playCount || 0);
+      function headText(){ return '播放剩餘 <b>' + Math.max(0, maxPlays-used) + '</b> / ' + maxPlays + ' 次'; }
+      EXm.buildHeader(host, KEY, headText());
+
+      // 計分：每小節低音錯 -1、級數錯 -1；調性錯 -1（僅一次）；封頂 20、下限 0
+      function saveNow(){
+        EXm.saveAnswers(KEY, { seq: self.userSeq.slice(), bass: JSON.parse(JSON.stringify(self.userBass)), keyAns: self.userKeyAns });
+        const max = EXm.SECTIONS[KEY].max;
+        let lost = 0, blank = 0;
+        if(self.userKeyAns !== self.keyObj.name) lost += 1;
+        if(!self.userKeyAns) blank++;
+        for(let i=0; i<self.bars; i++){
+          const uNorm = normalizeChord(self.userSeq[i], self.keyObj.isMin);
+          const qNorm = normalizeChord(self.questionSeq[i], self.keyObj.isMin);
+          const chordOK = (self.userSeq[i] !== '' && uNorm === qNorm);
+          const bassOK = (self.userBass[i] != null) && (self.userBass[i].midi === self.questionVoicings[i][3]);
+          if(!chordOK) lost += 1;
+          if(!bassOK) lost += 1;
+          if(!self.userSeq[i] || self.userSeq[i] === '' || String(self.userSeq[i]).endsWith('/')) blank++;
+          if(self.userBass[i] == null) blank++;
+        }
+        EXm.saveResult(KEY, { score: Math.max(0, max - lost), max: max, unanswered: blank,
+          detail: [{ correct: lost===0, your: '扣 '+Math.min(lost,max)+' 分', right: '調性＋'+self.bars+' 小節低音與級數' }] });
+      }
+      saveNow();
+      const _origUpdateUI = this.updateUI.bind(this);
+      this.updateUI = function(){ _origUpdateUI(); saveNow(); };
+      const _origCheckSubmit = this.checkSubmitState ? this.checkSubmitState.bind(this) : null;
+      this.checkSubmitState = function(){ if(_origCheckSubmit) try{ _origCheckSubmit(); }catch(e){} saveNow(); };
+
+      const bAll = document.getElementById('btn-play-all');
+      const bArp = document.getElementById('btn-play-arp');
+      function refreshPlayBtn(){
+        const left = maxPlays - used;
+        if(self.isPlaying || self._examTuning){ bAll.disabled = true; bArp.disabled = true; return; }
+        const off = !pianoInst || left <= 0;
+        bAll.disabled = off; bArp.disabled = off;
+        bAll.textContent = left > 0 ? `🔊 完整四部（剩餘 ${left} 次）` : '🚫 次數用盡';
+        EXm.buildHeader(host, KEY, headText());
+      }
+      this.updatePlayBtns = function(){ refreshPlayBtn(); };
+      this._examReady = refreshPlayBtn;
+      refreshPlayBtn();
+
+      function doPlay(modeStr){
+        ensureAudio();
+        if(!pianoInst || self.isPlaying || self._examTuning || used >= maxPlays) return;
+        const firstTime = (used === 0);
+        used++;
+        const s = EXm.loadSession(); if(s && s.data && s.data[KEY]){ s.data[KEY].playCount = used; s.data[KEY].played = true; EXm.saveSession(s); }
+        self.hasPlayed = true; EXm.setPlaying(true);
+        function runSeq(){
+          self._examTuning = false;
+          self.playProgression(modeStr);
+          const dur = (self.bars * 4 * (60/self.bpm) + 1.2) * 1000;
+          const tid = setTimeout(function(){ EXm.setPlaying(false); refreshPlayBtn(); }, dur);
+          pendingTimers.push(tid);
+        }
+        if(firstTime){
+          self._examTuning = true; refreshPlayBtn();
+          const cap = document.getElementById('fpt-playCaption'); if(cap) cap.textContent = '🎵 標準音 A＝440Hz（2 秒）…';
+          pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: 3.5 });
+          const tid = setTimeout(runSeq, 2600); pendingTimers.push(tid);
+        } else runSeq();
+        refreshPlayBtn();
+      }
+      bAll.onclick = function(){ doPlay('block'); };
+      bArp.onclick = function(){ doPlay('arpeggio'); };
+
+      EXm.guardVisibility(KEY, function(){ window.fptStopAll(); self._examTuning=false; EXm.setPlaying(false); refreshPlayBtn(); });
+      EXm.buildBar(host, saveNow);
+    },
+
+    updateKeyboardVisibility: function() {
+      document.getElementById('btn-deg-N').style.display = (this.curLevel.id >= 4) ? 'inline-block' : 'none';
+      document.getElementById('btn-sev-switch').style.display = (this.curLevel.id >= 3) ? 'inline-block' : 'none';
+      document.getElementById('btn-slash').style.display = (this.curLevel.id >= 4) ? 'inline-block' : 'none';
+      document.getElementById('inv-btn-1').style.display = (this.curLevel.id >= 2) ? 'inline-block' : 'none';
+      document.getElementById('inv-btn-2').style.display = (this.curLevel.id >= 2) ? 'inline-block' : 'none';
+      // 變化和絃列：Lv.4 起顯示（此時只有 N6），Lv.5 起才加上增六三種
+      document.getElementById('kb-row-aug6').style.display = (this.curLevel.id >= 4) ? 'flex' : 'none';
+      document.querySelectorAll('#kb-row-aug6 .aug6-btn').forEach(function(b){
+        b.style.display = (this.curLevel.id >= 5) ? 'inline-block' : 'none';
+      }, this);
+      // 切換難度時重置 7 和絃開關與 42 按鈕，避免殘留上一個難度的狀態
+      let sevBtn = document.getElementById('btn-sev-switch');
+      sevBtn.classList.remove('active-toggle');
+      sevBtn.textContent = '7和絃 [關]';
+      document.querySelectorAll('.inv-btn').forEach((btn, idx) => {
+        if (idx === 0) btn.textContent = '原位';
+        if (idx === 1) btn.textContent = '6';
+        if (idx === 2) btn.textContent = '64';
+      });
+      document.getElementById('inv-btn-3').style.display = 'none';
+    },
+
+    updateSlotsOverlay: function(targetSvgId = 'fpt-staff-svg', forceResults) {
+      for (let i = 0; i < this.bars; i++) {
+        let slot = document.getElementById(`${targetSvgId}-slot-${i}`);
+        if (slot) {
+          if (this.isSubmitted && forceResults) {
+             let isOk = forceResults[i].chord;
+             slot.className = 'chord-slot ' + (isOk ? 'correct' : 'wrong');
+          } else {
+             slot.className = 'chord-slot' + ((this.activeTab === 'chord' && i === this.activeSlot) ? ' active-slot' : '');
+          }
+          slot.innerHTML = `<div class="slot-bar-num">${i+1}</div><div class="slot-value" style="font-size:15px;">${this.userSeq[i] || '—'}</div>`;
+        }
+      }
+      this.checkSubmitState();
+    },
+
+    checkSubmitState: function() {
+      // 提交鈕永遠可按；未填完的格子會在提交時跳出確認提示，並計為錯誤
+      let btn = document.getElementById('fpt-submitBtn');
+      if (btn) btn.disabled = false;
+    },
+
+    updateUI: function() {
+        this.renderStaff({});
+        this.updateSlotsOverlay();
+        this.checkSubmitState();
+    },
+
+    // 樂譜渲染核心 (支援雙軌焦點分離、防裁切)
+    renderStaff: function(opt) {
+      let targetSvgId = opt.targetSvgId || 'fpt-staff-svg';
+      let bars = opt.bars || this.bars;
+      let keyObj = opt.keyObj || this.keyObj;
+      let userSeq = opt.userSeq || this.userSeq;
+      let userBass = opt.userBass || this.userBass;
+      let userKeyAns = opt.userKeyAns || this.userKeyAns;
+      let isSubmitted = opt.isSubmitted !== undefined ? opt.isSubmitted : this.isSubmitted;
+      let showAnswer = opt.showAnswer || false;
+      let vDraw = opt.customVoicings || this.questionVoicings;
+      let forceResults = opt.forceResults || null;
+      // 正解和絃記號（供增六等特殊和絃的拼寫判斷）；showAnswer 時 userSeq 即為正解記號
+      let questionSeq = opt.questionSeq || (showAnswer ? userSeq : (this.questionSeq || []));
+
+      const container = document.getElementById(targetSvgId); if (!container) return;
+      container.innerHTML = '';
+
+      // 作答階段（主練習譜、尚未提交）只顯示低音譜表以節省空間；
+      // 解答/複習/顯示正解時顯示完整大譜表（高音+低音四聲部）。
+      let bassOnly = (targetSvgId === 'fpt-staff-svg') && !isSubmitted && !showAnswer;
+      // 各區塊的垂直座標：大譜表用雙行、只顯示低音時把低音行提到最上方
+      const BASS_TOP = bassOnly ? 4 : 115;
+      const TREBLE_TOP = 15;
+      const SVG_H = bassOnly ? 100 : 240;
+      const SLOT_TOP = bassOnly ? 104 : 245; // 級數作答格 / 調性下拉的垂直位置
+      
+      let overlay = document.getElementById(targetSvgId + '-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div'); overlay.id = targetSvgId + '-overlay';
+        overlay.style.position = 'absolute'; overlay.style.top = '0px'; overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.pointerEvents = 'none'; 
+        overlay.style.zIndex = '10';
+        container.parentElement.appendChild(overlay);
+      }
+      overlay.style.height = (bassOnly ? 175 : 310) + 'px';
+      overlay.innerHTML = '';
+
+      // 精確修復寬度計算
+      const width = Math.max(500, bars * 110 + 180) + 40; 
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+      renderer.resize(width, SVG_H);
+      const ctx = renderer.getContext();
+      
+      let xPos = 30; // 右移防大括號裁切
+      const barW = (width - 150) / bars; 
+      let activeBarCenterX = null; // 供鏡頭跟隨使用：目前作答格的水平中心點
+
+      for (let i = 0; i < bars; i++) {
+        let isFirst = (i === 0); let w = isFirst ? barW + 80 : barW;
+        let sT = bassOnly ? null : new VF.Stave(xPos, TREBLE_TOP, w);
+        let sB = new VF.Stave(xPos, BASS_TOP, w);
+        if (isFirst) { 
+            if (sT) sT.addClef('treble').addKeySignature(keyObj.vfk).addTimeSignature('4/4'); 
+            sB.addClef('bass').addKeySignature(keyObj.vfk).addTimeSignature('4/4'); 
+        }
+        if (i === bars - 1) {
+            if (sT) sT.setEndBarType(VF.Barline.type.END);
+            sB.setEndBarType(VF.Barline.type.END);
+        }
+        if (sT) sT.setContext(ctx).draw();
+        sB.setContext(ctx).draw();
+        if (isFirst && sT) {
+          new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();
+          new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(ctx).draw();
+        }
+
+        let refStave = sT || sB;
+        let startX = refStave.getNoteStartX(); let endX = refStave.getX() + refStave.getWidth();
+        let slotLeft = startX; let slotWidth = endX - startX;
+
+        if (targetSvgId === 'fpt-staff-svg' && i === this.activeSlot) {
+            activeBarCenterX = slotLeft + slotWidth / 2;
+        }
+
+        // 生成調性下拉選單
+        if (isFirst) {
+            let ksDiv = document.createElement('div');
+            ksDiv.style.position = 'absolute'; ksDiv.style.left = (refStave.getX()) + 'px'; 
+            ksDiv.style.top = SLOT_TOP + 'px';
+            ksDiv.style.width = Math.max(70, startX - refStave.getX() - 5) + 'px'; ksDiv.style.height = '64px';
+            ksDiv.style.pointerEvents = 'auto';
+            
+            let optsHtml = '<option value="">調性?</option>';
+            // 只列出本題調號對應的關係大調與關係小調（依實際調號，二選一）
+            let keyPair = getRelativeKeyPair(keyObj);
+            keyPair.forEach(k => { optsHtml += `<option value="${k.name}">${k.name.replace(' ','')}</option>`; });
+            ksDiv.innerHTML = `<select id="fpt-keySelect-${targetSvgId}" class="select-box" style="width:100%; height:100%; font-size:12px; padding:0 4px; font-weight:700;">${optsHtml}</select>`;
+            overlay.appendChild(ksDiv);
+            
+            setTimeout(() => {
+                let ks = document.getElementById(`fpt-keySelect-${targetSvgId}`);
+                if (ks) {
+                    if (isSubmitted || showAnswer) {
+                        ks.value = opt.forceCorrectSlots ? keyObj.name : (userKeyAns || keyObj.name);
+                        let keyCorrect = opt.forceCorrectSlots ? true : (userKeyAns === keyObj.name);
+                        ks.style.borderColor = keyCorrect ? 'var(--correct)' : 'var(--wrong)';
+                        ks.style.backgroundColor = keyCorrect ? 'var(--correct-soft)' : 'var(--wrong-soft)';
+                        ks.disabled = true;
+                    } else {
+                        if (userKeyAns) ks.value = userKeyAns;
+                        ks.onchange = (e) => { window.fptModule.userKeyAns = e.target.value; window.fptModule.checkSubmitState(); };
+                    }
+                }
+            }, 10);
+        }
+
+        // ====== 視覺焦點與全直行感應區 ======
+        if (!isSubmitted && !showAnswer) {
+            // 低音譜表感應區（點擊切換到 Bass 編輯）
+            let hitTop = document.createElement('div');
+            hitTop.className = 'hitbox-top';
+            hitTop.style.left = slotLeft + 'px'; hitTop.style.width = slotWidth + 'px';
+            hitTop.style.top = '0px';
+            hitTop.style.height = (bassOnly ? 98 : 230) + 'px';
+            hitTop.onclick = () => { 
+                window.fptModule.switchTab('bass');
+                window.fptModule.activeSlot = i; 
+                window.fptModule.lastEditedBassSlot = null;
+                window.fptModule.updateUI(); 
+            };
+            overlay.appendChild(hitTop);
+            
+            // 級數作答格感應區（點擊切換到 Chord 編輯）
+            let hitBot = document.createElement('div');
+            hitBot.className = 'hitbox-bot';
+            hitBot.style.left = slotLeft + 'px'; hitBot.style.width = slotWidth + 'px';
+            hitBot.style.top = (bassOnly ? 100 : 235) + 'px';
+            hitBot.style.height = '72px';
+            hitBot.onclick = () => { 
+                window.fptModule.switchTab('chord');
+                window.fptModule.activeSlot = i; 
+                window.fptModule.lastEditedChordSlot = null;
+                window.fptModule.updateUI(); 
+            };
+            overlay.appendChild(hitBot);
+        }
+
+        // 2. 視覺焦點：低音音高選取框
+        if (!isSubmitted && !showAnswer && this.activeTab === 'bass' && i === this.activeSlot) {
+            let noteBox = document.createElement('div');
+            noteBox.className = 'active-note-box';
+            noteBox.style.top = (bassOnly ? 14 : 125) + 'px'; // 低音譜表位置（隨模式調整）
+            noteBox.style.left = slotLeft + 'px';
+            noteBox.style.width = (slotWidth - 6) + 'px';
+            noteBox.style.height = '74px';
+            overlay.appendChild(noteBox);
+        }
+
+        // 3. 視覺焦點與作答框：級數作答格
+        let slot = document.createElement('div');
+        if (opt.forceCorrectSlots) slot.className = 'chord-slot correct';
+        else if (isSubmitted || showAnswer) {
+             if (forceResults) slot.className = 'chord-slot ' + (forceResults[i].chord ? 'correct' : 'wrong');
+             else {
+                 let uNorm = normalizeChord(userSeq[i], keyObj.isMin);
+                 let qNorm = normalizeChord(this.questionSeq[i], keyObj.isMin);
+                 slot.className = 'chord-slot ' + ((uNorm === qNorm) ? 'correct' : 'wrong');
+             }
+        }
+        else {
+             slot.className = 'chord-slot' + ((this.activeTab === 'chord' && i === this.activeSlot) ? ' active-slot' : '');
+        }
+        
+        slot.id = `${targetSvgId}-slot-${i}`;
+        slot.style.position = 'absolute'; slot.style.left = slotLeft + 'px'; 
+        slot.style.top = SLOT_TOP + 'px'; 
+        slot.style.width = (slotWidth - 6) + 'px'; slot.style.height = '64px';
+        
+        let dispVal = opt.forceCorrectSlots ? (userSeq[i] || this.questionSeq[i] || '—') : (userSeq[i] || '—');
+        slot.innerHTML = `<div class="slot-bar-num">${i+1}</div><div class="slot-value" style="font-size:15px;">${dispVal}</div>`;
+        overlay.appendChild(slot);
+
+        // ====== 渲染音符 ======
+        let mAccT = {}; let mAccB = {};
+        // 變化和絃（增六、拿坡里、副屬）使用專用拼寫修正調外變化音，避免調性表的自然音拼法拼錯
+        let curSym = (questionSeq && questionSeq[i]) ? questionSeq[i] : '';
+        let isAug6Here = (curSym === 'It6' || curSym === 'Fr6' || curSym === 'Ger6');
+        let isN6Here = curSym.includes('N');
+        let isSecDomHere = curSym.includes('/');
+        let tonicLetterIdx = LETTERS.indexOf((keyObj.vfk || 'C')[0].toUpperCase());
+        // 副屬和絃：算出目標根音的音級與字母（供專用拼寫用）
+        let secDomTargetPc = null, secDomTargetLetterIdx = null;
+        if (isSecDomHere) {
+          let target = curSym.split('/')[1];
+          // 目標級數 → 相對主音的級數位移（字母數）與音級（半音數）
+          const DEG_INFO = {
+            'I':[0,0],'i':[0,0],'II':[1,2],'ii':[1,2],'III':[2,4],'iii':[2,3],'III+':[2,4],
+            'IV':[3,5],'iv':[3,5],'V':[4,7],'v':[4,7],'VI':[5,9],'vi':[5,9],'VII':[6,11],'vii':[6,10]
+          };
+          let info = DEG_INFO[target] || DEG_INFO[target.replace('°','')] ;
+          if (info) {
+            secDomTargetLetterIdx = (tonicLetterIdx + info[0]) % 7;
+            secDomTargetPc = (keyObj.off + info[1]) % 12;
+          }
+        }
+        let spellFn = (midi) => {
+          if (isAug6Here) {
+            let ov = spellAug6Tone(midi, keyObj.off, tonicLetterIdx);
+            if (ov) return ov;
+          }
+          if (isN6Here) {
+            let ov = spellNapolitanTone(midi, keyObj.off, tonicLetterIdx);
+            if (ov) return ov;
+          }
+          if (isSecDomHere && secDomTargetPc !== null) {
+            let ov = spellSecondaryDominantTone(midi, secDomTargetPc, secDomTargetLetterIdx);
+            if (ov) return ov;
+          }
+          return getSpellingByMidiAndKey(midi, keyObj.name);
+        };
+        if (showAnswer || (isSubmitted && opt.forceCorrectSlots)) {
+          let [s, a, t, b] = vDraw[i];
+          let bSpell = spellFn(b); let tSpell = spellFn(t);
+          let aSpell = spellFn(a); let sSpell = spellFn(s);
+
+          let nS = new VF.StaveNote({ clef: 'treble', keys: [sSpell.keyStr], duration: 'w', stem_direction: 1 });
+          let nA = new VF.StaveNote({ clef: 'treble', keys: [aSpell.keyStr], duration: 'w', stem_direction: -1 });
+          let accS = getAccidentalToDraw(sSpell, mAccT, keyObj); if (accS) nS.addAccidental(0, new VF.Accidental(accS));
+          let accA = getAccidentalToDraw(aSpell, mAccT, keyObj); if (accA) nA.addAccidental(0, new VF.Accidental(accA));
+          
+          let vT1 = new VF.Voice({ num_beats: 4, beat_value: 4 }).addTickables([nS]);
+          let vT2 = new VF.Voice({ num_beats: 4, beat_value: 4 }).addTickables([nA]);
+          new VF.Formatter().joinVoices([vT1, vT2]).format([vT1, vT2], slotWidth - 20);
+          vT1.draw(ctx, sT); vT2.draw(ctx, sT);
+
+          let nT = new VF.StaveNote({ clef: 'bass', keys: [tSpell.keyStr], duration: 'w', stem_direction: 1 });
+          let nB = new VF.StaveNote({ clef: 'bass', keys: [bSpell.keyStr], duration: 'w', stem_direction: -1 });
+          let accT = getAccidentalToDraw(tSpell, mAccB, keyObj); if (accT) nT.addAccidental(0, new VF.Accidental(accT));
+          let accB = getAccidentalToDraw(bSpell, mAccB, keyObj); if (accB) nB.addAccidental(0, new VF.Accidental(accB));
+          
+          let vB1 = new VF.Voice({ num_beats: 4, beat_value: 4 }).addTickables([nT]);
+          let vB2 = new VF.Voice({ num_beats: 4, beat_value: 4 }).addTickables([nB]);
+          new VF.Formatter().joinVoices([vB1, vB2]).format([vB1, vB2], slotWidth - 20);
+          vB1.draw(ctx, sB); vB2.draw(ctx, sB);
+        } else {
+          if (sT) {
+            let rT = new VF.StaveNote({ clef: 'treble', keys: ['a/4'], duration: 'wr' });
+            VF.Formatter.FormatAndDraw(ctx, sT, [rT]);
+          }
+          
+          if (userBass[i] && !isSubmitted) {
+             let ub = userBass[i];
+             let uSpell = { keyStr: `${ub.step.toLowerCase()}${ub.acc==='n'?'':ub.acc}/${ub.oct}`, letter: ub.step, acc: ub.acc==='n'?'':ub.acc };
+             let nB = new VF.StaveNote({ clef: 'bass', keys: [uSpell.keyStr], duration: 'w' });
+             nB.setStyle({ fillStyle: 'var(--accent)', strokeStyle: 'var(--accent)' }); 
+             let accB = getAccidentalToDraw(uSpell, mAccB, keyObj); if (accB) nB.addAccidental(0, new VF.Accidental(accB));
+             VF.Formatter.FormatAndDraw(ctx, sB, [nB]);
+          } else if (userBass[i] && isSubmitted && !opt.forceCorrectSlots) {
+             let ub = userBass[i];
+             let isBassCorrect = (ub.midi === vDraw[i][3]);
+             let uSpell = { keyStr: `${ub.step.toLowerCase()}${ub.acc==='n'?'':ub.acc}/${ub.oct}`, letter: ub.step, acc: ub.acc==='n'?'':ub.acc };
+             let nB = new VF.StaveNote({ clef: 'bass', keys: [uSpell.keyStr], duration: 'w' });
+             if (!isBassCorrect) nB.setStyle({ fillStyle: 'var(--wrong)', strokeStyle: 'var(--wrong)' });
+             let accB = getAccidentalToDraw(uSpell, mAccB, keyObj); if (accB) nB.addAccidental(0, new VF.Accidental(accB));
+             VF.Formatter.FormatAndDraw(ctx, sB, [nB]);
+          } else {
+             let rB = new VF.StaveNote({ clef: 'bass', keys: ['d/3'], duration: 'wr' });
+             VF.Formatter.FormatAndDraw(ctx, sB, [rB]);
+          }
+        }
+        xPos += w;
+      }
+
+      // 鏡頭跟隨：只有在「自動往下跳格」時才捲動，手動點選某一格不強制捲動
+      if (targetSvgId === 'fpt-staff-svg' && this._shouldFollowScroll && activeBarCenterX !== null) {
+        const scrollEl = document.getElementById('staffContainerOuter');
+        if (scrollEl) {
+          const target = Math.max(0, activeBarCenterX - scrollEl.clientWidth / 2);
+          scrollEl.scrollTo({ left: target, behavior: 'smooth' });
+        }
+        this._shouldFollowScroll = false;
+      }
+    },
+
+    playProgression: function(modeStr) {
+      if (!pianoInst || this.isPlaying) return;
+      this.isPlaying = true; 
+      this.hasPlayed = true; 
+      this.updatePlayBtns();
+      this.updateSlotsOverlay(); 
+      
+      let capEl = document.getElementById('fpt-playCaption');
+      if (capEl) capEl.textContent = '🔊 準備聆聽題目...';
+
+      const ctx = ensureAudio();
+      // 標準音改為由「🎵 標準音 A」按鈕自行播放（考試模式則於第一次播放前自動給 2 秒）
+      let t = ctx.currentTime + 0.1;
+      let secPerBeat = 60 / this.bpm;
+      let measureDur = 4 * secPerBeat;
+
+      // 標準音與停頓結束後，更新提示文字為正在播放題目
+      const capTimer = setTimeout(() => {
+        if (this.isPlaying && capEl) capEl.textContent = `🔊 正在播放 (${modeStr === 'block'?'完整四部':'分解＋完整'})...`;
+      }, (t - ctx.currentTime) * 1000);
+      pendingTimers.push(capTimer);
+
+      this.questionVoicings.forEach((v) => {
+        let [s, a, tn, b] = v;
+        if (modeStr === 'block') {
+            pianoInst.play(b, t - 0.010, { duration: measureDur * 0.95, gain: 3.5 });
+            pianoInst.play(tn, t, { duration: measureDur * 0.95, gain: 3.5 });
+            pianoInst.play(a, t, { duration: measureDur * 0.95, gain: 3.5 });
+            pianoInst.play(s, t, { duration: measureDur * 0.95, gain: 3.5 });
+        } else if (modeStr === 'arpeggio') {
+            pianoInst.play(b, t, { duration: measureDur, gain: 3.5 });
+            pianoInst.play(tn, t + 0.3, { duration: measureDur - 0.3, gain: 3.5 });
+            pianoInst.play(a, t + 0.6, { duration: measureDur - 0.6, gain: 3.5 });
+            pianoInst.play(s, t + 0.9, { duration: measureDur - 0.9, gain: 3.5 });
+            
+            let remDur = Math.max(0.5, measureDur - 1.2);
+            pianoInst.play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: 3.5 });
+            pianoInst.play(tn, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
+            pianoInst.play(a, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
+            pianoInst.play(s, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
+        }
+        t += measureDur;
+      });
+
+      const timer = setTimeout(() => {
+        this.isPlaying = false; this.updatePlayBtns();
+        if (capEl) capEl.textContent = '✅ 播放完畢，請切換頁籤填寫低音與級數！';
+      }, (t - ctx.currentTime) * 1000 + 100);
+      pendingTimers.push(timer);
+    },
+
+    playReview: function(id, modeStr) {
+        let item = this.reviewItems.find(r => r.id === id);
+        if (!item || !pianoInst || this.isPlaying) return;
+        this.isPlaying = true;
+        const ctx = ensureAudio();
+        // 訂正播放：不播標準音、不停頓，直接聆聽和聲
+        let t = ctx.currentTime + 0.1;
+        let secPerBeat = 60 / this.bpm;
+        let measureDur = 4 * secPerBeat;
+
+        item.questionVoicings.forEach((v) => {
+            let [s, a, tn, b] = v;
+            if (modeStr === 'block') {
+                pianoInst.play(b, t - 0.010, { duration: measureDur * 0.95, gain: 3.5 });
+                pianoInst.play(tn, t, { duration: measureDur * 0.95, gain: 3.5 });
+                pianoInst.play(a, t, { duration: measureDur * 0.95, gain: 3.5 });
+                pianoInst.play(s, t, { duration: measureDur * 0.95, gain: 3.5 });
+            } else if (modeStr === 'arpeggio') {
+                pianoInst.play(b, t, { duration: measureDur, gain: 3.5 });
+                pianoInst.play(tn, t + 0.3, { duration: measureDur - 0.3, gain: 3.5 });
+                pianoInst.play(a, t + 0.6, { duration: measureDur - 0.6, gain: 3.5 });
+                pianoInst.play(s, t + 0.9, { duration: measureDur - 0.9, gain: 3.5 });
+                
+                let remDur = Math.max(0.5, measureDur - 1.2);
+                pianoInst.play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: 3.5 });
+                pianoInst.play(tn, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
+                pianoInst.play(a, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
+                pianoInst.play(s, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
+            }
+            t += measureDur;
+        });
+        const timer = setTimeout(() => { this.isPlaying = false; }, (t - ctx.currentTime) * 1000 + 100);
+        pendingTimers.push(timer);
+    },
+
+    updatePlayBtns: function() {
+      const btns = ['btn-play-all', 'btn-play-arp'];
+      btns.forEach(id => {
+        let b = document.getElementById(id);
+        if (!b) return;
+        if (this.isPlaying) b.disabled = true;
+        else b.disabled = !pianoInst || (this.mode === 'test' && this.testSession && this.testSession.replaysLeft <= 0);
+      });
+      // 解答頁的播放按鈕（不受測驗次數限制）
+      ['btn-play-all-ans', 'btn-play-arp-ans'].forEach(id => {
+        let b = document.getElementById(id);
+        if (b) b.disabled = this.isPlaying || !pianoInst;
+      });
+      if (!this.isPlaying && this.mode === 'test' && this.testSession) {
+        document.getElementById('btn-play-all').textContent = `🔊 完整四部 (剩 ${this.testSession.replaysLeft} 次)`;
+      } else if (!this.isPlaying) {
+        document.getElementById('btn-play-all').textContent = '🔊 完整四部 (SATB)';
+      }
+    },
+
+    submitAnswer: function() {
+      // 提交前檢查未完成項目，跳出確認提示
+      let emptyBass = this.userBass.filter(v => v === null).length;
+      let emptySeq = this.userSeq.filter(v => v === '' || v.endsWith('/')).length;
+      let keyMissing = !this.userKeyAns;
+      let issues = [];
+      if (keyMissing) issues.push('調性尚未選擇');
+      if (emptyBass > 0) issues.push(`${emptyBass} 格低音未填`);
+      if (emptySeq > 0) issues.push(`${emptySeq} 格級數未填或未完成`);
+      if (issues.length > 0) {
+        let msg = '尚有未完成項目：\n・' + issues.join('\n・') + '\n\n未填的部分會計為錯誤，確定要提交嗎？';
+        if (!window.confirm(msg)) return;
+      }
+
+      window.fptStopAll();
+      this.isSubmitted = true;
+      let allCorrect = true;
+      let results = [];
+
+      let keyCorrect = (this.userKeyAns === this.keyObj.name);
+      if (!keyCorrect) allCorrect = false;
+
+      for (let i = 0; i < this.bars; i++) {
+        let uNorm = normalizeChord(this.userSeq[i], this.keyObj.isMin);
+        let qNorm = normalizeChord(this.questionSeq[i], this.keyObj.isMin);
+        let isChordC = (this.userSeq[i] !== '' && uNorm === qNorm);
+        // 未填低音 (null) 視為錯誤，不再直接讀取 .midi 造成 crash
+        let isBassC = (this.userBass[i] != null) && (this.userBass[i].midi === this.questionVoicings[i][3]);
+        
+        results.push({ chord: isChordC, bass: isBassC });
+        if (!isChordC || !isBassC) allCorrect = false;
+      }
+
+      // 在解答頁渲染雙譜表對照：上=你的作答（紅色標錯）、下=標準正解（完整四聲部）
+      this.renderStaff({
+          targetSvgId: 'fpt-ansUser-svg', bars: this.bars, keyObj: this.keyObj,
+          userSeq: this.userSeq, userBass: this.userBass, userKeyAns: this.userKeyAns,
+          isSubmitted: true, showAnswer: false, customVoicings: this.questionVoicings, forceResults: results
+      });
+      this.renderStaff({
+          targetSvgId: 'fpt-ansCorrect-svg', bars: this.bars, keyObj: this.keyObj,
+          userSeq: this.questionSeq, userBass: this.userBass, userKeyAns: this.keyObj.name,
+          isSubmitted: true, showAnswer: true, customVoicings: this.questionVoicings, forceCorrectSlots: true
+      });
+      // 兩個譜表捲軸同步
+      setTimeout(() => {
+        let ua = document.getElementById('ansUserScroll');
+        let ca = document.getElementById('ansCorrectScroll');
+        if (ua && ca && !ua._syncBound) {
+          ua._syncBound = true;
+          let syncing = false;
+          let link = (from, to) => from.addEventListener('scroll', () => {
+            if (syncing) { syncing = false; return; }
+            syncing = true; to.scrollLeft = from.scrollLeft;
+          }, { passive: true });
+          link(ua, ca); link(ca, ua);
+        }
+      }, 60);
+
+      const ft = document.getElementById('fpt-feedbackText');
+      if (allCorrect) {
+        ft.textContent = '🎉 完美成真！調性、低音與對位聽覺完全是頂尖水準！';
+        ft.className = 'feedback-text correct';
+        this.score.c++;
+      } else {
+        let hasBassErr = results.some(r => !r.bass);
+        let hasChordErr = results.some(r => !r.chord);
+        if (hasBassErr && hasChordErr) {
+            ft.textContent = '❌ 低音與級數都有錯喔！完整正解如下，也已收進錯題本：';
+            ft.className = 'feedback-text wrong';
+        } else if (hasBassErr) {
+            ft.textContent = '⚠️ 級數寫對了，但低音抓錯囉！完整正解如下，已收進錯題本：';
+            ft.className = 'feedback-text partial';
+        } else {
+            ft.textContent = '⚠️ 低音全對！但和絃性質或轉位判斷有誤，完整正解如下，已收進錯題本：';
+            ft.className = 'feedback-text partial';
+        }
+        this.addToReview(results, keyCorrect);
+      }
+      this.score.t++;
+      let scoreText = `${this.score.c}/${this.score.t}`;
+      document.getElementById('fpt-scoreNum').textContent = scoreText;
+      document.getElementById('fpt-scoreNumAns').textContent = scoreText;
+      document.getElementById('fpt-answerBadge').textContent = allCorrect ? '✅ 答對了' : '📖 解答對照';
+      this.updatePlayBtns();
+      showPage('fpt-answer');
+      // 答案頁捲軸重置回第一小節（兩個譜表都歸零）
+      setTimeout(() => {
+        let ua = document.getElementById('ansUserScroll');
+        let ca = document.getElementById('ansCorrectScroll');
+        if (ua) ua.scrollLeft = 0;
+        if (ca) ca.scrollLeft = 0;
+      }, 80);
+    },
+
+    addToReview: function(results, keyCorrect) {
+      const id = this.reviewItems.length + 1;
+      // 只儲存錯題資料，實際渲染延到進入錯題本頁時才做（節省效能）
+      this.reviewItems.push({
+          id: id, bars: this.bars, keyObj: this.keyObj,
+          userKeyAns: this.userKeyAns, userSeq: [...this.userSeq], userBass: JSON.parse(JSON.stringify(this.userBass)),
+          questionSeq: [...this.questionSeq], questionVoicings: [...this.questionVoicings],
+          results: results.map(r => ({...r}))
+      });
+      this.updateReviewCount();
+    },
+
+    updateReviewCount: function() {
+      let el = document.getElementById('fpt-reviewCount');
+      if (el) el.textContent = this.reviewItems.length;
+    },
+
+    // 進入錯題本頁時，渲染所有累積的錯題（你的作答 vs 標準正解，捲軸同步）
+    renderReviewPage: function() {
+      const list = document.getElementById('fpt-reviewList');
+      const empty = document.getElementById('fpt-reviewEmpty');
+      if (!list) return;
+      list.innerHTML = '';
+      if (this.reviewItems.length === 0) { if (empty) empty.style.display = 'block'; return; }
+      if (empty) empty.style.display = 'none';
+
+      // 由新到舊排列
+      let items = [...this.reviewItems].reverse();
+      items.forEach(rItem => {
+        let id = rItem.id;
+        let box = document.createElement('div'); box.className = 'review-item';
+        box.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font-weight:700; color:var(--wrong);">❌ 錯題 #${id} (正解: ${rItem.keyObj.name})</span>
+          </div>
+          <div class="review-label">你的作答 (紅色為錯誤)：</div>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+             <button class="action-btn" style="border-color:var(--correct); color:var(--correct);" onclick="window.fptModule.playReview(${id}, 'block')">🔊 聽完整正解</button>
+             <button class="action-btn" style="border-color:var(--correct); color:var(--correct);" onclick="window.fptModule.playReview(${id}, 'arpeggio')">🎵 聽分解正解</button>
+          </div>
+          <div class="review-staff" id="rev-user-scroll-${id}">
+            <div style="position:relative; width:max-content; min-width:100%; height:320px;">
+               <div id="rev-user-${id}"></div>
+            </div>
+          </div>
+          <div class="review-label" style="margin-top:8px;">標準正解：</div>
+          <div class="review-staff" id="rev-correct-scroll-${id}">
+            <div style="position:relative; width:max-content; min-width:100%; height:320px;">
+               <div id="rev-correct-${id}"></div>
+            </div>
+          </div>
+        `;
+        list.appendChild(box);
+      });
+
+      setTimeout(() => {
+        items.forEach(rItem => {
+          let id = rItem.id;
+          this.renderStaff({
+              targetSvgId: `rev-user-${id}`, bars: rItem.bars, keyObj: rItem.keyObj,
+              userSeq: rItem.userSeq, questionSeq: rItem.questionSeq, userBass: rItem.userBass, userKeyAns: rItem.userKeyAns,
+              isSubmitted: true, showAnswer: false, customVoicings: rItem.questionVoicings, forceResults: rItem.results
+          });
+          this.renderStaff({
+              targetSvgId: `rev-correct-${id}`, bars: rItem.bars, keyObj: rItem.keyObj,
+              userSeq: rItem.questionSeq, questionSeq: rItem.questionSeq, userBass: rItem.userBass, userKeyAns: rItem.keyObj.name,
+              isSubmitted: true, showAnswer: true, customVoicings: rItem.questionVoicings, forceCorrectSlots: true
+          });
+          let ua = document.getElementById(`rev-user-scroll-${id}`);
+          let ca = document.getElementById(`rev-correct-scroll-${id}`);
+          if (ua && ca) {
+            let syncing = false;
+            let link = (from, to) => from.addEventListener('scroll', () => {
+              if (syncing) { syncing = false; return; }
+              syncing = true; to.scrollLeft = from.scrollLeft;
+            }, { passive: true });
+            link(ua, ca); link(ca, ua);
+          }
+        });
+      }, 50);
+    },
+
+    setupEvents: function() {
+      document.querySelectorAll('#fpt-modeSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.mode = b.dataset.mode; document.querySelectorAll('#fpt-modeSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+        document.getElementById('testReplayWrapper').style.display = this.mode === 'test' ? 'flex' : 'none';
+      });
+      document.querySelectorAll('#fpt-keySwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.keyPref = b.dataset.key; document.querySelectorAll('#fpt-keySwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+      });
+
+      document.getElementById('fpt-enterBtn').onclick = () => {
+        ensureAudio(); window.fptStopAll();
+        this.bars = parseInt(document.getElementById('fpt-barsSelect').value, 10);
+        this.bpm = parseInt(document.getElementById('fpt-bpm').value, 10);
+        if (this.mode === 'test') {
+          let max = parseInt(document.getElementById('fpt-testReplaySelect').value, 10);
+          this.testSession = { replaysLeft: max, total: max };
+        } else this.testSession = null;
+        
+        this.generateQuestion();
+        showPage('fpt-practice');
+        this.switchTab('bass');
+        setTimeout(() => { let el = document.getElementById('staffContainerOuter'); if (el) el.scrollLeft = 0; }, 80);
+      };
+
+      document.getElementById('btn-play-all').onclick = () => { if(this.mode==='test'&&this.testSession)this.testSession.replaysLeft--; this.playProgression('block'); };
+      document.getElementById('btn-play-arp').onclick = () => { if(this.mode==='test'&&this.testSession)this.testSession.replaysLeft--; this.playProgression('arpeggio'); };
+      // 解答頁的播放按鈕（不受測驗次數限制，可自由聆聽正解）
+      document.getElementById('btn-play-all-ans').onclick = () => this.playProgression('block');
+      document.getElementById('btn-play-arp-ans').onclick = () => this.playProgression('arpeggio');
+
+      document.getElementById('btn-case-switch').onclick = (e) => {
+        e.target.classList.toggle('active-toggle');
+        let isUpper = e.target.classList.contains('active-toggle');
+        e.target.textContent = isUpper ? '大寫 (A)' : '小寫 (a)';
+        document.querySelectorAll('.deg-btn').forEach((btn, idx) => {
+          // N6（拿坡里六和絃）不參與大小寫切換；此處原本比對 'N' 但實際屬性是 'N6'，
+          // 導致 N6 被當成第 8 個級數去取陣列值（陣列只有 7 個）而被清成空白。
+          if (btn.dataset.deg === 'N6') return;
+          const up = ['I','II','III','IV','V','VI','VII'], low = ['i','ii','iii','iv','v','vi','vii'];
+          const label = isUpper ? up[idx] : low[idx];
+          if (label) btn.textContent = label;
+        });
+      };
+      document.getElementById('btn-sev-switch').onclick = (e) => {
+        e.target.classList.toggle('active-toggle');
+        let isSev = e.target.classList.contains('active-toggle');
+        e.target.textContent = isSev ? '7和絃 [開]' : '7和絃 [關]';
+        document.querySelectorAll('.inv-btn').forEach((btn, idx) => {
+          if (idx === 0) btn.textContent = isSev ? '7' : '原位';
+          if (idx === 1) btn.textContent = isSev ? '65' : '6';
+          if (idx === 2) btn.textContent = isSev ? '43' : '64';
+        });
+        // 第三轉位 42 只存在於七和絃，一般三和絃沒有，因此只在 7 和絃模式顯示
+        let btn42 = document.getElementById('inv-btn-3');
+        if (btn42) btn42.style.display = (isSev && this.curLevel.id >= 3) ? 'inline-block' : 'none';
+      };
+
+      document.querySelectorAll('.deg-btn').forEach(b => b.onclick = () => this.handleKbInput('deg', b.dataset.deg));
+      document.querySelectorAll('.inv-btn').forEach(b => b.onclick = () => this.handleKbInput('inv', b.dataset.inv));
+      document.querySelectorAll('.mod-btn').forEach(b => b.onclick = () => this.handleKbInput('mod', b.dataset.mod));
+      document.querySelectorAll('.aug6-btn').forEach(b => b.onclick = () => this.handleKbInput('aug6', b.dataset.aug6));
+      
+      document.getElementById('kb-backspace').onclick = () => this.handleKbInput('back');
+      document.getElementById('kb-clear').onclick = () => this.handleKbInput('clear');
+
+      document.getElementById('fpt-submitBtn').onclick = () => this.submitAnswer();
+      document.getElementById('fpt-nextBtn').onclick = () => {
+        window.fptStopAll();
+        document.getElementById('fpt-feedbackText').className = 'feedback-text';
+        document.getElementById('fpt-feedbackText').textContent = '';
+        this.generateQuestion();
+        this.switchTab('bass');
+        showPage('fpt-practice');
+        // 作答譜例捲軸回第一小節
+        setTimeout(() => { let el = document.getElementById('staffContainerOuter'); if (el) el.scrollLeft = 0; }, 80);
+      };
+
+      // 錯題本清空
+      let clearBtn = document.getElementById('fpt-clearReviewBtn');
+      if (clearBtn) clearBtn.onclick = () => {
+        if (this.reviewItems.length === 0) return;
+        if (window.confirm('確定要清空所有錯題紀錄嗎？此動作無法復原。')) {
+          this.reviewItems = [];
+          this.updateReviewCount();
+          this.renderReviewPage();
+        }
+      };
+
+      window.addEventListener('resize', () => { if(document.getElementById('pageFptPractice').classList.contains('active')) this.updateUI(); });
+    }
+  };
+
+  window.fptModule = fptModule;
+  fptModule.init(); loadPiano();
+  if(window.EXAM && window.EXAM.isExamMode()){ fptModule.examBootstrap(); }
+
+  /* 「🎵 標準音 A」按鈕：隨時可按，播放 A4（440Hz）2 秒，不影響題目播放次數 */
+  (function(){
+    var btn = document.getElementById('tuningABtn'); if(!btn) return;
+    // 考試模式已於第一次播放前自動給標準音，不需要這顆按鈕
+    if(window.EXAM && window.EXAM.isExamMode()){ btn.style.display = 'none'; return; }
+    btn.onclick = function(){
+      try{
+        ensureAudio();
+        if(!pianoInst) return;
+        var ctx = ensureAudio();
+        pianoInst.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
+        var t = btn.textContent; btn.textContent = '🎵 A 響起…';
+        setTimeout(function(){ btn.textContent = t; }, 2000);
+      }catch(e){}
+    };
+  })();
+
+})();
+</script>
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
+</script>
+<script>
+/* 附加（不改動既有邏輯）：1) 錯題本完整資料持久化＋載入還原；2) 玩法說明按鈕與彈窗。 */
+(function(){
+  var KEY='fourpart';
+  if(!window.REVIEW_STORE){
+    window.REVIEW_STORE = { PREFIX:'earTrainer.review.',
+      load:function(t){try{return JSON.parse(localStorage.getItem(this.PREFIX+t)||'[]')}catch(e){return[]}},
+      save:function(t,a){try{localStorage.setItem(this.PREFIX+t,JSON.stringify(a))}catch(e){}},
+      clear:function(t){this.save(t,[])},count:function(t){return this.load(t).length} };
+  }
+  function buildStorable(){ var m=window.fptModule; if(!m) return [];
+    return (m.reviewItems||[]).map(function(it){ var kn=it.keyObj?it.keyObj.name:'';
+      return { id:it.id, bars:it.bars, keyObj:it.keyObj, userKeyAns:it.userKeyAns, userSeq:it.userSeq, userBass:it.userBass, questionSeq:it.questionSeq, questionVoicings:it.questionVoicings, results:it.results, ts:it.ts||Date.now(), label:kn, correctText:kn?('正解調性 '+kn):'（四部和聲）', yourText:'' }; }); }
+  function persist(){ try{ window.REVIEW_STORE.save(KEY, buildStorable()); }catch(e){} }
+  function hydrate(){ try{ var m=window.fptModule; if(!m) return; var stored=window.REVIEW_STORE.load(KEY);
+    if(stored && stored.length && (!m.reviewItems || m.reviewItems.length===0)){
+      m.reviewItems = stored.map(function(s){ return { id:s.id, bars:s.bars, keyObj:s.keyObj, userKeyAns:s.userKeyAns, userSeq:s.userSeq, userBass:s.userBass, questionSeq:s.questionSeq, questionVoicings:s.questionVoicings, results:s.results, ts:s.ts }; });
+      if(typeof m.updateReviewCount==='function') m.updateReviewCount(); } }catch(e){} }
+  var tries=0; var iv=setInterval(function(){ tries++;
+    if(window.fptModule && typeof window.fptModule.addToReview==='function'){ clearInterval(iv); hydrate();
+      var origAdd=window.fptModule.addToReview.bind(window.fptModule);
+      window.fptModule.addToReview=function(){ var r=origAdd.apply(window.fptModule,arguments); persist(); return r; };
+      var clr=document.getElementById('fpt-clearReviewBtn'); if(clr) clr.addEventListener('click', function(){ setTimeout(persist,60); });
+      if(location.hash==='#review' && typeof showPage==='function') showPage('fpt-review');
+    } else if(tries>40){ clearInterval(iv); } },150);
+  var hcss = ''
+    + '.help-btn{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--accent);background:#fff;border:1px solid var(--accent-line);padding:8px 14px;border-radius:999px;cursor:pointer;touch-action:manipulation;white-space:nowrap;}'
+    + '.help-btn:hover,.help-btn:active{background:var(--accent);color:var(--panel);border-color:var(--accent);}'
+    + '.help-modal{display:none;position:fixed;inset:0;z-index:1000;background:rgba(38,36,32,0.55);padding:24px 16px;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
+    + '.help-modal.open{display:flex;align-items:flex-start;justify-content:center;}'
+    + '.help-box{background:var(--paper);border:1px solid var(--panel-border);border-radius:16px;max-width:560px;width:100%;margin:auto;padding:24px 22px 22px;box-shadow:0 20px 50px rgba(0,0,0,0.28);position:relative;}'
+    + '.help-box h2{font-family:var(--font-display);font-size:22px;font-weight:600;margin:0 30px 6px 0;}'
+    + '.help-box h3{font-family:var(--font-body);font-size:13.5px;font-weight:700;color:var(--accent);margin:16px 0 5px;}'
+    + '.help-box p{font-size:13.5px;line-height:1.8;color:var(--ink);margin:0 0 8px;}'
+    + '.help-box .help-lead{color:var(--ink-soft);font-size:13px;margin-bottom:4px;}'
+    + '.help-box b{font-weight:700;}'
+    + '.help-close{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:1px solid var(--panel-border);background:var(--panel);color:var(--ink);font-size:20px;line-height:1;cursor:pointer;}'
+    + '.help-close:hover{background:var(--accent);color:var(--panel);border-color:var(--accent);}'
+    + '.help-common{margin-top:18px;padding-top:14px;border-top:1px dashed var(--panel-border);}'
+    + '.help-common h3{color:var(--ink-soft);}'
+    + '.help-common p{font-size:12.5px;line-height:1.75;color:var(--ink-soft);}'
+    + '.help-foot{margin-top:16px;text-align:center;}'
+    + '.help-foot button{font-family:var(--font-body);font-weight:700;font-size:14px;padding:11px 30px;border-radius:999px;background:var(--accent);color:var(--panel);border:none;cursor:pointer;touch-action:manipulation;}';
+  var st=document.createElement('style'); st.textContent=hcss; document.head.appendChild(st);
+  var hhtml = ''
+    + '<div class="help-box"><button class="help-close" data-help-close aria-label="關閉">×</button>'
+    + '<h2>四部和聲進行 — 玩法說明</h2>'
+    + '<p class="help-lead">聽辨古典四部和聲的進行——判斷調性、寫出低音線條、標出功能級數與轉位（全音符 4/4 記譜）。</p>'
+    + '<h3>設定</h3><p>可選調性（隨機 24 大小調／僅大調／僅小調）、小節數（6／8／10／12）、速度、難度 Lv1～Lv5（Lv1 本調三和絃原位，逐級加入轉位、七和絃、副屬／拿坡里，到 Lv5 增六和絃）。</p>'
+    + '<h3>作答</h3><p>按「完整四部（SATB）」或「分解＋完整」聆聽，接著完成三件事——① <b>調性</b>：在譜例最前面的「調性?」下拉選單，從共用同一組調號的大調與關係小調中二選一。② <b>編輯低音</b>：用音名鍵盤寫出每格低音；先打音名，再用升／降／還原／「復原回本調」與八度做事後修飾（輸入後自動跳下一格）。③ <b>編輯級數</b>：選羅馬數字級數與轉位（原位／6／64，七和絃 65／43／42），另有大小寫切換、減／半減／增、副屬、拿坡里 N6、增六（義／法／德）等修飾鍵。</p>'
+    + '<p>按提交 → 若還有未完成（調性未選、低音或級數未填）會列出提醒、仍可提交（未填算錯）→ 解答頁把你的作答與標準正解「雙譜表對照」、紅色標錯，可聆聽完整／分解正解。</p>'
+    + '<div class="help-common"><h3>共通規則（六個練習都適用）</h3>'
+    + '<p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>'
+    + '<p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>'
+    + '<p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>'
+    + '<p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照與即時訂正。</p>'
+    + '</div><div class="help-foot"><button data-help-close>我知道了</button></div></div>';
+  var modal=document.createElement('div'); modal.className='help-modal'; modal.id='fpt-helpModal'; modal.innerHTML=hhtml; document.body.appendChild(modal);
+  function closeM(){ modal.classList.remove('open'); } function openM(){ modal.classList.add('open'); }
+  modal.addEventListener('click', function(e){ if(e.target===modal) closeM(); });
+  Array.prototype.forEach.call(modal.querySelectorAll('[data-help-close]'), function(b){ b.addEventListener('click', closeM); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeM(); });
+  var nav=document.querySelector('#pageFptSettings .nav-header-row');
+  if(nav){ var btn=document.createElement('button'); btn.type='button'; btn.className='help-btn'; btn.textContent='❔ 玩法說明'; btn.addEventListener('click', openM);
+    var reset=nav.querySelector('.reset-cache-btn');
+    if(reset){ var w=document.createElement('div'); w.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;'; nav.insertBefore(w, reset); w.appendChild(btn); w.appendChild(reset); } else nav.appendChild(btn); }
+})();
+</script>
+<script>
+/* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */
+(function(){
+  function setPlayback(){ try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} }
+  setPlayback();
+  var SILENT="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+  var done=false;
+  function unlock(){ if(done) return; done=true; setPlayback();
+    try{ var a=new Audio(SILENT); a.setAttribute("playsinline",""); a.volume=0.02; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){}
+    document.removeEventListener("touchend",unlock,true); document.removeEventListener("click",unlock,true);
+  }
+  document.addEventListener("touchend",unlock,true);
+  document.addEventListener("click",unlock,true);
+})();
+</script>
+</body>
+</html>

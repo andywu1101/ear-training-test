@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>單旋律曲調 - 音樂聽力練習</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="聽力訓練">
+<meta name="theme-color" content="#33415c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
+<script src="soundfont-player.min.js"></script>
+<script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
+<script src="vexflow-min.js"></script>
+<script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
+<style>
+  :root{
+    --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
+    --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
+    --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--font-body); }
+  .wrap { height: 100%; display: flex; flex-direction: column; max-width: 820px; margin: 0 auto; width: 100%; }
+
+  .page-view { display: none; height: 100%; flex-direction: column; animation: fadeIn 0.2s ease-out; }
+  .page-view.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ================= 設定頁 / 解答頁 / 錯題本頁（可捲動） ================= */
+  #pageMelSettings, #pageMelAnswer, #pageMelReview { overflow-y: auto; padding: 20px 16px 64px; }
+  .nav-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .nav-back-btn, .reset-cache-btn {
+    display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid var(--panel-border); background: var(--panel); color: var(--ink); cursor: pointer; text-decoration: none;
+  }
+  .reset-cache-btn { color: #8a6d20; border-color: #ffd885; background: #fff8e6; margin-left: 8px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: 28px; margin: 0 0 8px; }
+  .subtitle { color: var(--ink-soft); font-size: 13.5px; margin: 0 0 20px; line-height: 1.5; }
+
+  .switch-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .switch-group { display: flex; flex-direction: column; gap: 8px; }
+  .switch-group-label { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+  .switch-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mode-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 10px; background: transparent; border: 1px solid var(--panel-border); color: var(--ink-soft); cursor: pointer; }
+  .mode-btn.active { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+
+  .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); cursor: pointer; }
+  .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
+
+  .pattern-grid-header { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; }
+  .select-all-btn { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--panel-border); background: var(--panel); font-weight: bold; cursor: pointer; }
+  .pattern-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 24px; }
+  .pattern-item { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; border: 2px solid var(--panel-border); border-radius: 10px; padding: 4px; cursor: pointer; transition: 0.1s; height: 60px; overflow: hidden; }
+  .pattern-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .pattern-item svg { pointer-events: none; }
+
+  .start-big-btn { width: 100%; font-weight: 700; font-size: 16px; padding: 16px; border-radius: var(--radius); background: var(--accent); color: var(--panel); border: none; cursor: pointer; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(51,65,92,0.2); transition: filter 0.2s; }
+  .start-big-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .review-entry-btn{ width:100%; padding:14px; border-radius:999px; font-weight:700; font-size:15px; background:transparent; color:var(--ink); border:1px solid var(--ink); cursor:pointer; margin-bottom:20px; }
+  .review-entry-btn:hover, .review-entry-btn:active{ background:var(--ink); color:var(--panel); }
+
+  /* ================= 作答頁 (上下分層) ================= */
+  .practice-top-fixed { flex: 0 0 auto; padding: 12px 16px; background: var(--paper); z-index: 10; border-bottom: 1px solid var(--panel-border); box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+  .practice-bottom-scroll { flex: 1 1 auto; overflow-y: auto; padding: 16px; background: var(--panel); }
+
+  .top-bar-practice { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .practice-status-badge { font-family: var(--font-mono); font-size: 12px; background: var(--panel); border: 1px solid var(--panel-border); padding: 6px 12px; border-radius: 999px; color: var(--ink-soft); }
+  .score-box { text-align: right; font-family: var(--font-mono); }
+  .score-box .num { font-size: 18px; font-weight: 700; color: var(--accent); line-height: 1; }
+
+  .staff-scroll-container { width: 100%; background: #fff; border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 4px; box-shadow: inset 0 0 8px rgba(0,0,0,0.02); margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+  .staff-scroll-container::-webkit-scrollbar { height: 6px; }
+  .staff-scroll-container::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
+
+  .unified-action-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .action-btn, .play-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s; }
+  .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
+  .play-btn, .btn-submit { background: var(--accent); color: var(--panel); border: none; }
+  .play-btn:disabled, .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; background: var(--ink-soft); }
+  .play-caption { font-size: 12px; color: var(--ink-soft); font-weight: 600; text-align: center; }
+
+  /* 膠囊分頁卡設計 */
+  .editor-tabs-container { display: flex; justify-content: center; align-items: center; margin-bottom: 14px; }
+  .editor-tabs { display: inline-flex; background: var(--paper); border: 1px solid var(--panel-border); border-radius: 999px; padding: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+  .tab-btn { font-size: 13.5px; font-weight: 700; padding: 8px 22px; border-radius: 999px; border: none; background: transparent; color: var(--ink-soft); cursor: pointer; transition: all 0.15s; }
+  .tab-btn.active { background: var(--accent); color: var(--panel); box-shadow: 0 2px 8px rgba(51,65,92,0.25); }
+
+  /* 節奏鍵盤 */
+  .rhythm-keypad { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; padding-bottom: 40px; }
+  .rhythm-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 60px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); overflow: hidden; transition: all 0.1s; }
+  .rhythm-btn:active { transform: scale(0.94); border-color: var(--accent); }
+
+  /* 音高鍵盤 */
+  .pitch-keypad { display: flex; flex-direction: column; gap: 8px; max-width: 500px; margin: 0 auto; padding-bottom: 40px; }
+  .pitch-row-acc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pitch-row-notes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pitch-row-oct { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .p-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; font-weight: 700; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); transition: 0.1s; }
+  .p-btn:active { transform: scale(0.95); border-color: var(--accent); }
+  .p-btn.acc-btn { height: 38px; font-size: 16px; background: var(--panel); }
+  .p-btn.acc-btn.active { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  .p-btn.note-btn { height: 55px; font-size: 18px; }
+  .p-btn.note-btn span { font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-top: 2px; }
+  .p-btn.oct-btn { height: 42px; font-size: 13px; background: var(--panel); }
+
+  .feedback-text { text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 6px; display: none; }
+  .feedback-text.correct { color: var(--correct); display: block; }
+  .feedback-text.wrong { color: var(--wrong); display: block; }
+  .answer-big-feedback{ font-family: var(--font-display); font-size: 22px; font-weight: 700; text-align:center; margin: 6px 0 14px; }
+  .answer-big-feedback.correct{ color: var(--correct); }
+  .answer-big-feedback.wrong{ color: var(--wrong); }
+
+  .review-section h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 12px; }
+  .review-item { background: #fff; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .review-label { font-size: 12px; font-weight: bold; color: var(--ink-soft); margin-bottom: 4px; }
+  .review-staff { background: var(--panel); border-radius: 8px; padding: 10px 4px; margin-bottom: 12px; border: 1px solid var(--hairline); width: 100%; overflow-x: auto; overflow-y: hidden; }
+
+  .loading-banner { text-align: center; font-size: 12px; color: var(--ink-soft); background: #fff; padding: 8px; border-radius: 8px; margin-bottom: 16px; }
+
+  @media (min-width: 768px) {
+    .wrap { border-left: 1px solid var(--hairline); border-right: 1px solid var(--hairline); background: var(--paper); box-shadow: 0 0 20px rgba(0,0,0,0.05); }
+    .practice-top-fixed { padding: 20px 40px; }
+    .practice-bottom-scroll { padding: 20px 40px; }
+    .rhythm-keypad { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 16px; }
+    .rhythm-btn { height: 75px; }
+    .pattern-item { height: 65px; }
+    .action-btn, .play-btn { font-size: 14px; padding: 12px 20px; }
+  }
+
+  @media (orientation: landscape) and (max-width: 900px) {
+    .practice-top-fixed { padding: 4px 10px; }
+    .top-bar-practice { margin-bottom: 4px; }
+    .score-box .num { font-size: 16px; }
+    .staff-scroll-container { margin-bottom: 4px; padding: 4px; }
+    .unified-action-row { margin-bottom: 4px; }
+    .play-caption { margin-top: 0; }
+    .rhythm-btn { height: 50px; }
+    .pattern-item { height: 45px; }
+    .p-btn.note-btn { height: 45px; }
+    .p-btn.acc-btn { height: 32px; }
+  }
+
+  /* ===== 玩法說明按鈕與彈窗 ===== */
+  .help-btn{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-body); font-size:13px; font-weight:600; color:var(--accent); background:#fff; border:1px solid var(--accent-line); padding:8px 14px; border-radius:999px; cursor:pointer; touch-action:manipulation; white-space:nowrap; }
+  .help-btn:hover, .help-btn:active{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .help-modal{ display:none; position:fixed; inset:0; z-index:1000; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .help-modal.open{ display:flex; align-items:flex-start; justify-content:center; }
+  .help-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; max-width:560px; width:100%; margin:auto; padding:24px 22px 22px; box-shadow:0 20px 50px rgba(0,0,0,0.28); position:relative; animation:helpIn .2s ease-out; }
+  @keyframes helpIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .help-box h2{ font-family:var(--font-display); font-size:22px; font-weight:600; margin:0 30px 6px 0; }
+  .help-box h3{ font-family:var(--font-body); font-size:13.5px; font-weight:700; color:var(--accent); margin:16px 0 5px; }
+  .help-box p{ font-size:13.5px; line-height:1.8; color:var(--ink); margin:0 0 8px; }
+  .help-box .help-lead{ color:var(--ink-soft); font-size:13px; margin-bottom:4px; }
+  .help-box b{ font-weight:700; }
+  .help-close{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:50%; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink); font-size:20px; line-height:1; cursor:pointer; }
+  .help-close:hover{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .help-common{ margin-top:18px; padding-top:14px; border-top:1px dashed var(--panel-border); }
+  .help-common h3{ color:var(--ink-soft); }
+  .help-common p{ font-size:12.5px; line-height:1.75; color:var(--ink-soft); }
+  .help-foot{ margin-top:16px; text-align:center; }
+  .help-foot button{ font-family:var(--font-body); font-weight:700; font-size:14px; padding:11px 30px; border-radius:999px; background:var(--accent); color:var(--panel); border:none; cursor:pointer; touch-action:manipulation; }
+
+  /* ===== 版面壓縮：比照四部和聲的密度（考試與練習皆適用） =====
+     重點：上方固定區可壓縮（flex:0 1 auto）、譜例設高度上限，
+     讓下方作答鍵盤拿到剩餘空間，不再被譜例擠扁。 */
+  /* 上方區不壓縮：播放列一定完整顯示；空間不足時由下方鍵盤區自行捲動 */
+  .practice-top-fixed { flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; overflow: visible; padding: 8px 10px; }
+  .practice-bottom-scroll { min-height: 0; }
+  /* 提示字沒有內容時不佔空間（播放中／播放完畢仍會顯示） */
+  .play-caption:empty { display: none; }
+  .top-bar-practice { margin-bottom: 6px; }
+  /* 不可壓縮：避免考試模式下外框被擠短而切到譜例；內容垂直置中，真的放不下才捲動 */
+  .staff-scroll-container { flex: 0 0 auto; min-height: 0; max-height: 40dvh; max-height: calc(var(--app-vh, 1vh) * 40); overflow-y: auto; display: flex; align-items: center; padding: 4px 3px; margin-bottom: 4px; }
+  .unified-action-row { margin-bottom: 4px; }
+  .play-caption { margin-top: 0; }
+  .practice-bottom-scroll { padding: 10px 10px 14px; }
+  @media (min-width: 768px) {
+    .practice-top-fixed { padding: 10px 24px; }
+    .practice-bottom-scroll { padding: 12px 24px 16px; }
+  }
+  @media (orientation: landscape) and (max-width: 900px) {
+    .staff-scroll-container { max-height: 52dvh; max-height: calc(var(--app-vh, 1vh) * 52); }
+  }
+
+  /* ===== 電腦版（螢幕寬 ≥1024px）：放寬版面，手機不受影響 ===== */
+  @media (min-width: 1024px) {
+    .staff-scroll-container { max-height: 55vh; max-height: calc(var(--app-vh, 1vh) * 55); padding: 14px 10px; margin-bottom: 12px; }
+    .practice-top-fixed { padding: 18px 28px; }
+    .top-bar-practice { margin-bottom: 14px; }
+    .unified-action-row { margin-bottom: 10px; gap: 12px; }
+    .practice-bottom-scroll { padding: 20px 28px 28px; }
+    .action-btn, .play-btn { font-size: 15px; padding: 13px 24px; }
+    .rhythm-btn { height: 84px; }
+    .rhythm-keypad { gap: 16px; }
+    .p-btn { font-size: 16px; }
+    .pattern-item { height: 72px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="loading-banner" id="loadingBanner">🎹 正在載入高音質鋼琴音色，請稍候…</div>
+
+  <div id="pageMelSettings" class="page-view active">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+        <button class="help-btn" onclick="openHelp('mel-helpModal')">❔ 玩法說明</button>
+        <button class="reset-cache-btn" onclick="forceResetCache()">🔄 重置快取</button>
+      </div>
+    </div>
+
+    <h1>單旋律曲調 — 設定</h1>
+    <p class="subtitle">訓練對單旋律樂句的音高與節奏記憶，支援無升降記號隨機無調性出題，以臨時記號作答。</p>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">練習模式</div>
+        <div class="switch-btns" id="mel-modeSwitch">
+          <button class="mode-btn active" data-mode="practice">練習模式</button>
+          <button class="mode-btn" data-mode="test">測驗模式 (限制次數)</button>
+        </div>
+      </div>
+      <div class="switch-group">
+        <div class="switch-group-label">譜號選項</div>
+        <div class="switch-btns" id="mel-clefSwitch">
+          <button class="mode-btn active" data-clef="treble">高音譜號 (Treble)</button>
+          <button class="mode-btn" data-clef="bass">低音譜號 (Bass)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">拍號 (Meter)</div>
+        <div class="switch-btns" id="mel-meterSwitch">
+          <button class="mode-btn active" data-meter="2/4" data-type="simple">2/4</button>
+          <button class="mode-btn" data-meter="3/4" data-type="simple">3/4</button>
+          <button class="mode-btn" data-meter="4/4" data-type="simple">4/4</button>
+          <button class="mode-btn" data-meter="3/8" data-type="compound">3/8</button>
+          <button class="mode-btn" data-meter="6/8" data-type="compound">6/8</button>
+          <button class="mode-btn" data-meter="12/8" data-type="compound">12/8</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <div class="switch-group">
+        <div class="switch-group-label">小節數 (Bars)</div>
+        <select id="mel-barsSelect" class="select-box">
+          <option value="1">1 小節</option>
+          <option value="2" selected>2 小節</option>
+          <option value="3">3 小節</option>
+          <option value="4">4 小節 (上限)</option>
+        </select>
+      </div>
+      <div class="switch-group" id="testReplayWrapper" style="display:none;">
+        <div class="switch-group-label">限制重播次數</div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <select id="mel-testReplaySelect" class="select-box">
+            <option value="1">1 次</option>
+            <option value="2">2 次</option>
+            <option value="3" selected>3 次</option>
+            <option value="4">4 次</option>
+            <option value="5">5 次</option>
+            <option value="6">6 次</option>
+            <option value="custom">自定義...</option>
+          </select>
+          <input type="number" id="mel-testReplayInput" class="select-box" style="display:none; width: 75px; text-align: center; cursor: text;" min="1" max="20" value="10" placeholder="次數">
+        </div>
+      </div>
+      <div class="switch-group" style="flex:1;">
+        <div class="switch-group-label">播放速度: <span id="bpmSym">♩</span> = <span id="bpmVal">80</span> BPM</div>
+        <input type="range" id="mel-bpm" class="bpm-slider" min="40" max="160" value="80" oninput="document.getElementById('bpmVal').innerText = this.value">
+      </div>
+    </div>
+
+    <div class="pattern-grid-header">
+      <div class="switch-group-label">勾選出題節奏型 (以 1 拍為單位，無休止符)</div>
+      <button class="select-all-btn" id="selectAllBtn">☑️ 全選 / 全不選</button>
+    </div>
+
+    <div class="pattern-grid" id="settingsPatternGrid"></div>
+
+    <button class="start-big-btn" id="mel-enterBtn" disabled>🎯 開始單旋律訓練 →</button>
+    <button class="review-entry-btn" onclick="showPage('mel-review')">📕 錯題本（<span id="mel-reviewCount">0</span> 題）</button>
+  </div>
+
+  <div id="pageMelPractice" class="page-view">
+    <div class="practice-top-fixed">
+      <div class="top-bar-practice">
+        <button class="nav-back-btn" style="margin:0;" onclick="showPage('mel-settings')">← 返回設定頁</button>
+        <span class="practice-status-badge" id="mel-statusBadge">高音｜2/4拍｜2小節｜80 BPM</span>
+        <div class="score-box"><div class="num" id="mel-scoreNum">0/0</div></div>
+      </div>
+
+      <div class="staff-scroll-container" id="staffContainerOuter">
+        <div id="staffInnerWrapper" style="margin: 0 auto; display: block; position: relative; width: max-content; min-width: 100%;">
+          <div id="mel-staff-svg" style="position: relative; display: inline-block; width: 100%;"></div>
+        </div>
+      </div>
+
+      <div class="unified-action-row">
+        <button class="play-btn" id="mel-playBtn" disabled>▶ 播放題目</button>
+        <button class="action-btn" id="tuningABtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <span id="mel-editBtns" style="display:flex; gap:8px;">
+          <button class="action-btn" id="mel-backspaceBtn">⌫ 退格</button>
+          <button class="action-btn" id="mel-clearBtn">🗑️ 清空</button>
+          <button class="action-btn btn-submit" id="mel-submitBtn" disabled>✔ 提交</button>
+        </span>
+      </div>
+      <div class="play-caption" id="mel-playCaption"></div>
+    </div>
+
+    <div class="practice-bottom-scroll">
+      <div class="editor-tabs-container">
+        <div class="editor-tabs">
+          <button class="tab-btn active" id="tab-rhythm" onclick="melModule.switchTab('rhythm')">🎵 1. 編輯節奏</button>
+          <button class="tab-btn" id="tab-pitch" onclick="melModule.switchTab('pitch')">🎹 2. 編輯音高</button>
+        </div>
+      </div>
+
+      <div id="panel-rhythm">
+        <div class="rhythm-keypad" id="mel-keypad"></div>
+      </div>
+
+      <div id="panel-pitch" style="display:none;">
+        <div class="pitch-keypad">
+          <div class="pitch-row-acc">
+            <button class="p-btn acc-btn" id="acc-b" onclick="melModule.setAccidental('b')">♭ 降</button>
+            <button class="p-btn acc-btn active" id="acc-n" onclick="melModule.setAccidental('n')">♮ 還原</button>
+            <button class="p-btn acc-btn" id="acc-s" onclick="melModule.setAccidental('#')">♯ 升</button>
+          </div>
+          <div class="pitch-row-notes">
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('C')">C<span>Do</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('D')">D<span>Re</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('E')">E<span>Mi</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('F')">F<span>Fa</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('G')">G<span>Sol</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('A')">A<span>La</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('B')">B<span>Ti</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('C_high')">C<span>高Do</span></button>
+          </div>
+          <div class="pitch-row-oct">
+            <button class="p-btn oct-btn" onclick="melModule.shiftOctave(-1)">▼ 低八度 <span id="oct-label-low"></span></button>
+            <button class="p-btn oct-btn" onclick="melModule.shiftOctave(1)">▲ 高八度 <span id="oct-label-high"></span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 【單旋律】解答頁（提交作答後） -->
+  <div id="pageMelAnswer" class="page-view">
+    <div class="top-bar-practice" style="margin-bottom:14px;">
+      <button class="nav-back-btn" style="margin:0;" onclick="showPage('mel-practice')">← 返回作答</button>
+      <span class="practice-status-badge" id="mel-ansBadge">解答對照</span>
+      <div class="score-box"><div class="num" id="mel-ansScore">0/0</div></div>
+    </div>
+    <div id="mel-ansFeedback" class="answer-big-feedback"></div>
+    <div class="unified-action-row" style="margin-bottom:14px;">
+      <button class="action-btn" id="mel-ansPlayUser" style="color:var(--wrong); border-color:var(--wrong);">🔊 聽你的作答</button>
+      <button class="play-btn" id="mel-ansPlayCorrect">🔁 聽正解</button>
+    </div>
+    <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+    <div class="review-staff"><div id="mel-ansUser"></div></div>
+    <div class="review-label" style="margin-top:8px;">正確解答：</div>
+    <div class="review-staff"><div id="mel-ansCorrect"></div></div>
+    <div class="unified-action-row" style="margin-top:18px;">
+      <button class="action-btn btn-submit" id="mel-ansNextBtn" style="flex:1; padding:14px;">下一題 →</button>
+    </div>
+    <div class="unified-action-row" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+    </div>
+  </div>
+
+  <!-- 【單旋律】錯題本頁 -->
+  <div id="pageMelReview" class="page-view">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <button class="reset-cache-btn" id="mel-clearReviewBtn">🗑️ 清空錯題本</button>
+    </div>
+    <h1>錯題本</h1>
+    <p class="subtitle">收錄答錯的旋律題，重整或關閉後仍會保留。可分別聆聽你的作答與正解，並對照紅色標錯音符。</p>
+    <div id="mel-reviewList"></div>
+    <p id="mel-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
+  </div>
+</div>
+
+<script src="exam-common.js"></script>
+<script>
+/* ===== 統一錯題本儲存（六個練習共用，寫入 localStorage，供 index 總覽聚合） ===== */
+window.REVIEW_STORE = {
+  PREFIX: 'earTrainer.review.',
+  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行' },
+  TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html' },
+  load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
+  save(type, arr){ try { localStorage.setItem(this.PREFIX+type, JSON.stringify(arr)); } catch(e){} },
+  add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); this.save(type,a); return a; },
+  clear(type){ this.save(type, []); },
+  count(type){ return this.load(type).length; }
+};
+
+function forceResetCache() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(r => r.forEach(x => x.unregister()));
+  if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
+  alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
+}
+function showPage(pageId) {
+  if (window.melStopAll) window.melStopAll();
+  document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+  if (pageId === 'mel-settings') { document.getElementById('pageMelSettings').classList.add('active'); if(window.melModule) window.melModule.refreshReviewCount(); }
+  else if (pageId === 'mel-practice') document.getElementById('pageMelPractice').classList.add('active');
+  else if (pageId === 'mel-answer') document.getElementById('pageMelAnswer').classList.add('active');
+  else if (pageId === 'mel-review') { document.getElementById('pageMelReview').classList.add('active'); if(window.melModule) window.melModule.renderReviewPage(); }
+}
+
+(function(){
+  const SIMPLE_ORDER = ['4', '2-2', '1-1-1-1', '2-1-1', '1-1-2', '1-2-1', '3-1', '1-3', '3tuplet'];
+  const COMPOUND_ORDER = [
+    '6', '4-2', '2-4', '4-1-1', '1-1-4', '2-2-2', '2-2-1-1', '2-1-1-2',
+    '1-1-2-2', '2-1-1-1-1', '1-1-2-1-1', '1-1-1-1-2', '1-1-1-1-1-1', '3-1-1-1', '1-1-1-3', '1-3-1-1',
+    '1-1-3-1', '3-1-2', '3-2-1', '2-3-1', '2-1-3', '1-3-2', '1-2-3', '4~1-1',
+    '1-1~4', '3-3', '2-1-2-1', '1-2-1-2', '1-2-2-1', '1-1~3-1', '1-2-1-1-1', '1-1-1-2-1'
+  ];
+
+  function parsePatternId(id) {
+    if (id === '3tuplet') {
+      return { lengths: [4/3, 4/3, 4/3], tieNext: [false, false, false], isTuplet: true };
+    }
+    let lengths = []; let tieNext = [];
+    let tokens = id.split(/([-\~])/);
+    for (let i = 0; i < tokens.length; i += 2) {
+      lengths.push(Number(tokens[i]));
+      if (i + 1 < tokens.length) tieNext.push(tokens[i + 1] === '~');
+      else tieNext.push(false);
+    }
+    return { lengths, tieNext, isTuplet: false };
+  }
+
+  const ALL_BLOCKS = {};
+  SIMPLE_ORDER.forEach(id => { ALL_BLOCKS[id] = { id, ...parsePatternId(id), type: 'simple', beats: 1 }; });
+  COMPOUND_ORDER.forEach(id => { ALL_BLOCKS[id] = { id, ...parsePatternId(id), type: 'compound', beats: 1 }; });
+
+  const VF = Vex.Flow;
+
+  function createEnhancedTie(firstNote, lastNote) {
+    if (typeof firstNote.setExtraRightPx === 'function') firstNote.setExtraRightPx(30);
+    return new VF.StaveTie({ first_note: firstNote, last_note: lastNote, first_indices: [0], last_indices: [0] }).setDirection(1);
+  }
+
+  const EXTRA_SPACING_IDS = ['4-1-1', '1-1-4', '4~1-1', '1-1~4'];
+  const NOTE_TO_SEMI = { 'C':0, 'D':2, 'E':4, 'F':5, 'G':7, 'A':9, 'B':11 };
+
+  function getPitchFromObj(pObj) {
+    if(!pObj) return 69;
+    let midi = (pObj.oct + 1) * 12 + NOTE_TO_SEMI[pObj.step];
+    if(pObj.acc === '#') midi += 1;
+    else if(pObj.acc === 'b') midi -= 1;
+    return midi;
+  }
+
+  function getVexKey(pObj, clef) {
+    if(!pObj) return clef === 'treble' ? 'a/4' : 'c/3';
+    return `${pObj.step.toLowerCase()}/${pObj.oct}`;
+  }
+
+  function applyAccidental(note, pObj, measureAccState) {
+    if(!pObj) return;
+    let step = pObj.step.toUpperCase();
+    let acc = pObj.acc || 'n';
+    let needsAcc = false;
+
+    if (acc === 'n') {
+      if (measureAccState[step] && measureAccState[step] !== 'n') needsAcc = true;
+    } else {
+      if (measureAccState[step] !== acc) needsAcc = true;
+    }
+
+    if (needsAcc) {
+      note.addAccidental(0, new VF.Accidental(acc));
+      measureAccState[step] = acc;
+    }
+  }
+
+  function getVexNotes(block, isWrong, pitchArray, startIndex, clef, activeNoteIdx = -1, measureAccState = {}) {
+    let notes = []; let ties = []; let tuplet = null;
+    let lengths = block.lengths; let tieNext = block.tieNext || [];
+    let noteCount = lengths.length;
+
+    if (block.isTuplet) {
+      for(let i=0; i<3; i++) {
+        let pObj = pitchArray ? pitchArray[startIndex + i] : null;
+        let n = new VF.StaveNote({ clef: clef, keys: [getVexKey(pObj, clef)], duration: '8', auto_stem: true });
+        applyAccidental(n, pObj, measureAccState);
+        if(isWrong) n.setStyle({ fillStyle: 'var(--wrong)', strokeStyle: 'var(--wrong)' });
+        if((startIndex + i) === activeNoteIdx) n.setStyle({ fillStyle: 'var(--accent)', strokeStyle: 'var(--accent)' });
+        notes.push(n);
+      }
+      tuplet = new VF.Tuplet(notes, { num_notes: 3, notes_occupied: 2, ratioed: false });
+      let beams = [new VF.Beam(notes, true)];
+      return { notes, ties, beams, tuplet, noteCount: 3 };
+    }
+
+    let needsExtraSpacing = EXTRA_SPACING_IDS.includes(block.id);
+    lengths.forEach((len, idx) => {
+      let pObj = pitchArray ? pitchArray[startIndex + idx] : null;
+      let n1;
+      if(len===1) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'16', auto_stem: true });
+      else if(len===2) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'8', auto_stem: true });
+      else if(len===3) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'8', auto_stem: true }).addDot(0);
+      else if(len===4) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true });
+      else if(len===6) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true }).addDot(0);
+
+      applyAccidental(n1, pObj, measureAccState);
+
+      if(isWrong) n1.setStyle({ fillStyle: 'var(--wrong)', strokeStyle: 'var(--wrong)' });
+      if((startIndex + idx) === activeNoteIdx) n1.setStyle({ fillStyle: 'var(--accent)', strokeStyle: 'var(--accent)' });
+      if(needsExtraSpacing && typeof n1.setExtraRightPx === 'function') n1.setExtraRightPx(25);
+      notes.push(n1);
+    });
+
+    for(let idx = 0; idx < tieNext.length; idx++) {
+      if(tieNext[idx] && idx + 1 < notes.length) ties.push(createEnhancedTie(notes[idx], notes[idx + 1]));
+    }
+
+    const beamNotes = notes.filter(n => n.duration.includes('8') || n.duration.includes('16'));
+    const beams = beamNotes.length > 1 ? [new VF.Beam(beamNotes, true)] : [];
+    return { notes, ties, beams, tuplet, noteCount };
+  }
+
+  function drawMiniRhythm(container, blockId) {
+    try {
+      container.innerHTML = ''; const block = ALL_BLOCKS[blockId];
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(260, 110);
+      const svg = container.querySelector('svg');
+      svg.setAttribute('viewBox', '0 20 260 65'); svg.style.width = '100%'; svg.style.height = '100%';
+      const ctx = renderer.getContext(); ctx.scale(1.25, 1.25);
+      const stave = new VF.Stave(5, 5, 200).setContext(ctx).draw();
+      const { notes, ties, beams, tuplet } = getVexNotes(block, false, null, 0, 'treble', -1, {});
+      VF.Formatter.FormatAndDraw(ctx, stave, notes);
+      beams.forEach(b => b.setContext(ctx).draw()); ties.forEach(t => t.setContext(ctx).draw()); if(tuplet) tuplet.setContext(ctx).draw();
+    } catch(e) {}
+  }
+
+  // 繪製主譜；靜態渲染（解答頁 / 錯題本）時透過 ctxOverride 指定該題自身的拍號、小節設定（clef 仍由參數指定）
+  function renderMainStaff(containerId, seq, pitchArray, interactive = false, correctSeq = null, correctPitch = null, clef = 'treble', activeTab = 'rhythm', activeSlot = 0, activeNote = 0, ctxOverride = null) {
+    try {
+      const container = document.getElementById(containerId); if (!container) return;
+      const cfg = ctxOverride || { barsCount: melModule.barsCount, beatsPerBar: melModule.beatsPerBar, meter: melModule.meter, meterType: melModule.meterType };
+      const outerContainer = document.getElementById('staffContainerOuter');
+      const innerWrapper = document.getElementById('staffInnerWrapper');
+      let currentScrollLeft = 0;
+      if (outerContainer && interactive && innerWrapper) {
+        currentScrollLeft = outerContainer.scrollLeft;
+        innerWrapper.style.minWidth = innerWrapper.scrollWidth + 'px';
+      }
+      container.innerHTML = '';
+
+      const minMeasureWidth = 240; const requiredWidth = (minMeasureWidth * cfg.barsCount) + 60;
+      const totalWidth = requiredWidth; const usableWidth = totalWidth - 10;
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(totalWidth, 130);
+      const ctx = renderer.getContext();
+      let xPos = 5; const barWidth = (usableWidth - 60) / cfg.barsCount;
+
+      let bars = []; let currentBar = []; let currentBeats = 0;
+      seq.forEach(id => {
+        currentBar.push(id);
+        let b = id === 'placeholder' ? 1 : ALL_BLOCKS[id].beats;
+        currentBeats += b;
+        if(currentBeats >= cfg.beatsPerBar) { bars.push(currentBar); currentBar = []; currentBeats = 0; }
+      });
+      while(bars.length < cfg.barsCount) bars.push([]);
+
+      let globalBeatIdx = 0; let globalNoteIdx = 0;
+      let beatFirstNotes = []; let allIndividualNotes = [];
+
+      for(let b = 0; b < cfg.barsCount; b++) {
+        const isFirst = (b === 0); const sWidth = isFirst ? barWidth + 60 : barWidth;
+        const stave = new VF.Stave(xPos, 20, sWidth);
+        if(isFirst) stave.addClef(clef).addTimeSignature(cfg.meter);
+        stave.setContext(ctx).draw();
+
+        let barNotes = []; let barBeams = []; let barTies = []; let barTuplets = [];
+        let barKeys = bars[b] || [];
+        let filledBeats = barKeys.reduce((acc, k) => acc + (k === 'placeholder' ? 1 : ALL_BLOCKS[k].beats), 0);
+        while(filledBeats < cfg.beatsPerBar) { barKeys.push('placeholder'); filledBeats++; }
+
+        let measureAccState = {};
+
+        barKeys.forEach(id => {
+          if (id !== 'placeholder') {
+            const block = ALL_BLOCKS[id];
+            let isWrong = false;
+            if(correctSeq && correctPitch) {
+              if(seq[globalBeatIdx] !== correctSeq[globalBeatIdx]) isWrong = true;
+              else {
+                for(let k = 0; k < block.lengths.length; k++) {
+                  let pU = getPitchFromObj(pitchArray[globalNoteIdx + k]);
+                  let pC = getPitchFromObj(correctPitch[globalNoteIdx + k]);
+                  if(pU !== pC) { isWrong = true; break; }
+                }
+              }
+            }
+            let hlNoteIdx = (interactive && activeTab === 'pitch') ? activeNote : -1;
+            const { notes, ties, beams, tuplet, noteCount } = getVexNotes(block, isWrong, pitchArray, globalNoteIdx, clef, hlNoteIdx, measureAccState);
+            barNotes.push(...notes); barBeams.push(...beams); barTies.push(...ties);
+            if(tuplet) barTuplets.push(tuplet);
+            beatFirstNotes[globalBeatIdx] = notes[0];
+            notes.forEach(n => allIndividualNotes.push(n));
+            globalNoteIdx += noteCount;
+          } else {
+            let ghostKey = clef === 'treble' ? 'a/4' : 'c/3';
+            let ghost = new VF.StaveNote({ clef: clef, keys:[ghostKey], duration: 'qr' });
+            if(cfg.meterType === 'compound') ghost.addDot(0);
+            ghost.setStyle({ fillStyle: '#e0e0e0', strokeStyle: '#e0e0e0' });
+            barNotes.push(ghost);
+            beatFirstNotes[globalBeatIdx] = ghost;
+            allIndividualNotes.push(ghost);
+            globalNoteIdx += 1;
+          }
+          globalBeatIdx++;
+        });
+        if(barNotes.length > 0) {
+          VF.Formatter.FormatAndDraw(ctx, stave, barNotes);
+          barBeams.forEach(bm => bm.setContext(ctx).draw());
+          barTies.forEach(t => t.setContext(ctx).draw());
+          barTuplets.forEach(tp => tp.setContext(ctx).draw());
+        }
+        xPos += sWidth;
+      }
+
+      if(interactive && melModule.hasPlayed) {
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute'; overlay.style.top = '0'; overlay.style.left = '0';
+        overlay.style.width = '100%'; overlay.style.height = '100%'; overlay.style.pointerEvents = 'none';
+        container.appendChild(overlay);
+
+        if(activeTab === 'rhythm') {
+          for(let i = 0; i < beatFirstNotes.length; i++) {
+            let fn = beatFirstNotes[i]; let nn = beatFirstNotes[i+1];
+            let stave = fn.getStave(); if(!stave) continue;
+            let nx = typeof fn.getAbsoluteX === 'function' ? fn.getAbsoluteX() : stave.getX() + fn.getTickContext().getX();
+            let x = nx - 12; let y = stave.getYForLine(0) - 20; let h = 110; let w = 30;
+            if(nn && nn.getStave() === stave) {
+              let n2x = typeof nn.getAbsoluteX === 'function' ? nn.getAbsoluteX() : stave.getX() + nn.getTickContext().getX();
+              w = n2x - nx;
+            } else w = stave.getX() + stave.getWidth() - nx + 10;
+            let slot = document.createElement('div'); slot.id = 'mel-slot-' + i;
+            slot.style.position = 'absolute'; slot.style.left = x + 'px'; slot.style.top = y + 'px';
+            slot.style.width = Math.max(w, 20) + 'px'; slot.style.height = h + 'px';
+            slot.style.cursor = 'pointer'; slot.style.pointerEvents = 'auto'; slot.style.borderRadius = '8px'; slot.style.transition = 'all 0.1s';
+            if(i === activeSlot && activeSlot !== -1) { slot.style.border = '2px solid var(--accent)'; slot.style.backgroundColor = 'var(--accent-soft)'; slot.style.zIndex = '10'; }
+            else { slot.style.border = '1px dashed transparent'; slot.style.zIndex = '1'; }
+            slot.onclick = () => { melModule.activeSlotIdx = i; melModule.updateUI(); };
+            overlay.appendChild(slot);
+          }
+        } else if(activeTab === 'pitch') {
+          for(let i = 0; i < allIndividualNotes.length; i++) {
+            if (melModule.isNoteTiedToPrevious(i)) continue;
+
+            let fn = allIndividualNotes[i];
+            let stave = fn.getStave(); if(!stave) continue;
+            let nx = typeof fn.getAbsoluteX === 'function' ? fn.getAbsoluteX() : stave.getX() + fn.getTickContext().getX();
+            let x = nx - 8; let y = stave.getYForLine(0) - 20; let h = 110; let w = 22;
+
+            let nn = null;
+            for (let nextI = i + 1; nextI < allIndividualNotes.length; nextI++) {
+                if (!melModule.isNoteTiedToPrevious(nextI)) { nn = allIndividualNotes[nextI]; break; }
+            }
+
+            if(nn && nn.getStave() === stave) {
+              let n2x = typeof nn.getAbsoluteX === 'function' ? nn.getAbsoluteX() : stave.getX() + nn.getTickContext().getX();
+              w = n2x - nx;
+            } else w = stave.getX() + stave.getWidth() - nx + 10;
+
+            let slot = document.createElement('div'); slot.id = 'mel-note-' + i;
+            slot.style.position = 'absolute'; slot.style.left = x + 'px'; slot.style.top = y + 'px';
+            slot.style.width = Math.max(w, 18) + 'px'; slot.style.height = h + 'px';
+            slot.style.cursor = 'pointer'; slot.style.pointerEvents = 'auto'; slot.style.borderRadius = '6px'; slot.style.transition = 'all 0.1s';
+            if(i === activeNote && activeNote !== -1) { slot.style.border = '2px solid var(--accent)'; slot.style.backgroundColor = 'var(--accent-soft)'; slot.style.zIndex = '10'; }
+            else if(melModule.lastEditedNoteIdx === i) { /* 記號會套用到的音 */ slot.style.border = '2px dashed var(--accent-line)'; slot.style.zIndex = '5'; }
+            else { slot.style.border = '1px dashed transparent'; slot.style.zIndex = '1'; }
+            slot.onclick = () => { melModule.activeNoteIdx = i; melModule.lastEditedNoteIdx = null; melModule.updateUI(); };
+            overlay.appendChild(slot);
+          }
+        }
+      }
+      if(outerContainer && interactive && innerWrapper) {
+        outerContainer.scrollLeft = currentScrollLeft;
+        innerWrapper.style.minWidth = '';
+      }
+    } catch(e) { console.error("Main Staff Error:", e); }
+  }
+
+  // 靜態渲染包裝：解答頁與錯題本用該題自身的設定繪譜
+  function renderStaticStaff(containerId, seq, pitchArray, correctSeq, correctPitch, item) {
+    renderMainStaff(containerId, seq, pitchArray, false, correctSeq, correctPitch, item.clef, 'rhythm', -1, -1, {
+      barsCount: item.barsCount, beatsPerBar: item.beatsPerBar, meter: item.meter, meterType: item.meterType
+    });
+  }
+
+  let audioCtx = null; let pianoInst = null; let pendingTimers = [];
+  function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+  window.melStopAll = function() {
+    if(pianoInst) pianoInst.stop();
+    clearTimers(); melModule.testSession.isRunning = false; melModule.isPlaying = false; melModule.updatePlayBtn();
+  };
+  function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }catch(e){} return audioCtx; }
+  window.loadPiano = function(){
+    const ctx = ensureAudio(); if(!ctx) return;
+    Soundfont.instrument(ctx, 'acoustic_grand_piano', { nameToUrl: function(){ return 'acoustic_grand_piano-mp3.js'; } }).catch(function(){ return Soundfont.instrument(ctx, 'acoustic_grand_piano'); }).then(inst => {
+      pianoInst = inst; document.getElementById('loadingBanner').style.display = 'none'; melModule.updatePlayBtn();
+      if(window.EXAM && window.EXAM.isExamMode() && melModule._examReady) melModule._examReady();
+    }).catch(()=>{ document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>'; });
+  };
+
+  // 靜態播放：解答頁 / 錯題本用該題自身的拍號、速度與音高播放（不動作答狀態）
+  function playStatic(seq, pitchArray, item) {
+    window.melStopAll();
+    if(!pianoInst) return;
+    const ctx = ensureAudio(); let time = ctx.currentTime + 0.1;
+    let secPerUnit = 60 / item.bpm; let numerator = parseInt(item.meter.split('/')[0], 10);
+    let secPer16th = item.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+    let beatUnits = item.meterType === 'simple' ? 4 : 6;
+    for(let i=0; i<numerator; i++) {
+      let o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle';
+      o.frequency.value = (item.meterType === 'simple' ? i === 0 : i % 3 === 0) ? 1000 : 700;
+      g.gain.setValueAtTime(0.2, time + i * secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time + i * secPerUnit + 0.05);
+      o.connect(g); g.connect(ctx.destination); o.start(time + i * secPerUnit); o.stop(time + i * secPerUnit + 0.05);
+    }
+    time += numerator * secPerUnit;
+    let noteIdx = 0;
+    seq.forEach(id => {
+      if(id === 'placeholder'){ time += beatUnits * secPer16th; noteIdx += 1; return; }
+      const block = ALL_BLOCKS[id]; const lengths = block.lengths; const tieNext = block.tieNext || [];
+      let i = 0;
+      while(i < lengths.length) {
+        let totalLen = lengths[i]; let isTied = tieNext[i]; let nextIdx = i + 1;
+        while(isTied && nextIdx < lengths.length) { totalLen += lengths[nextIdx]; isTied = tieNext[nextIdx]; nextIdx++; }
+        let midi = getPitchFromObj(pitchArray[noteIdx + i]);
+        pianoInst.play(midi, time, { duration: totalLen * secPer16th * 0.9, gain: 3.5 });
+        time += totalLen * secPer16th; i = nextIdx;
+      }
+      noteIdx += lengths.length;
+    });
+    melModule.isPlaying = true; melModule.updatePlayBtn();
+    const timerId = setTimeout(() => { melModule.isPlaying = false; melModule.updatePlayBtn(); }, (time-ctx.currentTime)*1000 + 100);
+    pendingTimers.push(timerId);
+  }
+
+  const melModule = {
+    mode: 'practice', clef: 'treble', meter: '2/4', meterType: 'simple', barsCount: 2, beatsPerBar: 2, bpm: 80, totalBeats: 4,
+    selectedPatterns: new Set(), questionSeq: [], questionPitch: [], userSeq: [], userPitch: [],
+    isPlaying: false, hasPlayed: false, activeTab: 'rhythm', activeSlotIdx: 0, activeNoteIdx: 0,
+    lastEditedNoteIdx: null, currentAccidental: 'n', currentOctave: 4,
+    score: { c:0, t:0 }, testSession: { isRunning: false, replaysLeft: 0, totalPlays: 0 }, _ansItem: null,
+
+    initSettings: function() {
+      const grid = document.getElementById('settingsPatternGrid'); grid.innerHTML = '';
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      this.selectedPatterns.clear();
+      order.forEach(id => {
+        this.selectedPatterns.add(id);
+        const item = document.createElement('div'); item.className = 'pattern-item selected';
+        const svgContainer = document.createElement('div'); item.appendChild(svgContainer);
+        item.onclick = () => {
+          if(this.selectedPatterns.has(id)) { this.selectedPatterns.delete(id); item.classList.remove('selected'); }
+          else { this.selectedPatterns.add(id); item.classList.add('selected'); }
+          document.getElementById('mel-enterBtn').disabled = this.selectedPatterns.size === 0;
+        };
+        grid.appendChild(item); setTimeout(() => drawMiniRhythm(svgContainer, id), 10);
+      });
+      document.getElementById('mel-enterBtn').disabled = false;
+    },
+
+    sanitizePitch: function(p) {
+      if (p.step === 'C' && p.acc === 'b') { p.step = 'B'; p.oct -= 1; p.acc = 'n'; }
+      if (p.step === 'B' && p.acc === '#') { p.step = 'C'; p.oct += 1; p.acc = 'n'; }
+      if (p.step === 'F' && p.acc === 'b') { p.step = 'E'; p.acc = 'n'; }
+      if (p.step === 'E' && p.acc === '#') { p.step = 'F'; p.acc = 'n'; }
+      if (p.step === 'D' && p.acc === 'b') { p.step = 'C'; p.acc = '#'; }
+      if (p.step === 'G' && p.acc === 'b') { p.step = 'F'; p.acc = '#'; }
+      if (p.step === 'A' && p.acc === '#') { p.step = 'B'; p.acc = 'b'; }
+      if (p.step === 'D' && p.acc === '#') { p.step = 'E'; p.acc = 'b'; }
+      return p;
+    },
+
+    generateQuestion: function() {
+      this.questionSeq = []; this.questionPitch = [];
+      const pool = Array.from(this.selectedPatterns);
+      const steps = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+      const accs = ['n', 'n', 'n', 'n', '#', 'b'];
+      let baseOct = this.clef === 'treble' ? 4 : 3;
+      let lastStepIdx = 0; let lastOct = baseOct;
+
+      let tiedFromPrev = false;
+
+      for(let i=0; i<this.totalBeats; i++) {
+        let pat = pool[Math.floor(Math.random() * pool.length)];
+        this.questionSeq.push(pat);
+        let block = ALL_BLOCKS[pat];
+        let numNotes = block.lengths.length;
+        for(let k=0; k<numNotes; k++) {
+          let newPitch;
+          if (tiedFromPrev) {
+             let prevPitch = this.questionPitch[this.questionPitch.length - 1];
+             newPitch = { step: prevPitch.step, oct: prevPitch.oct, acc: prevPitch.acc };
+          } else {
+             let stepIdx = (lastStepIdx + (Math.floor(Math.random() * 5) - 2) + 7) % 7;
+             let oct = lastOct;
+             if(stepIdx < lastStepIdx && Math.random() < 0.2) oct += 1;
+             if(stepIdx > lastStepIdx && Math.random() < 0.2) oct -= 1;
+             if(this.clef === 'treble') { oct = Math.max(4, Math.min(5, oct)); }
+             else { oct = Math.max(2, Math.min(3, oct)); }
+             let acc = accs[Math.floor(Math.random() * accs.length)];
+
+             newPitch = { step: steps[stepIdx], oct: oct, acc: acc };
+             newPitch = this.sanitizePitch(newPitch);
+          }
+
+          this.questionPitch.push(newPitch);
+          lastStepIdx = steps.indexOf(newPitch.step); lastOct = newPitch.oct;
+          tiedFromPrev = block.tieNext && block.tieNext[k];
+        }
+      }
+    },
+
+    getTotalNoteCount: function(seq) {
+      return seq.reduce((acc, id) => {
+        if(id === 'placeholder') return acc + 1;
+        return acc + ALL_BLOCKS[id].lengths.length;
+      }, 0);
+    },
+
+    isNoteTiedToNext: function(idx) {
+      if (idx < 0) return false;
+      let count = 0;
+      for(let b = 0; b < this.userSeq.length; b++) {
+        let blockId = this.userSeq[b];
+        if (blockId === 'placeholder') {
+          if (idx === count) return false;
+          count += 1; continue;
+        }
+        let block = ALL_BLOCKS[blockId];
+        if(idx >= count && idx < count + block.lengths.length) {
+          let currNoteInBeat = idx - count;
+          return block.tieNext && block.tieNext[currNoteInBeat];
+        }
+        count += block.lengths.length;
+      }
+      return false;
+    },
+
+    isNoteTiedToPrevious: function(idx) {
+      if (idx <= 0) return false;
+      return this.isNoteTiedToNext(idx - 1);
+    },
+
+    _noteCountOf: function(id) { return id === 'placeholder' ? 1 : ALL_BLOCKS[id].lengths.length; },
+
+    /* 依「拍」重建音高：改某一拍的節奏時，只重建那一拍，其餘各拍的音高原封不動。
+       （舊做法是照流水號對位，改一拍會讓後面所有音高整串位移。）
+       儲存格式不變，因此計分、繪譜、錯題本、考試存檔都不受影響。 */
+    rebuildUserPitchArray: function() {
+      let defOct = this.clef === 'treble' ? 4 : 3, defStep = this.clef === 'treble' ? 'A' : 'C';
+      let seqNow = this.userSeq;
+      let seqPrev = this._pitchSeqSnapshot;
+      let newPitch = [];
+      if (Array.isArray(seqPrev) && seqPrev.length === seqNow.length) {
+        let oldOff = 0;
+        for (let b = 0; b < seqNow.length; b++) {
+          let oldN = this._noteCountOf(seqPrev[b]);
+          let newN = this._noteCountOf(seqNow[b]);
+          for (let k = 0; k < newN; k++) {
+            let src = (k < oldN) ? this.userPitch[oldOff + k] : null;
+            newPitch.push(src ? src : { step: defStep, oct: defOct, acc: 'n' });
+          }
+          oldOff += oldN;   // 一律照舊拍長前進，確保後面各拍仍對得回原位
+        }
+      } else {
+        // 沒有對照表（首次建立／小節數改變）時，退回原本的流水號對位
+        let totalNotes = this.getTotalNoteCount(this.userSeq);
+        for (let i = 0; i < totalNotes; i++) {
+          newPitch.push(this.userPitch[i] ? this.userPitch[i] : { step: defStep, oct: defOct, acc: 'n' });
+        }
+      }
+      this.userPitch = newPitch;
+      this._pitchSeqSnapshot = seqNow.slice();
+    },
+
+    /* 拍 ↔ 音 的對應：讓兩個分頁的游標互相同步 */
+    _firstNoteIdxOfBeat: function(beatIdx) {
+      let n = 0;
+      for (let i = 0; i < this.userSeq.length; i++) {
+        if (i === beatIdx) return n;
+        n += this._noteCountOf(this.userSeq[i]);
+      }
+      return Math.max(0, n - 1);
+    },
+    _beatIdxOfNote: function(noteIdx) {
+      let n = 0;
+      for (let i = 0; i < this.userSeq.length; i++) {
+        let c = this._noteCountOf(this.userSeq[i]);
+        if (noteIdx < n + c) return i;
+        n += c;
+      }
+      return Math.max(0, this.userSeq.length - 1);
+    },
+
+    switchTab: function(tab) {
+      let prevTab = this.activeTab;
+      this.activeTab = tab;
+      this.lastEditedNoteIdx = null;
+      // 切換分頁時同步游標：看到的框就是接下來會生效的位置
+      if (tab === 'rhythm' && prevTab === 'pitch' && this.activeNoteIdx !== -1) {
+        this.activeSlotIdx = this._beatIdxOfNote(this.activeNoteIdx);
+      } else if (tab === 'pitch' && prevTab === 'rhythm' && this.activeSlotIdx !== -1) {
+        this._pendingNoteFromSlot = this.activeSlotIdx;
+      }
+      document.getElementById('tab-rhythm').className = `tab-btn ${tab === 'rhythm' ? 'active' : ''}`;
+      document.getElementById('tab-pitch').className = `tab-btn ${tab === 'pitch' ? 'active' : ''}`;
+      document.getElementById('panel-rhythm').style.display = tab === 'rhythm' ? 'block' : 'none';
+      document.getElementById('panel-pitch').style.display = tab === 'pitch' ? 'block' : 'none';
+
+      if(tab === 'rhythm') {
+        if(this.activeSlotIdx === -1) this.activeSlotIdx = 0;
+      } else {
+        let defPat = this.meterType === 'simple' ? '4' : '6';
+        for(let i = 0; i < this.userSeq.length; i++) {
+          if(this.userSeq[i] === 'placeholder') this.userSeq[i] = defPat;
+        }
+        this.rebuildUserPitchArray();
+
+        // 由節奏分頁切過來：框停在該拍的第一個音
+        if (this._pendingNoteFromSlot !== undefined && this._pendingNoteFromSlot !== null) {
+          this.activeNoteIdx = this._firstNoteIdxOfBeat(this._pendingNoteFromSlot);
+          this._pendingNoteFromSlot = null;
+        }
+        if(this.activeNoteIdx < 0 || this.activeNoteIdx >= this.userPitch.length) this.activeNoteIdx = 0;
+
+        let totalNotes = this.getTotalNoteCount(this.userSeq);
+        while (this.activeNoteIdx < totalNotes && this.isNoteTiedToPrevious(this.activeNoteIdx)) {
+            this.activeNoteIdx++;
+        }
+        if (this.activeNoteIdx >= totalNotes) this.activeNoteIdx = -1;
+
+        this.currentOctave = (this.activeNoteIdx !== -1 && this.userPitch[this.activeNoteIdx]) ? this.userPitch[this.activeNoteIdx].oct : (this.clef === 'treble' ? 4 : 3);
+        this.updateOctaveLabels();
+      }
+      this.updateUI();
+    },
+
+    // 更新升降按鈕視覺狀態與「待套用」記號（先按記號、再輸入音名的舊行為用）
+    setPendingAccidental: function(acc) {
+      this.currentAccidental = acc;
+      document.getElementById('acc-b').className = `p-btn acc-btn ${acc === 'b' ? 'active' : ''}`;
+      document.getElementById('acc-n').className = `p-btn acc-btn ${acc === 'n' ? 'active' : ''}`;
+      document.getElementById('acc-s').className = `p-btn acc-btn ${acc === '#' ? 'active' : ''}`;
+    },
+
+    // 升降按鈕邏輯：
+    //  1) 剛輸入完一個音（lastEditedNoteIdx）→ 直接修改那個音（事後修飾，不前進）。
+    //  2) 沒有剛輸入的音、但目前有選中的音（activeNoteIdx，例如用點選跳過去的）→ 套用到該音一次，然後跳到下一個音。
+    //  3) 都沒有（焦點已到結尾）→ 暫存記號待下次輸入。
+    setAccidental: function(acc) {
+      let afterIdx = this.lastEditedNoteIdx;
+      if (afterIdx !== null && afterIdx !== -1 && this.userPitch[afterIdx]) {
+        this._applyAccidentalToIdx(afterIdx, acc);
+        this.setPendingAccidental('n');
+        this.updateUI();
+        return;
+      }
+      let selIdx = this.activeNoteIdx;
+      if (selIdx !== -1 && this.userPitch[selIdx]) {
+        this._applyAccidentalToIdx(selIdx, acc);
+        this.lastEditedNoteIdx = selIdx; // 記住剛修飾的音，之後再按記號可再改同一音
+        // 修改既有音：框留在該音不移動，連按多次都改同一個音（所見即所改）
+        this.activeNoteIdx = selIdx;
+        this.setPendingAccidental('n');
+        this.updateUI();
+        return;
+      }
+      this.setPendingAccidental(acc);
+    },
+
+    _applyAccidentalToIdx: function(idx, acc) {
+      let base = this.userPitch[idx];
+      // 作答輸入不做異名同音轉換：你按什麼就顯示什麼（A♯ 就是 A♯）。對錯以音高比對，不受拼法影響。
+      let np = { step: base.step, oct: base.oct, acc: acc };
+      this.userPitch[idx] = np;
+      let propagateIdx = idx;
+      while (this.isNoteTiedToNext(propagateIdx)) {
+        if (propagateIdx + 1 < this.userPitch.length) this.userPitch[propagateIdx + 1] = { step: np.step, oct: np.oct, acc: np.acc };
+        propagateIdx++;
+      }
+      this.currentOctave = np.oct; this.updateOctaveLabels();
+    },
+
+    updateOctaveLabels: function() {
+      document.getElementById('oct-label-low').textContent = `(Oct ${this.currentOctave - 1})`;
+      document.getElementById('oct-label-high').textContent = `(Oct ${this.currentOctave + 1})`;
+    },
+
+    shiftOctave: function(delta) {
+      this.currentOctave += delta;
+      if(this.currentOctave < 2) this.currentOctave = 2; if(this.currentOctave > 6) this.currentOctave = 6;
+      this.updateOctaveLabels();
+
+      let targetIdx = (this.lastEditedNoteIdx !== null) ? this.lastEditedNoteIdx : this.activeNoteIdx;
+
+      if(targetIdx !== -1 && this.userPitch[targetIdx]) {
+        this.userPitch[targetIdx].oct += delta;
+        if(this.userPitch[targetIdx].oct < 2) this.userPitch[targetIdx].oct = 2;
+        if(this.userPitch[targetIdx].oct > 6) this.userPitch[targetIdx].oct = 6;
+
+        let propagateIdx = targetIdx;
+        while(this.isNoteTiedToNext(propagateIdx)) {
+          if(propagateIdx + 1 < this.userPitch.length) {
+            this.userPitch[propagateIdx + 1].oct = this.userPitch[targetIdx].oct;
+          }
+          propagateIdx++;
+        }
+        this.updateUI();
+      }
+    },
+
+    inputPitch: function(stepInput) {
+      if(!this.hasPlayed || this.activeNoteIdx === -1) return;
+      let step = stepInput; let oct = this.currentOctave;
+      if(stepInput === 'C_high') { step = 'C'; oct += 1; }
+
+      this.userPitch[this.activeNoteIdx] = { step: step, oct: oct, acc: this.currentAccidental };
+      this.currentOctave = oct; this.updateOctaveLabels();
+
+      let accToApply = this.currentAccidental;
+      if(this.currentAccidental !== 'n') this.setPendingAccidental('n');
+
+      let propagateIdx = this.activeNoteIdx;
+      while(this.isNoteTiedToNext(propagateIdx)) {
+        if(propagateIdx + 1 < this.userPitch.length) {
+          this.userPitch[propagateIdx + 1] = { step: step, oct: oct, acc: accToApply };
+        }
+        propagateIdx++;
+      }
+
+      this.lastEditedNoteIdx = this.activeNoteIdx;
+
+      let totalNotes = this.getTotalNoteCount(this.userSeq);
+      let nextIdx = this.activeNoteIdx + 1;
+
+      while (nextIdx < totalNotes && this.isNoteTiedToPrevious(nextIdx)) {
+          nextIdx++;
+      }
+
+      if(nextIdx < totalNotes) this.activeNoteIdx = nextIdx;
+      // 已是最後一個音：框留在最後一格（不消失），方便繼續修改／加記號
+
+      this.updateUI();
+    },
+
+    playSequence: function(seq, pitchArray, onEnd) {
+      if(!pianoInst || this.isPlaying) return;
+      this.isPlaying = true; this.updatePlayBtn();
+
+      // 播放／重播不移動作答框，維持在原本位置
+      this.updateUI();
+
+      const ctx = ensureAudio(); let time = ctx.currentTime + 0.1;
+      let secPerUnit = 60 / this.bpm; let numerator = parseInt(this.meter.split('/')[0], 10);
+      let secPer16th = this.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+
+      for(let i=0; i<numerator; i++) {
+        let o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle';
+        o.frequency.value = (this.meterType === 'simple' ? i === 0 : i % 3 === 0) ? 1000 : 700;
+        g.gain.setValueAtTime(0.2, time + i * secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time + i * secPerUnit + 0.05);
+        o.connect(g); g.connect(ctx.destination); o.start(time + i * secPerUnit); o.stop(time + i * secPerUnit + 0.05);
+      }
+      time += numerator * secPerUnit;
+
+      let noteIdx = 0;
+      seq.forEach(id => {
+        const block = ALL_BLOCKS[id]; const lengths = block.lengths; const tieNext = block.tieNext || [];
+        let i = 0;
+        while(i < lengths.length) {
+          let totalLen = lengths[i]; let isTied = tieNext[i]; let nextIdx = i + 1;
+          while(isTied && nextIdx < lengths.length) { totalLen += lengths[nextIdx]; isTied = tieNext[nextIdx]; nextIdx++; }
+          let midi = getPitchFromObj(pitchArray[noteIdx + i]);
+          pianoInst.play(midi, time, { duration: totalLen * secPer16th * 0.9, gain: 3.5 });
+          time += totalLen * secPer16th; i = nextIdx;
+        }
+        noteIdx += lengths.length;
+      });
+      const timerId = setTimeout(() => { this.isPlaying = false; this.updatePlayBtn(); if(onEnd) onEnd(); }, (time-ctx.currentTime)*1000 + 100);
+      pendingTimers.push(timerId);
+    },
+
+    /* ===== 模擬測驗：考試模式 ===== */
+    examBootstrap: function() {
+      const EXm = window.EXAM; if(!EXm) return;
+      const KEY = EXm.currentSection(); if(!KEY || KEY.indexOf('melody') !== 0) return;
+      const cfg = EXm.configFor(KEY) || {};
+      const self = this;
+
+      ensureAudio(); window.melStopAll();
+      this.mode = 'practice';
+      this.clef = cfg.clef || 'treble';
+      this.meter = cfg.meter; this.meterType = cfg.meterType;
+      this.barsCount = cfg.bars; this.bpm = cfg.bpm || 80;
+      this.beatsPerBar = parseInt(this.meter.split('/')[0], 10);
+      if(this.meterType === 'compound') this.beatsPerBar /= 3;
+      this.totalBeats = this.barsCount * this.beatsPerBar;
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      this.selectedPatterns = new Set(order);
+
+      const sd = EXm.sectionData(KEY, function(){
+        self.generateQuestion();
+        return { questions: { seq: self.questionSeq.slice(), pitch: JSON.parse(JSON.stringify(self.questionPitch)) }, labels: {} };
+      });
+      if(!sd) return;
+      this.questionSeq = sd.questions.seq.slice();
+      this.questionPitch = JSON.parse(JSON.stringify(sd.questions.pitch));
+      this.userSeq = (sd.answers && sd.answers.seq) ? sd.answers.seq.slice() : Array(this.totalBeats).fill('placeholder');
+      this.userPitch = (sd.answers && sd.answers.pitch) ? JSON.parse(JSON.stringify(sd.answers.pitch)) : [];
+      this.hasPlayed = !!sd.played;
+      this.activeSlotIdx = 0; this.activeNoteIdx = 0; this.lastEditedNoteIdx = null;
+
+      const badge = document.getElementById('mel-statusBadge');
+      if(badge) badge.textContent = `${this.clef==='treble'?'高音':'低音'}｜${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
+      const back = document.querySelector('#pageMelPractice .nav-back-btn'); if(back) back.style.display = 'none';
+      const sub = document.getElementById('mel-submitBtn'); if(sub) sub.style.display = 'none';
+
+      this.renderKeypad(); showPage('mel-practice');
+      setTimeout(() => self.updateUI(), 150);
+
+      const host = document.getElementById('pageMelPractice');
+      const lockEl = document.querySelector('#pageMelPractice .practice-top-fixed');
+      if(lockEl && !lockEl.id) lockEl.id = 'exam-lockwrap';
+
+      const maxPlays = cfg.plays || 5;
+      let used = (sd.playCount || 0);
+      function headText(){ return '播放剩餘 <b>' + Math.max(0, maxPlays-used) + '</b> / ' + maxPlays + ' 次'; }
+      EXm.buildHeader(host, KEY, headText());
+
+      // 逐拍計分：節奏對→每個錯音 -1；節奏錯但音數同→ -2 再每錯音 -1；節奏錯且音數不同→該拍 -4
+      function saveNow(){
+        EXm.saveAnswers(KEY, { seq: self.userSeq.slice(), pitch: JSON.parse(JSON.stringify(self.userPitch||[])) });
+        const beats = []; let qOff = 0, uOff = 0, blank = 0;
+        for(let i=0; i<self.questionSeq.length; i++){
+          const qid = self.questionSeq[i], uid = self.userSeq[i];
+          const qN = ALL_BLOCKS[qid] ? ALL_BLOCKS[qid].lengths.length : 0;
+          const uN = (uid && uid !== 'placeholder' && ALL_BLOCKS[uid]) ? ALL_BLOCKS[uid].lengths.length : 0;
+          if(!uid || uid === 'placeholder') blank++;
+          const rhythmOK = (uid === qid);
+          const sameCount = (uN === qN);
+          let wrong = 0; const n = Math.min(qN, uN);
+          for(let k=0; k<n; k++){
+            const qp = self.questionPitch[qOff+k], up = (self.userPitch||[])[uOff+k];
+            if(!up || !qp || getPitchFromObj(up) !== getPitchFromObj(qp)) wrong++;
+          }
+          beats.push({ rhythmOK: rhythmOK, sameCount: sameCount, wrongPitches: wrong });
+          qOff += qN; uOff += uN;
+        }
+        const max = EXm.SECTIONS[KEY].max;
+        const sc = EXm.scoreBeats(beats, max);
+        const badBeats = beats.filter(function(b){ return !b.rhythmOK || b.wrongPitches>0; }).length;
+        EXm.saveResult(KEY, { score: sc, max: max, unanswered: blank,
+          detail: [{ correct: badBeats===0, your: '有誤 '+badBeats+' 拍', right: '共 '+beats.length+' 拍' }] });
+      }
+      saveNow();
+      const _origUpdateUI = this.updateUI.bind(this);
+      this.updateUI = function(){ _origUpdateUI(); saveNow(); };
+
+      const pb = document.getElementById('mel-playBtn');
+      function refreshPlayBtn(){
+        const left = maxPlays - used;
+        if(self.isPlaying || self._examTuning){ pb.textContent = '🔊 播放中...'; pb.disabled = true; return; }
+        pb.disabled = !pianoInst || left <= 0;
+        pb.textContent = left > 0 ? `▶ 播放題目（剩餘 ${left} 次）` : '▶ 已用完播放次數';
+        EXm.buildHeader(host, KEY, headText());
+      }
+      this.updatePlayBtn = function(){ refreshPlayBtn(); };
+      this._examReady = refreshPlayBtn;
+      refreshPlayBtn();
+
+      pb.onclick = function(){
+        ensureAudio();
+        if(!pianoInst || self.isPlaying || self._examTuning || used >= maxPlays) return;
+        const firstTime = (used === 0);
+        used++;
+        const s = EXm.loadSession(); if(s && s.data && s.data[KEY]){ s.data[KEY].playCount = used; s.data[KEY].played = true; EXm.saveSession(s); }
+        self.hasPlayed = true; EXm.setPlaying(true);
+        function runSeq(){
+          self._examTuning = false;
+          document.getElementById('mel-playCaption').textContent = '🔊 播放中...';
+          self.playSequence(self.questionSeq, self.questionPitch, function(){
+            EXm.setPlaying(false);
+            document.getElementById('mel-playCaption').textContent = (maxPlays-used) > 0 ? `✅ 播放完畢，可再播 ${maxPlays-used} 次` : '✅ 播放次數已用完，請完成作答';
+            refreshPlayBtn();
+          });
+        }
+        if(firstTime){
+          // 第一次播放先給標準音 A440（2 秒），再進預備拍
+          self._examTuning = true; refreshPlayBtn();
+          document.getElementById('mel-playCaption').textContent = '🎵 標準音 A＝440Hz（2 秒）…';
+          pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: 3.5 });
+          const tid = setTimeout(runSeq, 2600); pendingTimers.push(tid);
+        } else {
+          runSeq();
+        }
+        refreshPlayBtn();
+      };
+
+      EXm.guardVisibility(KEY, function(){ window.melStopAll(); self._examTuning = false; EXm.setPlaying(false); refreshPlayBtn(); });
+      EXm.buildBar(host, saveNow);
+    },
+
+    renderKeypad: function() {
+      const pad = document.getElementById('mel-keypad'); pad.innerHTML = '';
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      order.forEach(id => {
+        if(!this.selectedPatterns.has(id)) return;
+        const btn = document.createElement('div'); btn.className = 'rhythm-btn';
+        const svgDiv = document.createElement('div'); btn.appendChild(svgDiv);
+        btn.onclick = () => {
+          if(!this.hasPlayed || this.activeSlotIdx === -1) return;
+          let reqBeats = ALL_BLOCKS[id].beats; let available = 0; let removeCount = 0;
+          for(let i = this.activeSlotIdx; i < this.userSeq.length; i++) {
+            available += this.userSeq[i] === 'placeholder' ? 1 : ALL_BLOCKS[this.userSeq[i]].beats;
+            removeCount++; if(available >= reqBeats) break;
+          }
+          if(available >= reqBeats) {
+            this.userSeq.splice(this.activeSlotIdx, removeCount, id);
+            let overshot = available - reqBeats;
+            for(let k=0; k<overshot; k++) this.userSeq.splice(this.activeSlotIdx + 1 + k, 0, 'placeholder');
+            this.rebuildUserPitchArray();
+            let nextSlot = this.activeSlotIdx + 1;
+            if(nextSlot < this.userSeq.length) this.activeSlotIdx = nextSlot; else this.activeSlotIdx = this.userSeq.length - 1;
+            this.updateUI();
+          }
+        };
+        pad.appendChild(btn); setTimeout(() => drawMiniRhythm(svgDiv, id), 10);
+      });
+    },
+
+    updateUI: function() {
+      renderMainStaff('mel-staff-svg', this.userSeq, this.userPitch, true, null, null, this.clef, this.activeTab, this.activeSlotIdx, this.activeNoteIdx);
+      // 提交鈕在播放後即可按；未填的格子會在提交時跳出提醒並計為錯誤
+      document.getElementById('mel-submitBtn').disabled = !this.hasPlayed;
+
+      const containerOuter = document.getElementById('staffContainerOuter');
+      let targetEl = null;
+      if(this.activeTab === 'rhythm' && this.activeSlotIdx !== -1) targetEl = document.getElementById('mel-slot-' + this.activeSlotIdx);
+      else if(this.activeTab === 'pitch' && this.activeNoteIdx !== -1) targetEl = document.getElementById('mel-note-' + this.activeNoteIdx);
+
+      if(containerOuter && targetEl) {
+        const slotLeft = targetEl.offsetLeft; const slotWidth = targetEl.offsetWidth;
+        const containerWidth = containerOuter.clientWidth; const currentScroll = containerOuter.scrollLeft;
+        if(slotLeft < currentScroll || (slotLeft + slotWidth) > (currentScroll + containerWidth)) {
+          containerOuter.scrollTo({ left: slotLeft - (containerWidth / 2) + (slotWidth / 2), behavior: 'smooth' });
+        }
+      }
+    },
+
+    updatePlayBtn: function() {
+      const b = document.getElementById('mel-playBtn');
+      if(this.isPlaying) {
+          b.textContent = '🔊 播放中...';
+          b.disabled = true;
+      } else {
+          if (this.mode === 'test') {
+              if (this.testSession.replaysLeft > 0) {
+                  b.textContent = `▶ 播放題目 (剩 ${this.testSession.replaysLeft} 次)`;
+                  b.disabled = !pianoInst;
+              } else {
+                  b.textContent = '🚫 次數用盡';
+                  b.disabled = true;
+              }
+          } else {
+              b.textContent = '▶ 播放題目';
+              b.disabled = !pianoInst;
+          }
+      }
+    },
+
+    refreshReviewCount: function() {
+      const el = document.getElementById('mel-reviewCount'); if(el) el.textContent = window.REVIEW_STORE.count('melody');
+    },
+
+    showAnswerPage: function(isCorrect) {
+      const item = {
+        correctSeq: [...this.questionSeq], correctPitch: JSON.parse(JSON.stringify(this.questionPitch)),
+        userSeq: [...this.userSeq], userPitch: JSON.parse(JSON.stringify(this.userPitch)), clef: this.clef,
+        meter: this.meter, meterType: this.meterType, barsCount: this.barsCount, beatsPerBar: this.beatsPerBar, bpm: this.bpm,
+        label: `${this.clef === 'treble' ? '高音' : '低音'}・${this.meter}拍・${this.barsCount}小節`, correctText: '（旋律聽寫）', yourText: ''
+      };
+      this._ansItem = item;
+      document.getElementById('mel-ansBadge').textContent = isCorrect ? '✅ 答對了' : '📖 解答對照';
+      const fb = document.getElementById('mel-ansFeedback');
+      fb.textContent = isCorrect ? '🎉 完全正確！樂感太棒了！' : '❌ 音高或節奏有誤，來看看正解對照';
+      fb.className = 'answer-big-feedback ' + (isCorrect ? 'correct' : 'wrong');
+      document.getElementById('mel-ansScore').textContent = `${this.score.c}/${this.score.t}`;
+      if(!isCorrect){ window.REVIEW_STORE.add('melody', item); this.refreshReviewCount(); }
+      showPage('mel-answer');
+      setTimeout(() => {
+        renderStaticStaff('mel-ansUser', item.userSeq, item.userPitch, item.correctSeq, item.correctPitch, item);
+        renderStaticStaff('mel-ansCorrect', item.correctSeq, item.correctPitch, null, null, item);
+      }, 60);
+    },
+
+    renderReviewPage: function() {
+      this.refreshReviewCount();
+      const list = document.getElementById('mel-reviewList'); const empty = document.getElementById('mel-reviewEmpty');
+      if(!list) return; list.innerHTML = '';
+      const items = window.REVIEW_STORE.load('melody');
+      if(items.length === 0){ if(empty) empty.style.display = 'block'; return; }
+      if(empty) empty.style.display = 'none';
+      items.slice().reverse().forEach((item, ri) => {
+        const uid = item.id || ('m'+ri);
+        const box = document.createElement('div'); box.className = 'review-item';
+        box.innerHTML = `
+          <div style="font-size:13px; font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span style="color:var(--wrong);">❌ 錯題（${item.label || ''}）</span>
+            <div style="display:flex; gap:8px;">
+              <button class="select-all-btn mel-rev-user" style="color:var(--wrong); border-color:var(--wrong); background:var(--wrong-soft);">🔊 聽你的作答</button>
+              <button class="select-all-btn mel-rev-correct">🔁 聽正解</button>
+            </div>
+          </div>
+          <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+          <div class="review-staff"><div id="mel-rev-user-${uid}"></div></div>
+          <div class="review-label" style="margin-top:8px;">正確解答：</div>
+          <div class="review-staff"><div id="mel-rev-correct-${uid}"></div></div>
+        `;
+        list.appendChild(box);
+        box.querySelector('.mel-rev-user').onclick = () => playStatic(item.userSeq, item.userPitch, item);
+        box.querySelector('.mel-rev-correct').onclick = () => playStatic(item.correctSeq, item.correctPitch, item);
+        setTimeout(() => {
+          renderStaticStaff(`mel-rev-user-${uid}`, item.userSeq, item.userPitch, item.correctSeq, item.correctPitch, item);
+          renderStaticStaff(`mel-rev-correct-${uid}`, item.correctSeq, item.correctPitch, null, null, item);
+        }, 50);
+      });
+    },
+
+    setupEvents: function() {
+      document.querySelectorAll('#mel-modeSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.mode = b.dataset.mode; document.querySelectorAll('#mel-modeSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+        document.getElementById('testReplayWrapper').style.display = this.mode === 'test' ? 'flex' : 'none';
+      });
+
+      document.getElementById('mel-testReplaySelect').onchange = (e) => {
+        document.getElementById('mel-testReplayInput').style.display = (e.target.value === 'custom') ? 'inline-block' : 'none';
+      };
+
+      document.querySelectorAll('#mel-clefSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.clef = b.dataset.clef; document.querySelectorAll('#mel-clefSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+      });
+      document.querySelectorAll('#mel-meterSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.meter = b.dataset.meter; this.meterType = b.dataset.type;
+        document.querySelectorAll('#mel-meterSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+        document.getElementById('bpmSym').textContent = this.meterType === 'simple' ? '♩' : '♪';
+        this.initSettings();
+      });
+
+      document.getElementById('selectAllBtn').onclick = () => {
+        const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+        const items = document.querySelectorAll('.pattern-item');
+        if(this.selectedPatterns.size === order.length) { this.selectedPatterns.clear(); items.forEach(i => i.classList.remove('selected')); }
+        else { order.forEach(id => this.selectedPatterns.add(id)); items.forEach(i => i.classList.add('selected')); }
+        document.getElementById('mel-enterBtn').disabled = this.selectedPatterns.size === 0;
+      };
+
+      document.getElementById('mel-enterBtn').onclick = () => {
+        ensureAudio(); window.melStopAll();
+
+        this.barsCount = parseInt(document.getElementById('mel-barsSelect').value, 10);
+        this.beatsPerBar = parseInt(this.meter.split('/')[0], 10);
+        if(this.meterType==='compound') this.beatsPerBar /= 3;
+        this.totalBeats = this.barsCount * this.beatsPerBar;
+        this.bpm = parseInt(document.getElementById('mel-bpm').value, 10);
+
+        if (this.mode === 'test') {
+            let selectVal = document.getElementById('mel-testReplaySelect').value;
+            let plays = 3;
+            if (selectVal === 'custom') {
+                let customVal = parseInt(document.getElementById('mel-testReplayInput').value, 10);
+                if (isNaN(customVal) || customVal < 1) customVal = 1;
+                if (customVal > 20) customVal = 20;
+                document.getElementById('mel-testReplayInput').value = customVal;
+                plays = customVal;
+            } else {
+                plays = parseInt(selectVal, 10);
+            }
+            this.testSession.totalPlays = plays;
+            this.testSession.replaysLeft = this.testSession.totalPlays;
+        }
+
+        document.getElementById('mel-statusBadge').textContent = `${this.clef === 'treble' ? '高音' : '低音'}｜${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
+        this.userSeq = Array(this.totalBeats).fill('placeholder');
+        this.userPitch = []; this._pitchSeqSnapshot = null;
+        this.hasPlayed = false; this.activeSlotIdx = 0; this.activeNoteIdx = 0; this.lastEditedNoteIdx = null;
+        this.generateQuestion();
+        this.rebuildUserPitchArray();
+
+        document.getElementById('mel-playCaption').textContent = '';
+
+        this.updatePlayBtn();
+        this.renderKeypad(); showPage('mel-practice');
+        this.switchTab('rhythm');
+        setTimeout(() => this.updateUI(), 150);
+      };
+
+      document.getElementById('mel-playBtn').onclick = () => {
+        ensureAudio(); if(!pianoInst || this.isPlaying) return;
+        if(this.mode === 'test' && this.testSession.replaysLeft <= 0) return;
+
+        this.hasPlayed = true;
+        if (this.mode === 'test') this.testSession.replaysLeft--;
+
+        document.getElementById('mel-playCaption').textContent = '🔊 播放中...';
+        this.playSequence(this.questionSeq, this.questionPitch, () => document.getElementById('mel-playCaption').textContent = '✅ 播放完畢，請作答！');
+      };
+
+      document.getElementById('mel-backspaceBtn').onclick = () => {
+        if(!this.hasPlayed) return;
+        if(this.activeTab === 'rhythm') {
+          let t = this.activeSlotIdx;
+          if(t === -1) { for(let i = this.userSeq.length - 1; i >= 0; i--) { if(this.userSeq[i] !== 'placeholder') { t = i; break; } } }
+          else { if(this.userSeq[t] === 'placeholder' && t > 0) { t--; while(t > 0 && this.userSeq[t] === 'placeholder') t--; } }
+          if(t >= 0 && this.userSeq[t] !== 'placeholder') {
+            let b = ALL_BLOCKS[this.userSeq[t]].beats; this.userSeq.splice(t, 1);
+            for(let k=0; k<b; k++) this.userSeq.splice(t, 0, 'placeholder');
+            this.activeSlotIdx = t; this.rebuildUserPitchArray(); this.updateUI();
+          }
+        } else {
+          if (this.activeNoteIdx === -1) {
+             let prevIdx = this.userPitch.length - 1;
+             while (prevIdx >= 0 && this.isNoteTiedToPrevious(prevIdx)) prevIdx--;
+             if (prevIdx >= 0) this.activeNoteIdx = prevIdx;
+             this.updateUI();
+          } else if(this.userPitch[this.activeNoteIdx]) {
+             let defOct = this.clef === 'treble' ? 4 : 3; let defStep = this.clef === 'treble' ? 'A' : 'C';
+             this.userPitch[this.activeNoteIdx] = { step: defStep, oct: defOct, acc: 'n' };
+             let propagateIdx = this.activeNoteIdx;
+             while(this.isNoteTiedToNext(propagateIdx)) {
+                if(propagateIdx + 1 < this.userPitch.length) {
+                   this.userPitch[propagateIdx + 1] = { step: defStep, oct: defOct, acc: 'n' };
+                }
+                propagateIdx++;
+             }
+             let prevIdx = this.activeNoteIdx - 1;
+             while (prevIdx >= 0 && this.isNoteTiedToPrevious(prevIdx)) prevIdx--;
+             if(prevIdx >= 0) this.activeNoteIdx = prevIdx;
+
+             this.lastEditedNoteIdx = null;
+             this.updateUI();
+          }
+        }
+      };
+
+      document.getElementById('mel-clearBtn').onclick = () => {
+        if(!this.hasPlayed) return;
+        if(this.activeTab === 'rhythm') {
+          this.userSeq = Array(this.totalBeats).fill('placeholder'); this.userPitch = []; this._pitchSeqSnapshot = null;
+          this.activeSlotIdx = 0; this.activeNoteIdx = 0;
+        } else {
+          this.userPitch = []; this._pitchSeqSnapshot = null; this.rebuildUserPitchArray(); this.activeNoteIdx = 0;
+        }
+        this.lastEditedNoteIdx = null;
+        this.updateUI();
+      };
+
+      document.getElementById('mel-submitBtn').onclick = () => {
+        if(!this.hasPlayed) return;
+        // 未填提醒：仍可提交，但跳出確認（未填計為錯誤）
+        let emptyCount = this.userSeq.filter(x => x === 'placeholder').length;
+        if(emptyCount > 0){
+          if(!window.confirm(`還有 ${emptyCount} 拍節奏未填寫。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
+        }
+        window.melStopAll();
+        let isCorrect = true;
+        if(JSON.stringify(this.userSeq) !== JSON.stringify(this.questionSeq)) { isCorrect = false; }
+        else {
+          let totalNotes = this.getTotalNoteCount(this.userSeq);
+          for(let i = 0; i < totalNotes; i++) {
+            if(getPitchFromObj(this.userPitch[i]) !== getPitchFromObj(this.questionPitch[i])) { isCorrect = false; break; }
+          }
+        }
+        this.score.t++; if(isCorrect) this.score.c++;
+        document.getElementById('mel-scoreNum').textContent = `${this.score.c}/${this.score.t}`;
+        this.showAnswerPage(isCorrect);
+      };
+
+      // 解答頁播放與下一題
+      document.getElementById('mel-ansPlayUser').onclick = () => { if(this._ansItem) playStatic(this._ansItem.userSeq, this._ansItem.userPitch, this._ansItem); };
+      document.getElementById('mel-ansPlayCorrect').onclick = () => { if(this._ansItem) playStatic(this._ansItem.correctSeq, this._ansItem.correctPitch, this._ansItem); };
+      document.getElementById('mel-ansNextBtn').onclick = () => {
+        ensureAudio(); window.melStopAll();
+        this.userSeq = Array(this.totalBeats).fill('placeholder');
+        this.userPitch = []; this._pitchSeqSnapshot = null;
+        this.hasPlayed = false; this.activeSlotIdx = 0; this.activeNoteIdx = 0; this.lastEditedNoteIdx = null;
+        this.generateQuestion();
+        this.rebuildUserPitchArray();
+        if (this.mode === 'test') { this.testSession.replaysLeft = this.testSession.totalPlays; }
+        document.getElementById('mel-playCaption').textContent = '';
+        this.updatePlayBtn();
+        this.renderKeypad();
+        this.switchTab('rhythm');
+        showPage('mel-practice');
+        setTimeout(() => this.updateUI(), 150);
+      };
+
+      document.getElementById('mel-clearReviewBtn').onclick = () => {
+        if(window.REVIEW_STORE.count('melody') === 0) return;
+        if(window.confirm('確定要清空單旋律曲調的錯題本嗎？此動作無法復原。')){ window.REVIEW_STORE.clear('melody'); this.renderReviewPage(); this.refreshReviewCount(); }
+      };
+
+      window.addEventListener('resize', () => { if(document.getElementById('pageMelPractice').classList.contains('active')) this.updateUI(); });
+    }
+  };
+
+  window.melModule = melModule;
+
+  melModule.initSettings(); melModule.setupEvents(); melModule.refreshReviewCount(); loadPiano();
+
+  /* 「🎵 標準音 A」按鈕：隨時可按，播放 A4（440Hz）2 秒，不影響題目播放次數 */
+  (function(){
+    var btn = document.getElementById('tuningABtn'); if(!btn) return;
+    // 考試模式已於第一次播放前自動給標準音，不需要這顆按鈕
+    if(window.EXAM && window.EXAM.isExamMode()){ btn.style.display = 'none'; return; }
+    btn.onclick = function(){
+      try{
+        ensureAudio();
+        if(!pianoInst) return;
+        var ctx = ensureAudio();
+        pianoInst.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
+        var t = btn.textContent; btn.textContent = '🎵 A 響起…';
+        setTimeout(function(){ btn.textContent = t; }, 2000);
+      }catch(e){}
+    };
+  })();
+
+  if(window.EXAM && window.EXAM.isExamMode()){ melModule.examBootstrap(); }
+  // 由 index 錯題本總覽「跳回複習」進入時，直接開啟錯題本頁
+  if(location.hash === '#review') showPage('mel-review');
+})();
+</script>
+
+<script>
+  if('serviceWorker' in navigator){ window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js').catch(()=>{}); }); }
+</script>
+<!-- 玩法說明彈窗 -->
+<div class="help-modal" id="mel-helpModal" onclick="if(event.target===this) closeHelp('mel-helpModal')">
+  <div class="help-box">
+    <button class="help-close" onclick="closeHelp('mel-helpModal')" aria-label="關閉">×</button>
+    <h2>單旋律曲調 — 玩法說明</h2>
+    <p class="help-lead">把聽到的單旋律「節奏＋音高」完整寫出來（隨機無調性出題，用臨時記號作答）。</p>
+    <h3>設定</h3>
+    <p>可選譜號（<b>高音／低音</b>）、拍號、小節數、速度與要出現的節奏型；測驗模式可限制重播次數（可自訂）。</p>
+    <h3>作答</h3>
+    <p>播放後用兩個分頁作答——「<b>編輯節奏</b>」點拍位再點節奏鍵盤填；「<b>編輯音高</b>」點一個音符 → 按音名（C～B、含高 Do）填入並自動跳下一個音。<b>要加升降記號時，點到那個音後直接按 ♯／♭／♮，就會套用到該音、並自動跳到下一個</b>（剛打完的音也能直接按記號修改）；八度用「高低八度」事後微調。填完提交 → 解答頁紅色標錯、與正解對照，可聆聽你的作答／正解。</p>
+    <div class="help-common">
+      <h3>共通規則（六個練習都適用）</h3>
+      <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>
+      <p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>
+      <p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>
+      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照與即時訂正。</p>
+    </div>
+    <div class="help-foot"><button onclick="closeHelp('mel-helpModal')">我知道了</button></div>
+  </div>
+</div>
+<script>
+function openHelp(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); }
+function closeHelp(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); }
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document.querySelectorAll('.help-modal.open').forEach(function(m){ m.classList.remove('open'); }); } });
+</script>
+<script>
+(function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+</script>
+<script>
+/* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */
+(function(){
+  function setPlayback(){ try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} }
+  setPlayback();
+  var SILENT="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+  var done=false;
+  function unlock(){ if(done) return; done=true; setPlayback();
+    try{ var a=new Audio(SILENT); a.setAttribute("playsinline",""); a.volume=0.02; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){}
+    document.removeEventListener("touchend",unlock,true); document.removeEventListener("click",unlock,true);
+  }
+  document.addEventListener("touchend",unlock,true);
+  document.addEventListener("click",unlock,true);
+})();
+</script>
+</body>
+</html>
