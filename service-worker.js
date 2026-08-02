@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v56'; // v56：四部修飾提示框、和絃轉位斜線代號
+const CACHE_NAME = 'ear-training-shell-v58'; // v58：修正解答頁譜例被壓縮裁切
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

@@ -203,6 +203,11 @@
     .p-btn { font-size: 16px; }
     .pattern-item { height: 72px; }
   }
+
+  /* 解答頁／錯題本：譜例與內容不可被 flex 壓縮（頁面本身可捲動），
+     避免內容超過一個畫面時譜例被壓扁、下方譜表被裁掉。 */
+  #pageTpAnswer > *, #pageTpReview > * { flex-shrink: 0; }
+  .review-staff { flex: 0 0 auto; }
 </style>
 </head>
 <body>
