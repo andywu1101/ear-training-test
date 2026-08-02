@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v59'; // v59：問題回報按鈕與版本號
+const CACHE_NAME = 'ear-training-shell-v60'; // v60：音程自訂預設全選
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

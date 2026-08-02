@@ -568,7 +568,7 @@ function showPage(pageId) {
       { id: 3, name: 'Lv3 不完全協和', pool: ['M3','m3','M6','m6'] },
       { id: CUSTOM_ID, name: '自訂音程選項', pool: ['P1','M3','P5','P8'] }
     ];
-    let customPool = LEVELS[3].pool;
+    let customPool = [...ORDER];   // 自訂音程：預設全選（與和絃辨認一致）
     let mode = 'practice', qtype = 'single', compound = false, curLevel = LEVELS[0];
     let score = { correct: 0, total: 0, streak: 0 }, qIndex = 1, current = null, answered = false;
     let testSession = null, dictSession = null, hasPlayed = false;
