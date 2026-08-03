@@ -465,7 +465,10 @@ function showPage(pageId) {
     const trebleY = Math.round(height * 0.14); const bassY = Math.round(height * 0.52);
     const trebleStave = new VF.Stave(staveX, trebleY, staveWidth).addClef('treble');
     const bassStave = new VF.Stave(staveX, bassY, staveWidth).addClef('bass');
+    // 大譜表規範：終止線貫穿上下譜表
+    trebleStave.setEndBarType(VF.Barline.type.NONE); bassStave.setEndBarType(VF.Barline.type.NONE);
     trebleStave.setContext(context).draw(); bassStave.setContext(context).draw();
+    new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.BOLD_DOUBLE_RIGHT).setContext(context).draw();
     new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.BRACE).setContext(context).draw();
     new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
     const spelled = spellNotes(root, intervals, steps);

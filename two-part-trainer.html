@@ -565,7 +565,7 @@ function showPage(pageId) {
       container.innerHTML = '';
 
       const minMeasureWidth = 240;
-      const requiredWidth = (minMeasureWidth * cfg.barsCount) + 80;
+      const requiredWidth = (minMeasureWidth * cfg.barsCount) + 90;  // +10：終止線較寬，右側多留空間
       const totalWidth = requiredWidth;
       const usableWidth = totalWidth - 30;
 
@@ -596,7 +596,14 @@ function showPage(pageId) {
             staveT.addClef('treble').addTimeSignature(cfg.meter);
             staveB.addClef('bass').addTimeSignature(cfg.meter);
         }
+        // 大譜表規範：小節線與終止線一律貫穿上下譜表，各譜表本身不畫右側線
+        staveT.setEndBarType(VF.Barline.type.NONE);
+        staveB.setEndBarType(VF.Barline.type.NONE);
         staveT.setContext(ctx).draw(); staveB.setContext(ctx).draw();
+        new VF.StaveConnector(staveT, staveB)
+          .setType(b === cfg.barsCount - 1 ? VF.StaveConnector.type.BOLD_DOUBLE_RIGHT
+                                           : VF.StaveConnector.type.SINGLE_RIGHT)
+          .setContext(ctx).draw();
 
         if(isFirst) {
             new VF.StaveConnector(staveT, staveB).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();

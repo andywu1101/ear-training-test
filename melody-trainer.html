@@ -570,7 +570,7 @@ function showPage(pageId) {
       }
       container.innerHTML = '';
 
-      const minMeasureWidth = 240; const requiredWidth = (minMeasureWidth * cfg.barsCount) + 60;
+      const minMeasureWidth = 240; const requiredWidth = (minMeasureWidth * cfg.barsCount) + 70;  // +10：終止線較寬，右側多留空間
       const totalWidth = requiredWidth; const usableWidth = totalWidth - 10;
       const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(totalWidth, 130);
       const ctx = renderer.getContext();
@@ -592,6 +592,7 @@ function showPage(pageId) {
         const isFirst = (b === 0); const sWidth = isFirst ? barWidth + 60 : barWidth;
         const stave = new VF.Stave(xPos, 20, sWidth);
         if(isFirst) stave.addClef(clef).addTimeSignature(cfg.meter);
+        if(b === cfg.barsCount - 1) stave.setEndBarType(VF.Barline.type.END);    // 最後一小節：終止線
         stave.setContext(ctx).draw();
 
         let barNotes = []; let barBeams = []; let barTies = []; let barTuplets = [];

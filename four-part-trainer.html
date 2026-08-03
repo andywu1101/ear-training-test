@@ -2071,12 +2071,23 @@ window.addEventListener('resize', setVH); setVH();
             if (sT) sT.addClef('treble').addKeySignature(keyObj.vfk).addTimeSignature('4/4'); 
             sB.addClef('bass').addKeySignature(keyObj.vfk).addTimeSignature('4/4'); 
         }
-        if (i === bars - 1) {
-            if (sT) sT.setEndBarType(VF.Barline.type.END);
-            sB.setEndBarType(VF.Barline.type.END);
+        // 大譜表：小節線與終止線一律貫穿上下譜表，各譜表本身不畫右側線
+        // 只有低音譜表時（bassOnly）沒有可連接的上譜表，改由該譜表自己畫
+        var isLastBar = (i === bars - 1);
+        if (sT) {
+            sT.setEndBarType(VF.Barline.type.NONE);
+            sB.setEndBarType(VF.Barline.type.NONE);
+        } else {
+            sB.setEndBarType(isLastBar ? VF.Barline.type.END : VF.Barline.type.SINGLE);
         }
         if (sT) sT.setContext(ctx).draw();
         sB.setContext(ctx).draw();
+        if (sT) {
+          new VF.StaveConnector(sT, sB)
+            .setType(isLastBar ? VF.StaveConnector.type.BOLD_DOUBLE_RIGHT
+                               : VF.StaveConnector.type.SINGLE_RIGHT)
+            .setContext(ctx).draw();
+        }
         if (isFirst && sT) {
           new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();
           new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(ctx).draw();

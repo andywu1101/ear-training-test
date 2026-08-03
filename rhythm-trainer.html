@@ -526,7 +526,7 @@ function showPage(pageId) {
       container.innerHTML = '';
 
       const minMeasureWidth = 240;
-      const requiredWidth = (minMeasureWidth * cfg.barsCount) + 60;
+      const requiredWidth = (minMeasureWidth * cfg.barsCount) + 70;  // +10：終止線較寬，右側多留空間
       const totalWidth = requiredWidth;
       const usableWidth = totalWidth - 10;
 
@@ -555,6 +555,7 @@ function showPage(pageId) {
         const sWidth = isFirst ? barWidth + 60 : barWidth;
         const stave = new VF.Stave(xPos, -5, sWidth);
         if (isFirst) stave.addClef('treble').addTimeSignature(cfg.meter);
+        if (b === cfg.barsCount - 1) stave.setEndBarType(VF.Barline.type.END);   // 最後一小節：終止線
         stave.setContext(ctx).draw();
 
         let allNotes = []; let allBeams = []; let allTies = []; let allTuplets = [];

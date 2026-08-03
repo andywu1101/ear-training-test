@@ -61,7 +61,17 @@
   .report-wrap{ margin-top: 36px; text-align:center; }
   .report-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:13.5px; padding:10px 22px; border-radius:999px; background:transparent; color:var(--ink-soft); border:1px solid var(--panel-border); text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
   .report-btn:hover, .report-btn:active{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
-  .app-version{ margin-top: 10px; font-family:var(--font-mono); font-size: 11px; color: var(--ink-soft); opacity:0.7; text-align:center; }
+  .app-version{ margin-top: 10px; text-align:center; }
+  .ver-btn{ font-family:var(--font-mono); font-size: 11px; color: var(--ink-soft); background:none; border:none; opacity:0.75; cursor:pointer; padding:6px 8px; touch-action:manipulation; }
+  .ver-btn:hover, .ver-btn:active{ color:var(--accent); opacity:1; text-decoration:underline; }
+  /* 更新日誌 */
+  .log-list{ text-align:left; max-height:60vh; overflow-y:auto; padding:4px 2px; -webkit-overflow-scrolling:touch; }
+  .log-item{ padding:12px 2px; border-top:1px dashed var(--hairline); }
+  .log-item:first-child{ border-top:none; }
+  .log-ver{ font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--accent); margin-bottom:5px; }
+  .log-ver .now{ font-family:var(--font-body); font-size:10.5px; font-weight:700; color:var(--panel); background:var(--accent); border-radius:999px; padding:2px 8px; margin-left:6px; }
+  .log-item ul{ margin:0; padding-left:18px; }
+  .log-item li{ font-size:13.5px; line-height:1.75; color:var(--ink); }
 
   /* 錯題本總覽卡片（整合入口） */
   .review-hub-card{ grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: var(--panel); cursor:pointer; }
@@ -125,8 +135,9 @@
   .donate-card .menu-card-desc{ color: var(--ink-soft); }
   /* 贊助佔位彈窗 */
   .donate-modal{ display:none; position:fixed; inset:0; z-index:1200; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; }
-  .donate-modal.open{ display:flex; align-items:center; justify-content:center; }
-  .donate-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; max-width:400px; width:100%; padding:30px 26px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.28); }
+  /* 用 margin:auto 置中：內容高過螢幕時卡片上緣才不會溢出捲動範圍被裁掉（圓角消失） */
+  .donate-modal.open{ display:flex; align-items:flex-start; justify-content:center; }
+  .donate-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; overflow:hidden; margin:auto; max-width:400px; width:100%; padding:30px 26px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.28); }
   .donate-box .dico{ font-size:40px; line-height:1; }
   .donate-box h3{ font-family:var(--font-display); font-size:23px; font-weight:600; margin:10px 0 8px; }
   .donate-box p{ font-size:15px; color:var(--ink-soft); line-height:1.8; margin:0 0 18px; }
@@ -299,7 +310,7 @@
     </div>
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
-    <p class="app-version" id="appVersion">音樂聽力練習 v66</p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v70　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -357,6 +368,17 @@
     </div>
     <button type="button" class="author-item" style="width:100%; margin-bottom:12px;" onclick="closeDonate(); showAuthor();"><span class="ai-ico">🔗</span> 作者主頁</button>
     <button class="donate-dismiss" onclick="closeDonate()">關閉</button>
+  </div>
+</div>
+
+<!-- 更新日誌彈窗 -->
+<div class="donate-modal" id="logModal" onclick="if(event.target===this) closeChangelog()">
+  <div class="donate-box">
+    <div class="dico">📝</div>
+    <h3>更新日誌</h3>
+    <p>由舊到新，最新的更新在最下方。</p>
+    <div class="log-list" id="logList"></div>
+    <button class="donate-dismiss" onclick="closeChangelog()">關閉</button>
   </div>
 </div>
 
@@ -431,6 +453,42 @@ var SPONSORS = [
 ];
 
 /* 贊助彈窗的分頁切換：'' = 管道清單、'Jko' = 街口、'Bank' = 銀行、'Sponsors' = 名單 */
+/* ===================================================================
+ *  更新日誌：由舊到新排列（最新在最下方）。新增一版就在陣列末端加一筆。
+ * =================================================================== */
+var CHANGELOG = [
+  { v: 'v23', items: ['修正音程「複音程」模式下，完全一度與完全八度判定錯誤的問題'] },
+  { v: 'v31', items: ['新增「模擬測驗」：六大項綜合、滿分 100 分，含成績單與長期進步曲線'] },
+  { v: 'v41', items: ['贊助管道新增銀行轉帳與 TWQR 說明', '新增贊助者名單'] },
+  { v: 'v46', items: ['優化升降記號的操作：點選某個音後按記號，會套用在該音且作答框不再跳格'] },
+  { v: 'v47', items: ['修正回頭修改某一拍的節奏後，後面音高整串位移的問題'] },
+  { v: 'v48', items: ['修正切換「編輯節奏／編輯音高」時，作答框跑到別拍的問題'] },
+  { v: 'v49', items: ['修正音符符桿方向（第三線以上朝下），符尾不再超出譜表', '電腦版版面放寬，譜例與作答區更舒適'] },
+  { v: 'v55', items: ['支援完全離線使用：沒有網路也能畫譜、發聲與作答', '載入速度提升'] },
+  { v: 'v56', items: ['修正和絃轉位時的代號標示（例如 Cmaj7/E）', '四部和聲加上修飾目標的提示框'] },
+  { v: 'v59', items: ['新增「回報問題或建議」入口', '選單底部顯示版本號'] },
+  { v: 'v62', items: ['模擬測驗新增「高中檔（模擬音樂班甄選）」，與大學檔分開記錄進步曲線'] },
+  { v: 'v66', items: ['修正譜例在作答後會上下滑動、造成誤觸的問題'] },
+  { v: 'v69', items: ['譜例最後一小節改為終止線', '大譜表的小節線與終止線改為貫穿上下譜表'] },
+  { v: 'v70', items: ['新增「更新日誌」，可查看歷次更新內容', '修正贊助彈窗在手機上捲動時上緣圓角被裁切的問題'] }
+];
+
+function showChangelog(){
+  var box = document.getElementById('logList');
+  if(box){
+    var cur = (document.getElementById('appVersion')||{}).textContent || '';
+    box.innerHTML = CHANGELOG.map(function(g){
+      var isNow = cur.indexOf(g.v) !== -1;
+      return '<div class="log-item"><div class="log-ver">' + escapeHtml(g.v) +
+             (isNow ? '<span class="now">目前版本</span>' : '') + '</div><ul>' +
+             g.items.map(function(t){ return '<li>' + escapeHtml(t) + '</li>'; }).join('') + '</ul></div>';
+    }).join('');
+  }
+  var m = document.getElementById('logModal');
+  if(m){ m.classList.add('open'); if(box) setTimeout(function(){ box.scrollTop = box.scrollHeight; }, 30); }
+}
+function closeChangelog(){ var m=document.getElementById('logModal'); if(m) m.classList.remove('open'); }
+
 function showPanel(which){
   var ids = ['Jko','Bank','Sponsors'];
   var ch = document.getElementById('donateChannels');
@@ -459,7 +517,7 @@ function copyText(e, text){
     else { _fallbackCopy(num); done(); }
   }catch(_){ _fallbackCopy(num); done(); }
 }
-document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDonate(); closeAuthor(); } });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDonate(); closeAuthor(); closeChangelog(); } });
 /* 贊助者名單：有人才顯示入口按鈕 */
 (function(){
   try{
