@@ -280,6 +280,16 @@
         </div>
       </a>
 
+      <!-- 07 音高辨認（找錯音）：尚未開放 -->
+      <div class="menu-card disabled-feature">
+        <span class="menu-badge badge-soon">即將推出</span>
+        <div>
+          <div class="menu-card-num">07</div>
+          <h3 class="menu-card-title">音高辨認 (找錯音)</h3>
+          <p class="menu-card-desc">聆聽旋律，並在題目的譜例上找出錯誤的音高。</p>
+        </div>
+      </div>
+
       <!-- 模擬測驗（全寬、置於贊助卡上方） -->
       <a href="exam.html" class="menu-card active-feature" style="grid-column:1 / -1; border-color:var(--accent-line);">
         <span class="menu-badge badge-ready" id="examCardBadge" style="display:none;"></span>
@@ -310,7 +320,7 @@
     </div>    <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v72　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.74　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -458,20 +468,22 @@ var SPONSORS = [
  *  更新日誌：由舊到新排列（最新在最下方）。新增一版就在陣列末端加一筆。
  * =================================================================== */
 var CHANGELOG = [
-  { v: 'v23', items: ['修正音程「複音程」模式下，完全一度與完全八度判定錯誤的問題'] },
-  { v: 'v31', items: ['新增「模擬測驗」：六大項綜合、滿分 100 分，含成績單與長期進步曲線'] },
-  { v: 'v41', items: ['贊助管道新增銀行轉帳與 TWQR 說明', '新增贊助者名單'] },
-  { v: 'v46', items: ['優化升降記號的操作：點選某個音後按記號，會套用在該音且作答框不再跳格'] },
-  { v: 'v47', items: ['修正回頭修改某一拍的節奏後，後面音高整串位移的問題'] },
-  { v: 'v48', items: ['修正切換「編輯節奏／編輯音高」時，作答框跑到別拍的問題'] },
-  { v: 'v49', items: ['修正音符符桿方向（第三線以上朝下），符尾不再超出譜表', '電腦版版面放寬，譜例與作答區更舒適'] },
-  { v: 'v55', items: ['支援完全離線使用：沒有網路也能畫譜、發聲與作答', '載入速度提升'] },
-  { v: 'v56', items: ['修正和絃轉位時的代號標示（例如 Cmaj7/E）', '四部和聲加上修飾目標的提示框'] },
-  { v: 'v59', items: ['新增「回報問題或建議」入口', '選單底部顯示版本號'] },
-  { v: 'v62', items: ['模擬測驗新增「高中檔（模擬音樂班甄選）」，與大學檔分開記錄進步曲線'] },
-  { v: 'v66', items: ['修正譜例在作答後會上下滑動、造成誤觸的問題'] },
-  { v: 'v69', items: ['譜例最後一小節改為終止線', '大譜表的小節線與終止線改為貫穿上下譜表'] },
-  { v: 'v70', items: ['新增「更新日誌」，可查看歷次更新內容', '修正贊助彈窗在手機上捲動時上緣圓角被裁切的問題'] }
+  { v: 'v.23', items: ['修正音程「複音程」模式下，完全一度與完全八度判定錯誤的問題'] },
+  { v: 'v.31', items: ['新增「模擬測驗」：六大項綜合、滿分 100 分，含成績單與長期進步曲線'] },
+  { v: 'v.41', items: ['贊助管道新增銀行轉帳與 TWQR 說明', '新增贊助者名單'] },
+  { v: 'v.46', items: ['優化升降記號的操作：點選某個音後按記號，會套用在該音且作答框不再跳格'] },
+  { v: 'v.47', items: ['修正回頭修改某一拍的節奏後，後面音高整串位移的問題'] },
+  { v: 'v.48', items: ['修正切換「編輯節奏／編輯音高」時，作答框跑到別拍的問題'] },
+  { v: 'v.49', items: ['修正音符符桿方向（第三線以上朝下），符尾不再超出譜表', '電腦版版面放寬，譜例與作答區更舒適'] },
+  { v: 'v.55', items: ['支援完全離線使用：沒有網路也能畫譜、發聲與作答', '載入速度提升'] },
+  { v: 'v.56', items: ['修正和絃轉位時的代號標示（例如 Cmaj7/E）', '四部和聲加上修飾目標的提示框'] },
+  { v: 'v.59', items: ['新增「回報問題或建議」入口', '選單底部顯示版本號'] },
+  { v: 'v.62', items: ['模擬測驗新增「高中檔（模擬音樂班甄選）」，與大學檔分開記錄進步曲線'] },
+  { v: 'v.66', items: ['修正譜例在作答後會上下滑動、造成誤觸的問題'] },
+  { v: 'v.69', items: ['譜例最後一小節改為終止線', '大譜表的小節線與終止線改為貫穿上下譜表'] },
+  { v: 'v.70', items: ['新增「更新日誌」，可查看歷次更新內容', '修正贊助彈窗在手機上捲動時上緣圓角被裁切的問題'] },
+  { v: 'v.71', items: ['修正彈窗開啟時會捲動到背景頁面的問題'] },
+  { v: 'v.74', items: ['新增「音高辨認 (找錯音)」預告，功能即將推出'] }
 ];
 
 function showChangelog(){
@@ -486,7 +498,7 @@ function showChangelog(){
   var curEl = document.getElementById('logCurrent');
   if(curEl){
     var txt = (document.getElementById('appVersion')||{}).textContent || '';
-    var m = txt.match(/v\d+/);
+    var m = txt.match(/v\.?\d+/);
     curEl.textContent = m ? ('目前版本 ' + m[0]) : '';
   }
   var m2 = document.getElementById('logModal');
