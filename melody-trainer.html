@@ -178,7 +178,7 @@
   .play-caption:empty { display: none; }
   .top-bar-practice { margin-bottom: 6px; }
   /* 不可壓縮：避免考試模式下外框被擠短而切到譜例；內容垂直置中，真的放不下才捲動 */
-  .staff-scroll-container { flex: 0 0 auto; min-height: 0; max-height: 40dvh; max-height: calc(var(--app-vh, 1vh) * 40); overflow-y: auto; display: flex; align-items: center; padding: 4px 3px; margin-bottom: 4px; }
+  .staff-scroll-container { flex: 0 0 auto; min-height: 0; max-height: 40dvh; max-height: calc(var(--app-vh, 1vh) * 40); overflow-y: hidden; display: flex; align-items: center; padding: 4px 3px; margin-bottom: 4px; }
   .unified-action-row { margin-bottom: 4px; }
   .play-caption { margin-top: 0; }
   .practice-bottom-scroll { padding: 10px 10px 14px; }

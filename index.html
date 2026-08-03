@@ -168,8 +168,9 @@
   .bank-row .bk{ font-size:13px; color:var(--ink-soft); flex-shrink:0; width:34px; text-align:left; }
   .bank-row b{ flex:1; font-family:var(--font-mono); letter-spacing:0.02em; text-align:left; }
   /* 贊助者名單 */
-  .sponsor-list{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; padding:14px 10px; border:1px dashed var(--panel-border); border-radius:12px; }
-  .sponsor-list span{ font-size:15px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:999px; padding:7px 14px; }
+  .sponsor-list{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; padding:14px 10px; border:1px dashed var(--panel-border); border-radius:12px; }
+  /* 固定行高與高度：避免中英文因字型行高不同而上下錯位 */
+  .sponsor-list span{ display:inline-flex; align-items:center; justify-content:center; min-height:34px; line-height:1; font-size:15px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:999px; padding:0 14px; }
   @media (max-width:480px){ .cover-title{ font-size:34px; } .cover-clef{ font-size:76px; } .cover-msg{ font-size:15px; padding:18px 18px; } }
 </style>
 </head>
@@ -298,7 +299,7 @@
     </div>
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
-    <p class="app-version" id="appVersion">音樂聽力練習 v64</p>
+    <p class="app-version" id="appVersion">音樂聽力練習 v66</p>
   </div>
 
   <!-- 錯題本總覽 -->

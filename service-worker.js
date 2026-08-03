@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v64'; // v64：移除高中檔範圍註記
+const CACHE_NAME = 'ear-training-shell-v66'; // v66：譜例僅保留左右拖動
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
