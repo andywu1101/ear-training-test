@@ -974,7 +974,18 @@ function showPage(pageId) {
         window.stopAllPlayback(); testSession = null;
         // 題目只產生一次，之後回到本段題目不變
         var sd = EXm.sectionData(KEY, function(){
-          var qs = generateDictQs(cfg.count||10, cfg.allowRepeat===true);
+          var qs;
+          if(cfg.pool === 'HS9'){
+            // 高中檔：Lv5 十種去掉增七＝9 種，出 10 題（9 種各一次＋隨機重複一種）
+            var pool9 = curLevel.pool.filter(function(k){ return k !== 'augmented7'; });
+            curLevel = { id: curLevel.id, name: curLevel.name, pool: pool9 };
+            qs = generateDictQs(pool9.length, false);                 // 9 種各一次
+            var extra = generateDictQs(1, true);                      // 再隨機補一題
+            qs = qs.concat(extra);
+            for(var i=qs.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=qs[i]; qs[i]=qs[j]; qs[j]=t; }
+          } else {
+            qs = generateDictQs(cfg.count||10, cfg.allowRepeat===true);
+          }
           var labels = {}; Object.keys(QUALITIES).forEach(function(k){ labels[k] = QUALITIES[k].label; });
           return { questions: qs, labels: labels };
         });

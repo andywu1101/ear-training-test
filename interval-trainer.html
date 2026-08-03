@@ -563,9 +563,9 @@ function showPage(pageId) {
     const ORDER = ['P1','m2','M2','m3','M3','P4','A4_d5','P5','m6','M6','m7','M7','P8'];
     const CUSTOM_ID = 4;
     const LEVELS = [
-      { id: 1, name: 'Lv1 協和音程', pool: ['P1','P4','P5','P8'] },
-      { id: 2, name: 'Lv2 不協和音程', pool: ['M2','m2','A4_d5','M7','m7'] },
-      { id: 3, name: 'Lv3 不完全協和', pool: ['M3','m3','M6','m6'] },
+      { id: 1, name: '協和音程', pool: ['P1','P4','P5','P8'] },
+      { id: 2, name: '不協和音程', pool: ['M2','m2','A4_d5','M7','m7'] },
+      { id: 3, name: '不完全協和音程', pool: ['M3','m3','M6','m6'] },
       { id: CUSTOM_ID, name: '自訂音程選項', pool: ['P1','M3','P5','P8'] }
     ];
     let customPool = [...ORDER];   // 自訂音程：預設全選（與和絃辨認一致）
@@ -955,7 +955,9 @@ function showPage(pageId) {
         var cfg = EXm.configFor(KEY) || {};
         var playM = EXm.playMode();
         compound = !!cfg.compound;
+        // 題庫：大學檔 13 種全開；高中檔排除完全一度
         var examPool = Object.keys(QUALITIES);
+        if(cfg.pool === 'NO_P1') examPool = examPool.filter(function(k){ return k !== 'P1'; });
         customPool = examPool.slice();
         curLevel = { id: CUSTOM_ID, name: '模擬測驗', pool: examPool };
         mode = 'test'; qtype = 'dictation';

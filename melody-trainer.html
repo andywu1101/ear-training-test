@@ -1174,10 +1174,10 @@ function showPage(pageId) {
           beats.push({ rhythmOK: rhythmOK, sameCount: sameCount, wrongPitches: wrong });
           qOff += qN; uOff += uN;
         }
-        const max = EXm.SECTIONS[KEY].max;
-        const sc = EXm.scoreBeats(beats, max);
+        const max = EXm.maxFor(KEY);
+        const lost = EXm.beatLoss(beats);          // 逐拍失分單位
         const badBeats = beats.filter(function(b){ return !b.rhythmOK || b.wrongPitches>0; }).length;
-        EXm.saveResult(KEY, { score: sc, max: max, unanswered: blank,
+        EXm.saveResult(KEY, { lostUnits: lost, max: max, unanswered: blank,
           detail: [{ correct: badBeats===0, your: '有誤 '+badBeats+' 拍', right: '共 '+beats.length+' 拍' }] });
       }
       saveNow();

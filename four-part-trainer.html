@@ -461,10 +461,10 @@ window.addEventListener('resize', setVH); setVH();
 
   const LEVELS = [
     { id: 1, name: 'Lv.1 本調三和絃原位' },
-    { id: 2, name: 'Lv.2 三和絃所有轉位' },
-    { id: 3, name: 'Lv.3 三和絃＋七和絃全轉位' },
-    { id: 4, name: 'Lv.4 副屬和絃／拿坡里／變化和絃' },
-    { id: 5, name: 'Lv.5 增六和絃（義／法／德）' }
+    { id: 2, name: 'Lv.2 含三和絃所有轉位' },
+    { id: 3, name: 'Lv.3 含三和絃＋七和絃所有轉位' },
+    { id: 4, name: 'Lv.4 含副屬和絃／拿坡里／變化和絃' },
+    { id: 5, name: 'Lv.5 含增六和絃（義／法／德）' }
   ];
 
   // 24 大小調完整對應字典 (C=0 基準)
@@ -1893,7 +1893,7 @@ window.addEventListener('resize', setVH); setVH();
       // 計分：每小節低音錯 -1、級數錯 -1；調性錯 -1（僅一次）；封頂 20、下限 0
       function saveNow(){
         EXm.saveAnswers(KEY, { seq: self.userSeq.slice(), bass: JSON.parse(JSON.stringify(self.userBass)), keyAns: self.userKeyAns });
-        const max = EXm.SECTIONS[KEY].max;
+        const max = EXm.maxFor(KEY);
         let lost = 0, blank = 0;
         if(self.userKeyAns !== self.keyObj.name) lost += 1;
         if(!self.userKeyAns) blank++;
@@ -1907,7 +1907,7 @@ window.addEventListener('resize', setVH); setVH();
           if(!self.userSeq[i] || self.userSeq[i] === '' || String(self.userSeq[i]).endsWith('/')) blank++;
           if(self.userBass[i] == null) blank++;
         }
-        EXm.saveResult(KEY, { score: Math.max(0, max - lost), max: max, unanswered: blank,
+        EXm.saveResult(KEY, { lostUnits: lost, max: max, unanswered: blank,
           detail: [{ correct: lost===0, your: '扣 '+Math.min(lost,max)+' 分', right: '調性＋'+self.bars+' 小節低音與級數' }] });
       }
       saveNow();
@@ -1918,6 +1918,8 @@ window.addEventListener('resize', setVH); setVH();
 
       const bAll = document.getElementById('btn-play-all');
       const bArp = document.getElementById('btn-play-arp');
+      // 考試不提供「分解＋完整」，只給完整四部（分解聆聽僅練習模式的解答頁提供）
+      if(bArp) bArp.style.display = 'none';
       function refreshPlayBtn(){
         const left = maxPlays - used;
         if(self.isPlaying || self._examTuning){ bAll.disabled = true; bArp.disabled = true; return; }
@@ -1953,7 +1955,7 @@ window.addEventListener('resize', setVH); setVH();
         refreshPlayBtn();
       }
       bAll.onclick = function(){ doPlay('block'); };
-      bArp.onclick = function(){ doPlay('arpeggio'); };
+      if(bArp) bArp.onclick = function(){ doPlay('arpeggio'); };
 
       EXm.guardVisibility(KEY, function(){ window.fptStopAll(); self._examTuning=false; EXm.setPlaying(false); refreshPlayBtn(); });
       EXm.buildBar(host, saveNow);

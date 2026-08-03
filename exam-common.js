@@ -18,38 +18,105 @@
     chord:    { no: '二', label: '和絃性質判斷',      max: 10, page: 'chord-trainer.html',    type: 'choice' },
     rhythm1:  { no: '三', label: '節奏（第 1 題）',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
     rhythm2:  { no: '三', label: '節奏（第 2 題）',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
+    rhythm3:  { no: '三', label: '節奏（第 3 題）',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
     melody1:  { no: '四', label: '單旋律（第 1 題）', max: 10, page: 'melody-trainer.html',   type: 'saved' },
     melody2:  { no: '四', label: '單旋律（第 2 題）', max: 10, page: 'melody-trainer.html',   type: 'saved' },
     twopart:  { no: '五', label: '兩聲部',            max: 20, page: 'two-part-trainer.html', type: 'saved' },
     fourpart: { no: '六', label: '四部和聲',          max: 20, page: 'four-part-trainer.html',type: 'saved' }
   };
-  var FULL_ORDER = ['interval', 'chord', 'rhythm1', 'rhythm2', 'melody1', 'melody2', 'twopart', 'fourpart'];
-  var PHASE1 = ['interval', 'chord', 'rhythm1', 'rhythm2', 'melody1', 'melody2', 'twopart', 'fourpart'];
+  var FULL_ORDER = ['interval', 'chord', 'rhythm1', 'rhythm2', 'rhythm3', 'melody1', 'melody2', 'twopart', 'fourpart'];
 
-  /* 單拍子考題：拍號與小節數配對（總拍數相當） */
   var SIMPLE_METERS = [ { meter: '4/4', bars: 2 }, { meter: '3/4', bars: 3 }, { meter: '2/4', bars: 4 } ];
   var COMPOUND_METER = { meter: '6/8', bars: 2 };
+  /* 高中檔的拍號組合（單旋律／兩聲部隨機三選一） */
+  var HS_METERS = [ { meter: '4/4', meterType: 'simple', bars: 2 },
+                    { meter: '3/4', meterType: 'simple', bars: 3 },
+                    { meter: '6/8', meterType: 'compound', bars: 3 } ];
 
   var GAPS = { reps: 3, repGap: 500, questionGap: 2000, interleaveGap: 1500, roundGap: 2500 };
 
-  var STD_CONFIG = {
-    interval: { count: 10, allowRepeat: false, compound: true,  pool: 'ALL13' },   // 13 種抽 10 種，不重複
-    chord:    { count: 10, allowRepeat: false, inversion: false, pool: 'LV5' }
-    // rhythm1/2、melody1/2 的拍號在 startStandard() 時隨機決定並寫入 config
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  /* =========================================================
+   * 考卷檔位：內容難度與配分都由這裡決定
+   *  groups：成績單的顯示列與計分方式
+   *    perUnit  每個失分單位扣幾分（節奏＝每錯拍）
+   *    keys     這一列包含哪些段落（多個＝共用扣分池）
+   * ========================================================= */
+  var PRESETS = {
+    standard: {
+      mode: 'standard',
+      label: '大學檔（模擬大學聯合招生難易度）',
+      short: '大學檔',
+      queue: ['interval', 'chord', 'rhythm1', 'rhythm2', 'melody1', 'melody2', 'twopart', 'fourpart'],
+      groups: [
+        { no: '一', label: '音程',         max: 10, keys: ['interval'] },
+        { no: '二', label: '和絃性質判斷', max: 10, keys: ['chord'] },
+        { no: '三', label: '節奏',         max: 10, keys: ['rhythm1'], perUnit: 2, suffix: '（第 1 題）' },
+        { no: '三', label: '節奏',         max: 10, keys: ['rhythm2'], perUnit: 2, suffix: '（第 2 題）' },
+        { no: '四', label: '單旋律',       max: 10, keys: ['melody1'], perUnit: 1, suffix: '（第 1 題）' },
+        { no: '四', label: '單旋律',       max: 10, keys: ['melody2'], perUnit: 1, suffix: '（第 2 題）' },
+        { no: '五', label: '兩聲部',       max: 20, keys: ['twopart'], perUnit: 1 },
+        { no: '六', label: '四部和聲',     max: 20, keys: ['fourpart'], perUnit: 1 }
+      ],
+      buildConfig: function () {
+        var r1 = pick(SIMPLE_METERS), m1 = pick(SIMPLE_METERS);
+        return {
+          interval: { count: 10, allowRepeat: false, compound: true, pool: 'ALL13' },
+          chord:    { count: 10, allowRepeat: false, inversion: false, pool: 'LV5' },
+          rhythm1: { meter: r1.meter, meterType: 'simple', bars: r1.bars, bpm: 80, plays: 5, pitchMode: 'single' },
+          rhythm2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 80, plays: 5, pitchMode: 'dual' },
+          melody1: { meter: m1.meter, meterType: 'simple', bars: m1.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true },
+          melody2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true },
+          twopart:  { meter: '4/4', meterType: 'simple', bars: 2, bpm: 70, plays: 8, tuningA: true },
+          fourpart: { bars: 10, bpm: 100, plays: 6, levelId: 4, tuningA: true }
+        };
+      }
+    },
+
+    highschool: {
+      mode: 'standard-hs',
+      label: '高中檔（模擬音樂班甄選）',
+      short: '高中檔',
+      queue: ['interval', 'chord', 'rhythm1', 'rhythm2', 'rhythm3', 'melody1', 'twopart', 'fourpart'],
+      groups: [
+        { no: '一', label: '音程',         max: 10, keys: ['interval'] },
+        { no: '二', label: '和絃性質判斷', max: 10, keys: ['chord'] },
+        // 三題共用 20 分扣分池，每錯拍 -1
+        { no: '三', label: '節奏',         max: 20, keys: ['rhythm1', 'rhythm2', 'rhythm3'], perUnit: 1, pooled: true },
+        { no: '四', label: '單旋律',       max: 15, keys: ['melody1'], perUnit: 1 },
+        { no: '五', label: '兩聲部',       max: 25, keys: ['twopart'], perUnit: 1 },
+        { no: '六', label: '四部和聲',     max: 20, keys: ['fourpart'], perUnit: 1 }
+      ],
+      buildConfig: function () {
+        var m1 = pick(HS_METERS), t1 = pick(HS_METERS);
+        return {
+          interval: { count: 10, allowRepeat: false, compound: true, pool: 'NO_P1' },
+          chord:    { count: 10, allowRepeat: true, inversion: false, pool: 'HS9' },
+          rhythm1: { meter: '4/4', meterType: 'simple',   bars: 2, bpm: 72, plays: 5, pitchMode: 'single' },
+          rhythm2: { meter: '3/4', meterType: 'simple',   bars: 3, bpm: 72, plays: 5, pitchMode: 'single' },
+          rhythm3: { meter: '6/8', meterType: 'compound', bars: 3, bpm: 72, plays: 5, pitchMode: 'dual' },
+          melody1: { meter: m1.meter, meterType: m1.meterType, bars: m1.bars, bpm: 68, plays: 6, clef: 'treble', tuningA: true },
+          twopart:  { meter: t1.meter, meterType: t1.meterType, bars: t1.bars, bpm: 64, plays: 8, tuningA: true },
+          fourpart: { bars: 10, bpm: 80, plays: 6, levelId: 3, tuningA: true }
+        };
+      }
+    }
   };
 
-  /* 產生本次考卷的節奏／旋律設定（拍號在開考時決定，之後固定） */
-  function buildMeterConfig() {
-    function pickSimple() { return SIMPLE_METERS[Math.floor(Math.random() * SIMPLE_METERS.length)]; }
-    var r1 = pickSimple(), m1 = pickSimple();
-    return {
-      rhythm1: { meter: r1.meter, meterType: 'simple',   bars: r1.bars, bpm: 80, plays: 5, pitchMode: 'single' },
-      rhythm2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 80, plays: 5, pitchMode: 'dual' },
-      melody1: { meter: m1.meter, meterType: 'simple',   bars: m1.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true },
-      melody2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true },
-      twopart:  { meter: '4/4', meterType: 'simple', bars: 2, bpm: 70, plays: 8, tuningA: true },
-      fourpart: { bars: 10, bpm: 100, plays: 6, levelId: 4, tuningA: true }
-    };
+  function presetOf(s) {
+    s = s || loadSession();
+    var id = (s && s.preset) || 'standard';
+    return PRESETS[id] || PRESETS.standard;
+  }
+  /* 各段滿分：依檔位的 groups 推算（節奏共用池時，單段以整池上限為準） */
+  function maxFor(key, s) {
+    var p = presetOf(s);
+    for (var i = 0; i < p.groups.length; i++) {
+      var g = p.groups[i];
+      if (g.keys.indexOf(key) !== -1) return g.max;
+    }
+    return (SECTIONS[key] || {}).max || 10;
   }
 
   /* ---------------- session ---------------- */
@@ -58,21 +125,24 @@
   function clearSession() { try { localStorage.removeItem(LS_SESSION); } catch (e) {} }
   function hasSession() { return !!loadSession(); }
 
-  function startStandard() {
+  function startStandard(presetId) {
+    var p = PRESETS[presetId] || PRESETS.standard;
     var s = {
-      id: 'exam_' + Date.now(), mode: 'standard',
-      scopeLabel: '標準考卷（模擬大學入學考試難度）',
+      id: 'exam_' + Date.now(),
+      preset: (PRESETS[presetId] ? presetId : 'standard'),
+      mode: p.mode,
+      scopeLabel: p.label,
       startedAt: Date.now(),
-      queue: PHASE1.slice(), cursor: 0,
+      queue: p.queue.slice(), cursor: 0,
       play: (Math.random() < 0.5 ? 'A' : 'B'),
-      config: (function () { var c = JSON.parse(JSON.stringify(STD_CONFIG)); var m = buildMeterConfig(); for (var k in m) c[k] = m[k]; return c; })(),
-      data: {}   // { interval:{questions,labels,answers,played}, ... }
+      config: p.buildConfig(),
+      data: {}
     };
     saveSession(s); return s;
   }
 
   function currentSection(s) { s = s || loadSession(); if (!s) return null; return s.queue[s.cursor] || null; }
-  function configFor(k, s) { s = s || loadSession(); if (s && s.config && s.config[k]) return s.config[k]; return STD_CONFIG[k] || null; }
+  function configFor(k, s) { s = s || loadSession(); if (s && s.config && s.config[k]) return s.config[k]; return null; }
   function playMode(s) { s = s || loadSession(); return s ? s.play : 'A'; }
   function playModeLabel(m) { return m === 'A' ? '逐題三連（每題連播 3 遍）' : '整段三輪（整段共播 3 輪）'; }
   function progress(s) { s = s || loadSession(); if (!s) return null; return { index: s.cursor + 1, total: s.queue.length, key: currentSection(s) }; }
@@ -109,6 +179,17 @@
     });
     return Math.max(0, max - lost);
   }
+  /* 逐拍失分單位（不含配分；實際扣幾分由檔位的 perUnit 決定） */
+  function beatLoss(beats) {
+    var lost = 0;
+    (beats || []).forEach(function (b) {
+      if (b.rhythmOK) lost += (b.wrongPitches || 0);
+      else if (b.sameCount) lost += 2 + (b.wrongPitches || 0);
+      else lost += 4;
+    });
+    return lost;
+  }
+
   /* 節奏題計分：每個錯拍 -2 */
   function scoreRhythm(wrongBeats, max) { return Math.max(0, max - 2 * (wrongBeats || 0)); }
   function markPlayed(key) {
@@ -147,16 +228,13 @@
     return { total: total, parts: parts, unplayed: unplayed };
   }
 
-  /* 集中計分：音程／和絃皆為「答案 key === 題目 qualityKey」 */
+  /* 各段原始結果：選擇型回傳答對數，逐拍型回傳頁面存的 result（含 lostUnits） */
   function computeResults(s) {
     s = s || loadSession(); var out = {};
     if (!s) return out;
     s.queue.forEach(function (k) {
       var d = s.data && s.data[k]; if (!d) return;
-      if ((SECTIONS[k] || {}).type === 'saved') {
-        out[k] = d.result || { score: 0, max: SECTIONS[k].max, detail: null };
-        return;
-      }
+      if ((SECTIONS[k] || {}).type === 'saved') { out[k] = d.result || null; return; }
       var cor = 0, detail = [];
       d.questions.forEach(function (q, i) {
         var ua = (d.answers && d.answers[i]) || null;
@@ -164,21 +242,44 @@
         if (ok) cor++;
         detail.push({ correct: ok, your: ua ? (d.labels[ua] || ua) : '（未作答）', right: d.labels[q.qualityKey] || q.qualityKey });
       });
-      out[k] = { score: cor, max: SECTIONS[k].max, detail: detail };
+      out[k] = { correct: cor, count: d.questions.length, detail: detail };
     });
     return out;
   }
 
+  /* 依檔位的 groups 彙整成成績單各列（多個 keys＝共用扣分池） */
+  function buildScoreRows(s) {
+    s = s || loadSession(); if (!s) return [];
+    var raw = computeResults(s);
+    var p = presetOf(s);
+    return p.groups.map(function (g) {
+      var lost = 0, detail = [], touched = false;
+      g.keys.forEach(function (k) {
+        var r = raw[k]; if (!r) return;
+        touched = true;
+        if (typeof r.correct === 'number') {
+          lost += (r.count - r.correct) * (g.max / r.count);
+          if (r.detail) detail = detail.concat(r.detail);
+        } else {
+          lost += (r.lostUnits || 0) * (g.perUnit || 1);
+          if (r.detail) detail = detail.concat(r.detail);
+        }
+      });
+      var score = touched ? Math.max(0, Math.round((g.max - lost) * 100) / 100) : 0;
+      return { no: g.no, label: g.label + (g.suffix || ''), note: g.note || '',
+               max: g.max, score: score, detail: detail.length ? detail : null };
+    });
+  }
+
   function finalize() {
     var s = loadSession(); if (!s) return null;
-    var scores = computeResults(s);
-    var total = 0, max = 0, secOut = {};
-    FULL_ORDER.forEach(function (k) {
-      var sc = scores[k];
-      if (sc) { total += sc.score; max += sc.max; secOut[k] = sc; }
-    });
+    var rows = buildScoreRows(s);
+    var total = 0, max = 0;
+    rows.forEach(function (r) { total += r.score; max += r.max; });
+    total = Math.round(total * 100) / 100;
     var pct = max > 0 ? Math.round((total / max) * 100) : 0;
-    var rec = { date: Date.now(), mode: s.mode, scope: s.scopeLabel, total: total, max: max, pct: pct, play: s.play, sections: secOut, id: s.id };
+    var rec = { date: Date.now(), mode: s.mode, preset: s.preset || 'standard', scope: s.scopeLabel,
+                total: total, max: max, pct: pct, play: s.play, rows: rows, id: s.id };
     var h = loadHistory(); h.push(rec);
     if (h.length > HISTORY_CAP) h = h.slice(h.length - HISTORY_CAP);
     try { localStorage.setItem(LS_HISTORY, JSON.stringify(h)); } catch (e) {}
@@ -345,12 +446,13 @@
 
   window.EXAM = {
     LS_SESSION: LS_SESSION, LS_HISTORY: LS_HISTORY,
-    SECTIONS: SECTIONS, FULL_ORDER: FULL_ORDER, PHASE1: PHASE1, GAPS: GAPS, STD_CONFIG: STD_CONFIG,
+    SECTIONS: SECTIONS, FULL_ORDER: FULL_ORDER, GAPS: GAPS, PRESETS: PRESETS,
+    presetOf: presetOf, maxFor: maxFor, buildScoreRows: buildScoreRows,
     loadSession: loadSession, saveSession: saveSession, clearSession: clearSession, hasSession: hasSession,
     startStandard: startStandard, currentSection: currentSection, configFor: configFor,
     playMode: playMode, playModeLabel: playModeLabel, progress: progress, isLast: isLast,
     sectionData: sectionData, saveAnswers: saveAnswers, saveResult: saveResult, markPlayed: markPlayed, isPlayed: isPlayed,
-    scoreBeats: scoreBeats, scoreRhythm: scoreRhythm, SIMPLE_METERS: SIMPLE_METERS, COMPOUND_METER: COMPOUND_METER,
+    scoreBeats: scoreBeats, scoreRhythm: scoreRhythm, beatLoss: beatLoss, SIMPLE_METERS: SIMPLE_METERS, COMPOUND_METER: COMPOUND_METER,
     gotoIndex: gotoIndex, gotoPrev: gotoPrev, gotoNext: gotoNext,
     unansweredReport: unansweredReport, computeResults: computeResults, finalize: finalize,
     loadHistory: loadHistory, clearHistory: clearHistory, historyStats: historyStats,

@@ -50,6 +50,12 @@
   .score-breakdown li em{ flex:1; text-align:right; font-style:normal; font-size:12px; color:var(--ink-soft); }
   .big-btn{ display:inline-flex; align-items:center; justify-content:center; gap:10px; width:100%; font-family:var(--font-body); font-weight:700; font-size:17px; padding:16px; border-radius:999px; background:var(--accent); color:var(--panel); border:none; cursor:pointer; box-shadow:0 6px 20px rgba(51,65,92,0.22); transition:all .15s ease; touch-action:manipulation; }
   .big-btn:hover, .big-btn:active{ filter:brightness(1.1); transform:translateY(-2px); }
+  .card-sub{ font-weight:400; font-size:14px; color:var(--ink-soft); }
+  .card-stat{ font-family:var(--font-mono); font-size:12.5px; color:var(--ink-soft); margin:2px 0 14px; text-align:center; }
+  .card-stat b{ color:var(--accent); }
+  .hist-tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .hist-tabs button{ flex:1; font-family:var(--font-body); font-weight:700; font-size:13.5px; padding:10px; border-radius:999px; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink-soft); cursor:pointer; }
+  .hist-tabs button.on{ background:var(--accent); border-color:var(--accent); color:var(--panel); }
   .soon-card{ opacity:0.55; }
   .soon-tag{ font-family:var(--font-mono); font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--hairline); color:var(--ink-soft); }
   .ghost-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:13px; border-radius:999px; background:transparent; color:var(--ink); border:1px solid var(--panel-border); cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
@@ -109,11 +115,12 @@
   <div id="pageStart" class="page-view active">
     <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
     <h1>模擬測驗</h1>
-    <p class="subtitle">六大項綜合、滿分 100 分的模擬考卷，一次交卷計分，並記錄你的長期進步曲線。</p>
-    <div id="startStats"></div>
+    <p class="subtitle">六大項綜合、滿分 100 分的模擬考卷，一次交卷計分，並分別記錄各檔的長期進步曲線。</p>
     <div id="resumeSlot"></div>
+
+    <!-- 大學檔 -->
     <div class="exam-card">
-      <h2>標準考卷 <span style="font-weight:400;font-size:14px;color:var(--ink-soft);">（模擬大學入學考試難度）</span></h2>
+      <h2>大學檔 <span class="card-sub">（模擬大學聯合招生難易度）</span></h2>
       <p>六大項綜合、<b>滿分 100 分</b>，固定範圍、隨機出題。全部作答完畢後一次交卷計分。</p>
       <ul class="score-breakdown">
         <li><span>一、音程</span><b>10 分</b><em>10 題</em></li>
@@ -123,13 +130,31 @@
         <li><span>五、兩聲部</span><b>20 分</b><em>1 題</em></li>
         <li><span>六、四部和聲</span><b>20 分</b><em>1 題</em></li>
       </ul>
-      <p style="margin-top:12px;">每段播放次數固定，作答期間可自由往返修改。</p>
-      <button class="big-btn" onclick="startExam()">開始標準考卷 →</button>
+      <div class="card-stat" id="statStandard"></div>
+      <button class="big-btn" onclick="startExam('standard')">開始大學檔 →</button>
     </div>
+
+    <!-- 高中檔 -->
+    <div class="exam-card">
+      <h2>高中檔 <span class="card-sub">（模擬音樂班甄選）</span></h2>
+      <p>六大項綜合、<b>滿分 100 分</b>，配分與內容比照高中音樂班甄選聯合術科測驗。</p>
+      <ul class="score-breakdown">
+        <li><span>一、音程</span><b>10 分</b><em>10 題</em></li>
+        <li><span>二、和絃性質判斷</span><b>10 分</b><em>10 題</em></li>
+        <li><span>三、節奏</span><b>20 分</b><em>3 題</em></li>
+        <li><span>四、單旋律</span><b>15 分</b><em>1 題</em></li>
+        <li><span>五、兩聲部</span><b>25 分</b><em>1 題</em></li>
+        <li><span>六、四部和聲</span><b>20 分</b><em>1 題</em></li>
+      </ul>
+      <div class="card-stat" id="statHighschool"></div>
+      <button class="big-btn" onclick="startExam('highschool')">開始高中檔 →</button>
+    </div>
+
     <div class="exam-card soon-card">
-      <h2 style="display:flex;align-items:center;gap:10px;">自訂考卷 <span class="soon-tag">即將開放</span></h2>
-      <p>由你自己挑選要考的範圍與題數。將於後續階段開放。</p>
+      <h2 style="display:flex;align-items:center;gap:10px;">自訂考卷 <span class="soon-tag">尚未開放</span></h2>
+      <p>由你自己挑選要考的範圍與難度檔位。將於後續階段開放。</p>
     </div>
+
     <button id="histBtn" class="ghost-btn" style="display:none;" onclick="goHistory()">📈 查看歷史趨勢</button>
   </div>
 
@@ -141,7 +166,7 @@
     <div id="resultSections"></div>
     <div id="resultReview" class="review-acc"></div>
     <div class="btn-col">
-      <button class="big-btn" onclick="startExam()">再考一次（同標準）→</button>
+      <button class="big-btn" id="againBtn">再考一次 →</button>
       <button class="ghost-btn" onclick="goHistory()">📈 查看歷史趨勢</button>
       <button class="ghost-btn" onclick="location.href='index.html#menu'">🏠 回選單</button>
     </div>
@@ -151,7 +176,8 @@
   <div id="pageHistory" class="page-view">
     <button class="nav-back-btn" onclick="goStart()">← 返回</button>
     <h1>歷史趨勢</h1>
-    <p class="subtitle">縱軸為得分率 %（題數增加也能公平比較）。只顯示標準考卷。</p>
+    <p class="subtitle">縱軸為得分率 %。兩個檔位分開比較。</p>
+    <div class="hist-tabs" id="histTabs"></div>
     <div id="histStats"></div>
     <div class="chart-wrap" id="chartWrap"></div>
     <div id="histList"></div>
@@ -169,38 +195,44 @@
   function fmtDate(ts){ try{ var d=new Date(ts); var mm=String(d.getMonth()+1).padStart(2,'0'); var dd=String(d.getDate()).padStart(2,'0'); var h=String(d.getHours()).padStart(2,'0'); var mi=String(d.getMinutes()).padStart(2,'0'); return (d.getFullYear())+'/'+mm+'/'+dd+' '+h+':'+mi; }catch(e){ return ''; } }
 
   /* ---------- 開始頁 ---------- */
+  function presetOfRec(r){ return r.preset || (r.mode === 'standard-hs' ? 'highschool' : 'standard'); }
+  function statsOf(presetId){
+    var h = EX.loadHistory().filter(function(r){ return presetOfRec(r) === presetId; });
+    if(!h.length) return null;
+    var p = h.map(function(r){ return r.pct; });
+    return { best: Math.max.apply(null,p), last: p[p.length-1],
+             avg: Math.round(p.reduce(function(a,b){return a+b;},0)/p.length), count: p.length };
+  }
   function renderStart(){
-    var st = EX.historyStats('standard');
-    qs('startStats').innerHTML = st ? (
-      '<div class="stat-row">' +
-      '<div class="stat-chip"><div class="k">最佳</div><div class="v">'+st.best+'<small>%</small></div></div>' +
-      '<div class="stat-chip"><div class="k">最近</div><div class="v">'+st.last+'<small>%</small></div></div>' +
-      '<div class="stat-chip"><div class="k">平均</div><div class="v">'+st.avg+'<small>%</small></div></div>' +
-      '</div>'
-    ) : '';
-    qs('histBtn').style.display = st ? 'flex' : 'none';
-    // 續考
+    [['standard','statStandard'],['highschool','statHighschool']].forEach(function(pair){
+      var st = statsOf(pair[0]); var el = qs(pair[1]); if(!el) return;
+      el.innerHTML = st ? ('最近 <b>'+st.last+'%</b>　最佳 <b>'+st.best+'%</b>　已考 '+st.count+' 次') : '尚無紀錄';
+    });
+    var any = EX.loadHistory().length > 0;
+    qs('histBtn').style.display = any ? 'flex' : 'none';
     var s = EX.loadSession();
     if(s){
       var p = EX.progress(s); var secLabel = EX.SECTIONS[p.key] ? EX.SECTIONS[p.key].label : '';
+      var pname = (EX.PRESETS[s.preset||'standard']||{}).short || '';
       qs('resumeSlot').innerHTML =
-        '<div class="resume-box"><div class="rt">有一份未完成的考試</div>' +
+        '<div class="resume-box"><div class="rt">有一份未完成的考試（'+esc(pname)+'）</div>' +
         '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;">進度：第 '+p.index+' / '+p.total+' 段（'+esc(secLabel)+'）</div>' +
         '<div class="resume-actions">' +
         '<button class="big-btn" style="font-size:14.5px;padding:12px;" onclick="resumeExam()">繼續作答</button>' +
         '<button class="ghost-btn" onclick="abandonExam()">放棄重來</button>' +
         '</div></div>';
-    } else {
-      qs('resumeSlot').innerHTML = '';
-    }
+    } else { qs('resumeSlot').innerHTML = ''; }
   }
-  function startExam(){
-    var msg = '即將開始模擬測驗\n\n'
+  function startExam(presetId){
+    presetId = presetId || 'standard';
+    var p = EX.PRESETS[presetId] || EX.PRESETS.standard;
+    var msg = '即將開始模擬測驗 — ' + p.short + '\n\n'
             + '考試前建議準備空白五線譜與鉛筆，聽寫時直接在紙上作答，再將答案填上測驗系統，作答會更順手。\n\n'
             + '考試中每段僅能播放固定次數，作答可自由往返修改，最後按「交卷」一次計分。\n\n'
             + '準備好了嗎？';
     if(!window.confirm(msg)) return;
-    EX.startStandard(); location.href = EX.SECTIONS[EX.PHASE1[0]].page + '?exam=1';
+    var s = EX.startStandard(presetId);
+    location.href = EX.SECTIONS[s.queue[0]].page + '?exam=1';
   }
   function resumeExam(){ var s=EX.loadSession(); if(!s){ renderStart(); return; } var k=EX.currentSection(s); if(!k){ location.href='exam.html?done=1'; return; } location.href = EX.SECTIONS[k].page + '?exam=1'; }
   function abandonExam(){ if(window.confirm('確定放棄這份未完成的考試嗎？此動作無法復原。')){ EX.clearSession(); renderStart(); } }
@@ -208,68 +240,72 @@
   function goHistory(){ renderHistory(); showView('pageHistory'); }
 
   /* ---------- 成績單 ---------- */
+  function rowsOf(rec){
+    if(rec.rows && rec.rows.length) return rec.rows;
+    // 相容舊紀錄（v61 以前的 sections 格式）
+    var order = ['interval','chord','rhythm1','rhythm2','melody1','melody2','twopart','fourpart'];
+    var out = [];
+    order.forEach(function(k){
+      var sc = rec.sections && rec.sections[k]; if(!sc) return;
+      var d = EX.SECTIONS[k] || {};
+      out.push({ no: d.no||'', label: d.label||k, max: sc.max, score: sc.score, detail: sc.detail||null, note:'' });
+    });
+    return out;
+  }
   function renderResult(rec){
     if(!rec){ qs('resultHero').innerHTML='<div class="muted">找不到成績資料。</div>'; qs('resultSections').innerHTML=''; qs('resultReview').innerHTML=''; return; }
-    qs('resultScope').textContent = rec.scope || '標準考卷';
+    var pname = (EX.PRESETS[presetOfRec(rec)]||{}).label || rec.scope || '標準考卷';
+    qs('resultScope').textContent = pname;
     qs('resultHero').innerHTML =
       '<div class="score-hero"><div class="pct">'+rec.pct+'<span style="font-size:28px;">%</span></div>' +
       '<div class="raw">'+rec.total+' / '+rec.max+' 分</div></div>';
-    var rowsHtml = '';
-    EX.FULL_ORDER.forEach(function(k){
-      var def = EX.SECTIONS[k]; var sc = rec.sections[k];
-      if(sc){
-        var w = sc.max>0 ? Math.round(sc.score/sc.max*100) : 0;
-        rowsHtml += '<div class="sec-row"><div><div class="sec-name">'+esc(def.label)+'</div>' +
-          '<div class="bar"><i style="width:'+w+'%;"></i></div></div>' +
-          '<div class="sec-score">'+sc.score+' / '+sc.max+'</div></div>';
-      } else {
-        rowsHtml += '<div class="sec-row soon"><div class="sec-name">'+esc(def.label)+'<small>滿分 '+def.max+'</small></div>' +
-          '<div class="sec-score soon">尚未開放</div></div>';
-      }
-    });
-    qs('resultSections').innerHTML = rowsHtml;
-    // 逐題回顧
-    var revHtml = '';
-    EX.FULL_ORDER.forEach(function(k){
-      var sc = rec.sections[k];
-      if(sc && sc.detail && sc.detail.length){
-        var def = EX.SECTIONS[k];
-        var items = sc.detail.map(function(d, i){
-          var ok = d.correct;
-          var ans = ok
-            ? '<span class="right">'+esc(d.right)+'</span>'
-            : '你的：<span class="your bad">'+esc(d.your||'（未作答）')+'</span>　正解：<span class="right">'+esc(d.right)+'</span>';
-          return '<div class="q-item"><span class="q-idx">'+(i+1)+'</span>' +
-            '<span class="q-mark '+(ok?'ok':'no')+'">'+(ok?'✓':'✗')+'</span>' +
-            '<span class="q-ans">'+ans+'</span></div>';
-        }).join('');
-        revHtml += '<button class="acc-head" onclick="this.nextElementSibling.classList.toggle(\'open\')">'+
-          esc(def.label)+' 逐題回顧　<span style="color:var(--ink-soft);font-weight:500;">'+sc.score+'/'+sc.max+' ▾</span></button>' +
-          '<div class="acc-body">'+items+'</div>';
-      }
-    });
-    qs('resultReview').innerHTML = revHtml;
+    var rows = rowsOf(rec);
+    qs('resultSections').innerHTML = rows.map(function(r){
+      var w = r.max>0 ? Math.round(r.score/r.max*100) : 0;
+      return '<div class="sec-row"><div style="flex:1;"><div class="sec-name">'+esc(r.no)+'、'+esc(r.label)+
+        (r.note ? '<small>'+esc(r.note)+'</small>' : '')+'</div>' +
+        '<div class="bar"><i style="width:'+w+'%;"></i></div></div>' +
+        '<div class="sec-score">'+r.score+' / '+r.max+'</div></div>';
+    }).join('');
+    qs('resultReview').innerHTML = rows.filter(function(r){ return r.detail && r.detail.length; }).map(function(r){
+      var items = r.detail.map(function(d,i){
+        var ans = d.correct ? '<span class="right">'+esc(d.right)+'</span>'
+          : '你的：<span class="your bad">'+esc(d.your||'（未作答）')+'</span>　正解：<span class="right">'+esc(d.right)+'</span>';
+        return '<div class="q-item"><span class="q-idx">'+(i+1)+'</span><span class="q-mark '+(d.correct?'ok':'no')+'">'+
+               (d.correct?'✓':'✗')+'</span><span class="q-ans">'+ans+'</span></div>';
+      }).join('');
+      return '<button class="acc-head" onclick="this.nextElementSibling.classList.toggle(\'open\')">'+
+        esc(r.label)+' 逐題回顧　<span style="color:var(--ink-soft);font-weight:500;">'+r.score+'/'+r.max+' ▾</span></button>'+
+        '<div class="acc-body">'+items+'</div>';
+    }).join('');
   }
 
   /* ---------- 歷史趨勢 ---------- */
+  var histPreset = (function(){ var h = (window.EXAM && EXAM.loadHistory()) || [];
+    return h.length ? ((h[h.length-1].preset) || (h[h.length-1].mode === 'standard-hs' ? 'highschool' : 'standard')) : 'standard'; })();
+  function setHistPreset(p){ histPreset = p; renderHistory(); }
   function renderHistory(){
-    var h = EX.loadHistory().filter(function(r){ return r.mode==='standard'; });
-    var st = EX.historyStats('standard');
+    var h = EX.loadHistory().filter(function(r){ return presetOfRec(r) === histPreset; });
+    var st = statsOf(histPreset);
+    qs('histTabs').innerHTML =
+      ['standard','highschool'].map(function(p){
+        return '<button class="'+(p===histPreset?'on':'')+'" onclick="setHistPreset(\''+p+'\')">'+
+               ((EX.PRESETS[p]||{}).short||p)+'</button>';
+      }).join('');
     qs('histStats').innerHTML = st ? (
       '<div class="stat-row">' +
       '<div class="stat-chip"><div class="k">最佳</div><div class="v">'+st.best+'<small>%</small></div></div>' +
       '<div class="stat-chip"><div class="k">最近</div><div class="v">'+st.last+'<small>%</small></div></div>' +
       '<div class="stat-chip"><div class="k">平均</div><div class="v">'+st.avg+'<small>%</small></div></div>' +
       '<div class="stat-chip"><div class="k">次數</div><div class="v">'+st.count+'</div></div>' +
-      '</div>'
-    ) : '';
+      '</div>') : '';
     qs('chartWrap').innerHTML = chartSVG(h.map(function(r){ return r.pct; }));
-    var listHtml = h.slice().reverse().map(function(r){
+    qs('histList').innerHTML = h.slice().reverse().map(function(r){
       return '<div class="hist-item"><span class="hist-when">'+fmtDate(r.date)+'</span>' +
         '<span class="hist-pct">'+r.pct+'% <small>('+r.total+'/'+r.max+')</small></span></div>';
-    }).join('');
-    qs('histList').innerHTML = listHtml || '<div class="muted">尚無紀錄，先考一份標準考卷吧。</div>';
+    }).join('') || '<div class="muted">這個檔位還沒有紀錄。</div>';
   }
+
   function chartSVG(pcts){
     if(!pcts.length) return '<div class="muted">尚無紀錄，先考一份標準考卷吧。</div>';
     var W=640, H=220, pad=34, n=pcts.length;
@@ -297,7 +333,11 @@
     if(params.get('done')==='1'){
       var rec = EX.finalize();
       if(!rec){ var h = EX.loadHistory(); rec = h.length ? h[h.length-1] : null; }
-      renderResult(rec); showView('pageResult'); return;
+      renderResult(rec); showView('pageResult');
+      var again = qs('againBtn');
+      if(again){ var pid = presetOfRec(rec||{}); again.textContent = '再考一次（'+((EX.PRESETS[pid]||{}).short||'')+'）→';
+                 again.onclick = function(){ startExam(pid); }; }
+      return;
     }
     renderStart(); showView('pageStart');
   })();

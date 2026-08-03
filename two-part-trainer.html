@@ -1223,9 +1223,9 @@ function showPage(pageId) {
             qOff += qN; uOff += uN;
           }
         });
-        const max = EXm.SECTIONS[KEY].max;
+        const max = EXm.maxFor(KEY);
         const bad = beats.filter(function(b){ return !b.rhythmOK || b.wrongPitches>0; }).length;
-        EXm.saveResult(KEY, { score: EXm.scoreBeats(beats, max), max: max, unanswered: blank,
+        EXm.saveResult(KEY, { lostUnits: EXm.beatLoss(beats), max: max, unanswered: blank,
           detail: [{ correct: bad===0, your: '有誤 '+bad+' 拍（上下聲部合計）', right: '共 '+beats.length+' 拍' }] });
       }
       saveNow();

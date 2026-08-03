@@ -274,7 +274,7 @@
         <div>
           <div class="menu-card-num">★ 模擬測驗</div>
           <h3 class="menu-card-title">📝 模擬測驗</h3>
-          <p class="menu-card-desc">六大項綜合、滿分 100 分的模擬考卷，一次交卷計分，並記錄長期進步曲線。<span id="examCardStat"></span></p>
+          <p class="menu-card-desc">六大項綜合、滿分 100 分的模擬考卷，分大學檔與高中檔，一次交卷計分並記錄長期進步曲線。<span id="examCardStat"></span></p>
         </div>
       </a>
 
@@ -298,7 +298,7 @@
     </div>
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
-    <p class="app-version" id="appVersion">音樂聽力練習 v60</p>
+    <p class="app-version" id="appVersion">音樂聽力練習 v64</p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -424,6 +424,8 @@ var SPONSORS = [
   { name: 'Chu' },
   { name: '葉○佳' },
   { name: '陳○芳' },
+  { name: 'PEI YI' },
+  { name: '董○秀' },
   // { name: '王小明' },   ← 要新增就複製這一行、拿掉前面的「//」、把名字改掉
 ];
 
@@ -469,9 +471,15 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDon
 (function(){
   try{
     if(!window.EXAM) return;
-    var st = window.EXAM.historyStats('standard'); if(!st) return;
-    var stat = document.getElementById('examCardStat'); if(stat) stat.textContent = ' ｜ 最近 '+st.last+'%';
-    var b = document.getElementById('examCardBadge'); if(b){ b.textContent = '最佳 '+st.best+'%'; b.style.display=''; }
+    var h = window.EXAM.loadHistory(); if(!h.length) return;
+    var last = h[h.length-1];
+    var pid = last.preset || (last.mode === 'standard-hs' ? 'highschool' : 'standard');
+    var name = ((window.EXAM.PRESETS||{})[pid]||{}).short || '';
+    var same = h.filter(function(r){ return (r.preset || (r.mode==='standard-hs'?'highschool':'standard')) === pid; });
+    var best = Math.max.apply(null, same.map(function(r){ return r.pct; }));
+    var stat = document.getElementById('examCardStat');
+    if(stat) stat.textContent = ' ｜ 最近 '+last.pct+'%（'+name+'）';
+    var b = document.getElementById('examCardBadge'); if(b){ b.textContent = '最佳 '+best+'%'; b.style.display=''; }
   }catch(e){}
 })();
 

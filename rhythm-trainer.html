@@ -973,8 +973,9 @@ function showPage(pageId) {
           if(!u || u === 'placeholder') { blank++; wrong++; }
           else if(u !== self.questionSeq[i]) wrong++;
         }
-        const max = EXm.SECTIONS[KEY].max;
-        EXm.saveResult(KEY, { score: EXm.scoreRhythm(wrong, max), max: max, unanswered: blank,
+        const max = EXm.maxFor(KEY);
+        // lostUnits＝錯拍數；實際扣幾分由檔位決定（大學每拍 -2、高中每拍 -1 且三題共用 20 分池）
+        EXm.saveResult(KEY, { lostUnits: wrong, max: max, unanswered: blank,
           detail: [{ correct: wrong===0, your: '錯 '+wrong+' 拍', right: '共 '+self.questionSeq.length+' 拍' }] });
       }
       saveNow();
