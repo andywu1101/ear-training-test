@@ -69,9 +69,9 @@
   .log-item{ padding:12px 2px; border-top:1px dashed var(--hairline); }
   .log-item:first-child{ border-top:none; }
   .log-ver{ font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--accent); margin-bottom:5px; }
-  .log-ver .now{ font-family:var(--font-body); font-size:10.5px; font-weight:700; color:var(--panel); background:var(--accent); border-radius:999px; padding:2px 8px; margin-left:6px; }
   .log-item ul{ margin:0; padding-left:18px; }
   .log-item li{ font-size:13.5px; line-height:1.75; color:var(--ink); }
+  .log-current{ font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--accent); text-align:center; margin:16px 0 4px; }
 
   /* 錯題本總覽卡片（整合入口） */
   .review-hub-card{ grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: var(--panel); cursor:pointer; }
@@ -148,7 +148,7 @@
   .donate-go:hover, .donate-go:active{ filter:brightness(1.08); transform:translateY(-1px); }
   .donate-home{ background:transparent; color:var(--ink); border:1px solid var(--panel-border); }
   .donate-home:hover, .donate-home:active{ border-color:var(--accent); background:var(--accent-soft); }
-  .donate-dismiss{ font-family:var(--font-body); font-size:14px; color:var(--ink-soft); background:transparent; border:none; cursor:pointer; text-decoration:underline; touch-action:manipulation; }
+  .donate-dismiss{ font-family:var(--font-body); font-size:15.5px; color:var(--ink-soft); background:transparent; border:none; cursor:pointer; text-decoration:underline; touch-action:manipulation; }
   .cover-author a{ color:var(--ink-soft); text-decoration:none; border-bottom:1px dashed var(--accent-line); padding-bottom:1px; transition:all .15s ease; }
   .cover-author a:hover, .cover-author a:active{ color:var(--accent); border-color:var(--accent); }
   /* 封面作者列（改為開啟彈窗） */
@@ -307,10 +307,10 @@
           <p class="menu-card-desc">整合所有練習答錯的題目，一次檢視各項目的錯題數量與最近紀錄，並可跳回該練習複習。</p>
         </div>
       </div>
-    </div>
+    </div>    <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
+
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
-    <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v70　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v72　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -378,6 +378,7 @@
     <h3>更新日誌</h3>
     <p>由舊到新，最新的更新在最下方。</p>
     <div class="log-list" id="logList"></div>
+    <p class="log-current" id="logCurrent"></p>
     <button class="donate-dismiss" onclick="closeChangelog()">關閉</button>
   </div>
 </div>
@@ -476,18 +477,29 @@ var CHANGELOG = [
 function showChangelog(){
   var box = document.getElementById('logList');
   if(box){
-    var cur = (document.getElementById('appVersion')||{}).textContent || '';
     box.innerHTML = CHANGELOG.map(function(g){
-      var isNow = cur.indexOf(g.v) !== -1;
-      return '<div class="log-item"><div class="log-ver">' + escapeHtml(g.v) +
-             (isNow ? '<span class="now">目前版本</span>' : '') + '</div><ul>' +
+      return '<div class="log-item"><div class="log-ver">' + escapeHtml(g.v) + '</div><ul>' +
              g.items.map(function(t){ return '<li>' + escapeHtml(t) + '</li>'; }).join('') + '</ul></div>';
     }).join('');
   }
-  var m = document.getElementById('logModal');
-  if(m){ m.classList.add('open'); if(box) setTimeout(function(){ box.scrollTop = box.scrollHeight; }, 30); }
+  // 目前版本獨立顯示，與清單內容無關（版號未列入清單時也不會出錯）
+  var curEl = document.getElementById('logCurrent');
+  if(curEl){
+    var txt = (document.getElementById('appVersion')||{}).textContent || '';
+    var m = txt.match(/v\d+/);
+    curEl.textContent = m ? ('目前版本 ' + m[0]) : '';
+  }
+  var m2 = document.getElementById('logModal');
+  if(m2){ m2.classList.add('open'); syncBodyLock(); if(box) setTimeout(function(){ box.scrollTop = box.scrollHeight; }, 30); }
 }
-function closeChangelog(){ var m=document.getElementById('logModal'); if(m) m.classList.remove('open'); }
+function closeChangelog(){ var m=document.getElementById('logModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
+
+/* 彈窗開啟時鎖住背景捲動，避免手指滑到下層頁面 */
+function syncBodyLock(){
+  var open = document.querySelectorAll('.donate-modal.open').length > 0;
+  document.body.style.overflow = open ? 'hidden' : '';
+  document.body.style.touchAction = open ? 'none' : '';
+}
 
 function showPanel(which){
   var ids = ['Jko','Bank','Sponsors'];
@@ -503,10 +515,10 @@ function renderSponsors(){
   var box = document.getElementById('sponsorList'); if(!box) return;
   box.innerHTML = SPONSORS.map(function(s){ return '<span>'+escapeHtml(s.name)+'</span>'; }).join('');
 }
-function showDonate(){ showPanel(''); var m=document.getElementById('donateModal'); if(m) m.classList.add('open'); }
-function closeDonate(){ var m=document.getElementById('donateModal'); if(m) m.classList.remove('open'); }
-function showAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.add('open'); }
-function closeAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.remove('open'); }
+function showDonate(){ showPanel(''); var m=document.getElementById('donateModal'); if(m) m.classList.add('open'); syncBodyLock(); }
+function closeDonate(){ var m=document.getElementById('donateModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
+function showAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.add('open'); syncBodyLock(); }
+function closeAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
 function _fallbackCopy(t){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){} }
 function copyText(e, text){
   if(e){ e.preventDefault(); e.stopPropagation(); }

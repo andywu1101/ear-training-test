@@ -2776,7 +2776,9 @@ window.addEventListener('resize', setVH); setVH();
     + '<p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>'
     + '<div class="help-foot"><button data-help-close>我知道了</button></div></div>';
   var modal=document.createElement('div'); modal.className='help-modal'; modal.id='fpt-helpModal'; modal.innerHTML=hhtml; document.body.appendChild(modal);
-  function closeM(){ modal.classList.remove('open'); } function openM(){ modal.classList.add('open'); }
+  /* 彈窗開啟時鎖住背景捲動，避免手指滑到下層頁面 */
+  function _lock(on){ document.body.style.overflow = on ? 'hidden' : ''; document.body.style.touchAction = on ? 'none' : ''; }
+  function closeM(){ modal.classList.remove('open'); _lock(false); } function openM(){ modal.classList.add('open'); _lock(true); }
   modal.addEventListener('click', function(e){ if(e.target===modal) closeM(); });
   Array.prototype.forEach.call(modal.querySelectorAll('[data-help-close]'), function(b){ b.addEventListener('click', closeM); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeM(); });

@@ -1114,8 +1114,14 @@ function showPage(pageId) {
   </div>
 </div>
 <script>
-function openHelp(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); }
-function closeHelp(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); }
+function openHelp(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); _syncHelpLock(); }
+function closeHelp(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); _syncHelpLock(); }
+/* 彈窗開啟時鎖住背景捲動，避免手指滑到下層頁面 */
+function _syncHelpLock(){
+  var open = document.querySelectorAll('.help-modal.open').length > 0;
+  document.body.style.overflow = open ? 'hidden' : '';
+  document.body.style.touchAction = open ? 'none' : '';
+}
 document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document.querySelectorAll('.help-modal.open').forEach(function(m){ m.classList.remove('open'); }); } });
 </script>
 <script>
