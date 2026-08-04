@@ -2521,6 +2521,8 @@ window.addEventListener('resize', setVH); setVH();
           questionSeq: [...this.questionSeq], questionVoicings: [...this.questionVoicings],
           results: results.map(r => ({...r}))
       });
+      // 最多保留最新 50 筆，避免長期累積塞滿瀏覽器儲存空間
+      while (this.reviewItems.length > 50) this.reviewItems.shift();
       this.updateReviewCount();
     },
 
@@ -2731,6 +2733,7 @@ window.addEventListener('resize', setVH); setVH();
       return { id:it.id, bars:it.bars, keyObj:it.keyObj, userKeyAns:it.userKeyAns, userSeq:it.userSeq, userBass:it.userBass, questionSeq:it.questionSeq, questionVoicings:it.questionVoicings, results:it.results, ts:it.ts||Date.now(), label:kn, correctText:kn?('正解調性 '+kn):'（四部和聲）', yourText:'' }; }); }
   function persist(){ try{ window.REVIEW_STORE.save(KEY, buildStorable()); }catch(e){} }
   function hydrate(){ try{ var m=window.fptModule; if(!m) return; var stored=window.REVIEW_STORE.load(KEY);
+    if(stored && stored.length > 50) stored = stored.slice(stored.length - 50);
     if(stored && stored.length && (!m.reviewItems || m.reviewItems.length===0)){
       m.reviewItems = stored.map(function(s){ return { id:s.id, bars:s.bars, keyObj:s.keyObj, userKeyAns:s.userKeyAns, userSeq:s.userSeq, userBass:s.userBass, questionSeq:s.questionSeq, questionVoicings:s.questionVoicings, results:s.results, ts:s.ts }; });
       if(typeof m.updateReviewCount==='function') m.updateReviewCount(); } }catch(e){} }

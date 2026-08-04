@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v74'; // v.74：找錯音預告卡片、版本號寫法統一
+const CACHE_NAME = 'ear-training-shell-v75'; // v.75：錯題本上限、贊助文案與版本號樣式
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

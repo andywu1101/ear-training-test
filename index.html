@@ -62,7 +62,7 @@
   .report-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:13.5px; padding:10px 22px; border-radius:999px; background:transparent; color:var(--ink-soft); border:1px solid var(--panel-border); text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
   .report-btn:hover, .report-btn:active{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
   .app-version{ margin-top: 10px; text-align:center; }
-  .ver-btn{ font-family:var(--font-mono); font-size: 11px; color: var(--ink-soft); background:none; border:none; opacity:0.75; cursor:pointer; padding:6px 8px; touch-action:manipulation; }
+  .ver-btn{ font-family:var(--font-mono); font-size: 11px; color: var(--ink-soft); background:none; border:none; opacity:1; cursor:pointer; padding:6px 8px; touch-action:manipulation; }
   .ver-btn:hover, .ver-btn:active{ color:var(--accent); opacity:1; text-decoration:underline; }
   /* 更新日誌 */
   .log-list{ text-align:left; max-height:60vh; overflow-y:auto; padding:4px 2px; -webkit-overflow-scrolling:touch; }
@@ -320,7 +320,7 @@
     </div>    <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.74　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.75　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -356,7 +356,7 @@
       </a>
       <div class="jkopay-acct">街口帳號 <b>902103863</b><button class="copy-btn" type="button" onclick="copyText(event,'902103863')">複製</button></div>
       <p class="pay-note">此 QR 為 <b>TWQR 共通碼</b>，可用街口支付，或<b>任一家銀行的網銀 App</b> 掃描付款。</p>
-      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">📝 贊助完成後，歡迎填寫表單讓我知道 🙏</a>
+      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">請填寫贊助者表單，讓我將您放上贊助者名單 ❤</a>
       <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
     </div>
 
@@ -366,7 +366,7 @@
       <div class="bank-row"><span class="bk">帳號</span><b>163540424795</b><button class="copy-btn" type="button" onclick="copyText(event,'163540424795')">複製</button></div>
       <div class="bank-row"><span class="bk">戶名</span><b>伍○恆</b></div>
       <p class="pay-note">轉帳僅需銀行代號與帳號；戶名供核對用。</p>
-      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">📝 贊助完成後，歡迎填寫表單讓我知道 🙏</a>
+      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">請填寫贊助者表單，讓我將您放上贊助者名單 ❤</a>
       <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
     </div>
 
@@ -460,6 +460,7 @@ var SPONSORS = [
   { name: '陳○芳' },
   { name: 'PEI YI' },
   { name: '董○秀' },
+  { name: 'Tong' },
   // { name: '王小明' },   ← 要新增就複製這一行、拿掉前面的「//」、把名字改掉
 ];
 
@@ -483,7 +484,8 @@ var CHANGELOG = [
   { v: 'v.69', items: ['譜例最後一小節改為終止線', '大譜表的小節線與終止線改為貫穿上下譜表'] },
   { v: 'v.70', items: ['新增「更新日誌」，可查看歷次更新內容', '修正贊助彈窗在手機上捲動時上緣圓角被裁切的問題'] },
   { v: 'v.71', items: ['修正彈窗開啟時會捲動到背景頁面的問題'] },
-  { v: 'v.74', items: ['新增「音高辨認 (找錯音)」預告，功能即將推出'] }
+  { v: 'v.74', items: ['新增「音高辨認 (找錯音)」預告，功能即將推出'] },
+  { v: 'v.75', items: ['錯題本每個練習最多保留最近 50 筆，避免長期累積影響儲存'] }
 ];
 
 function showChangelog(){

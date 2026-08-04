@@ -403,7 +403,8 @@ window.REVIEW_STORE = {
   TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html' },
   load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
   save(type, arr){ try { localStorage.setItem(this.PREFIX+type, JSON.stringify(arr)); } catch(e){} },
-  add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); this.save(type,a); return a; },
+  MAX_ITEMS: 50,   // 每類錯題本最多保留最新 50 筆，避免長期累積塞滿瀏覽器儲存空間
+  add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); while(a.length > this.MAX_ITEMS) a.shift(); this.save(type,a); return a; },
   clear(type){ this.save(type, []); },
   count(type){ return this.load(type).length; }
 };
