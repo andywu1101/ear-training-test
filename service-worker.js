@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v75'; // v.75：錯題本上限、贊助文案與版本號樣式
+const CACHE_NAME = 'ear-training-shell-v76'; // v.76：新增音堆練習與國中檔預告、和絃 Lv6 更名
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
