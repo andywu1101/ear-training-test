@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v76'; // v.76：新增音堆練習與國中檔預告、和絃 Lv6 更名
+const CACHE_NAME = 'ear-training-shell-v77'; // v.77：Portaly 小額贊助開放
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

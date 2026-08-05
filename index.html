@@ -330,7 +330,7 @@
     </div>    <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.76　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.77　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -343,7 +343,7 @@
   </div>
 </div>
 
-<!-- 前往贊助彈窗（Portaly 尚未開放 / 街口支付 / 作者主頁入口） -->
+<!-- 前往贊助彈窗（Portaly / 街口支付 / 銀行轉帳 / 贊助者名單 / 作者主頁入口） -->
 <div class="donate-modal" id="donateModal" onclick="if(event.target===this) closeDonate()">
   <div class="donate-box">
     <div class="dico">❤</div>
@@ -351,8 +351,7 @@
     <p>這個工具永久免費。你的支持會用於後續的開發與維護，感謝你 🙏</p>
     <!-- 管道清單（日後要加新管道，在這裡多一顆按鈕即可） -->
     <div class="donate-links" id="donateChannels">
-      <!-- Portaly 贊助頁審核中：通過後移除 disabled、改成 <a class="author-item" href="專屬贊助連結" target="_blank" rel="noopener"> -->
-      <span class="donate-item disabled">❤ Portaly 小額贊助（尚未開放）</span>
+      <a class="author-item" href="https://portaly.cc/heng-heng.music/support" target="_blank" rel="noopener"><span class="ai-ico">❤</span> Portaly 小額贊助</a>
       <button type="button" class="author-item" onclick="showPanel('Jko')"><span class="ai-ico">📱</span> 街口支付贊助</button>
       <button type="button" class="author-item" onclick="showPanel('Bank')"><span class="ai-ico">🏦</span> 銀行轉帳贊助</button>
       <button type="button" class="author-item" id="sponsorEntryBtn" style="display:none;" onclick="showPanel('Sponsors')"><span class="ai-ico">💛</span> 贊助者名單</button>
@@ -495,7 +494,8 @@ var CHANGELOG = [
   { v: 'v.70', items: ['新增「更新日誌」，可查看歷次更新內容', '修正贊助彈窗在手機上捲動時上緣圓角被裁切的問題'] },
   { v: 'v.71', items: ['修正彈窗開啟時會捲動到背景頁面的問題'] },
   { v: 'v.74', items: ['新增「音高辨認 (找錯音)」預告，功能即將推出'] },
-  { v: 'v.75', items: ['錯題本每個練習最多保留最近 50 筆，避免長期累積影響儲存'] }
+  { v: 'v.75', items: ['錯題本每個練習最多保留最近 50 筆，避免長期累積影響儲存'] },
+  { v: 'v.77', items: ['Portaly 小額贊助正式開放'] }
 ];
 
 function showChangelog(){
