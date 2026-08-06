@@ -159,7 +159,6 @@
   .review-section .hint{ color: var(--ink-soft); font-size: 13px; margin: 0 0 18px; }
   .review-empty{ color: var(--ink-soft); font-size: 14px; padding: 28px; text-align:center; border: 1px dashed var(--panel-border); border-radius: 12px; }
   .review-item{ display:flex; align-items:center; gap: 16px; padding: 16px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-  .review-item.corrected{ border-color: var(--correct); }
   .review-staff-mini{ flex-shrink: 0; }
   .review-meta{ flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 6px; }
   .review-answers{ font-size: 13.5px; line-height: 1.6; }
@@ -168,9 +167,6 @@
   .review-actions{ display:flex; gap: 8px; align-items:center; flex-wrap: wrap; }
   .icon-btn{ background: transparent; border: 1px solid var(--panel-border); color: var(--ink-soft); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 600; cursor:pointer; transition: all 0.15s; touch-action: manipulation; }
   .icon-btn:hover, .icon-btn:active{ border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-  .corrected-tag{ font-size: 12px; color: var(--correct); font-family: var(--font-mono); font-weight: 700; }
-  .correction-grid{ width: 100%; display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 10px; }
-  .correction-grid .answer-btn{ padding: 11px 10px; font-size: 13px; }
   .q-num-badge { display: inline-block; font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); padding: 3px 8px; border-radius: 6px; align-self: flex-start; }
   .loading-banner{ text-align:center; font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); margin-bottom: 20px; background: var(--panel); padding: 10px; border-radius: 8px; border: 1px solid var(--panel-border); }
   @media (max-width: 480px){ h1{ font-size: 26px; } .card{ padding: 22px 16px; } .review-item{ flex-direction: column; align-items: flex-start; } .top-bar-practice { flex-direction: column; align-items: flex-start; gap: 8px; } .score-box { text-align: left; } .switch-row { gap: 12px; } }
@@ -203,7 +199,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="staff-header">
+  <div class="staff-header" id="staffHeader" style="display:none;">
     <div class="clef-mark">𝄞</div>
     <div class="staff-line"></div><div class="staff-line"></div><div class="staff-line"></div>
     <div class="staff-line"></div><div class="staff-line"></div>
@@ -332,7 +328,7 @@
       <div class="test-summary" id="chr-testSummary" style="display:none;">
         <div class="test-score-big" id="chr-testScore">0 / 10</div>
         <div class="test-score-label">測驗結束</div>
-        <p>答錯的題目已收進「錯題本」，可從設定頁的錯題本入口重播分解和絃、對照正解與訂正。</p>
+        <p>答錯的題目已收進「錯題本」，可從設定頁的錯題本入口重播分解和絃、對照正解。</p>
         <button class="test-again-btn" id="chr-testAgainBtn">🔁 再測一次</button>
         <button class="test-back-btn" onclick="showPage('chr-settings')">↩ 重新調整設定</button>
       </div>
@@ -352,7 +348,7 @@
       <div class="test-summary" id="chr-dictSummary" style="display:none;">
         <div class="test-score-big" id="chr-dictScore">0 / 10</div>
         <div class="test-score-label">聽寫結束</div>
-        <p>答錯的題目已收進「錯題本」（並標註題號），可從設定頁的錯題本入口對照與訂正。</p>
+        <p>答錯的題目已收進「錯題本」（並標註題號），可從設定頁的錯題本入口對照正解。</p>
         <button class="test-again-btn" id="chr-dictAgainBtn">🔁 再聽寫一次</button>
         <button class="test-back-btn" onclick="showPage('chr-settings')">↩ 重新調整設定</button>
       </div>
@@ -399,7 +395,7 @@
     </div>
     <div class="review-section">
       <h2>錯題本</h2>
-      <p class="hint">這裡收錄你答錯的和絃，重整或關閉後仍會保留。「分解琶音」會播放琶音方便逐音辨認，也可即時重新作答訂正。</p>
+      <p class="hint">這裡收錄你答錯的和絃，重整或關閉後仍會保留。「分解琶音」會播放琶音方便逐音辨認。</p>
       <div id="chr-reviewList"></div>
     </div>
   </div>
@@ -427,12 +423,19 @@ function forceResetCache() {
 }
 function showPage(pageId) {
   if (window.stopAllPlayback) window.stopAllPlayback();
+  updateStaffHeader(pageId);
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
   if (pageId === 'chr-settings') { document.getElementById('pageChrSettings').classList.add('active'); if(window.chrModule) window.chrModule.refreshReviewCount(); }
   else if (pageId === 'chr-practice') document.getElementById('pageChrPractice').classList.add('active');
   else if (pageId === 'chr-answer') document.getElementById('pageChrAnswer').classList.add('active');
   else if (pageId === 'chr-review') { document.getElementById('pageChrReview').classList.add('active'); if(window.chrModule) window.chrModule.renderRev(); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+// 高音譜表裝飾：僅在「單題作答」的作答頁顯示，其餘頁面隱藏以節省版面
+window.__staffSingleMode = true;
+function updateStaffHeader(pageId){
+  var sh = document.getElementById('staffHeader'); if(!sh) return;
+  sh.style.display = (pageId === 'chr-practice' && window.__staffSingleMode === true) ? 'block' : 'none';
 }
 
 (function(){
@@ -747,7 +750,7 @@ function showPage(pageId) {
     function addToRev(q, userKey, qNum){
       window.REVIEW_STORE.add('chord', {
         root: q.root, qualityKey: q.qualityKey, intervals: q.intervals, steps: q.steps,
-        userAnswerKey: userKey || null, corrected: false, levelId: curLevel.id, questionNum: qNum || null,
+        userAnswerKey: userKey || null, levelId: curLevel.id, questionNum: qNum || null,
         yourText: userKey ? QUALITIES[userKey].label : '（未作答）',
         correctText: QUALITIES[q.qualityKey].label
       });
@@ -756,44 +759,23 @@ function showPage(pageId) {
     function refreshReviewCount(){
       const el = document.getElementById('chr-reviewCount'); if(el) el.textContent = window.REVIEW_STORE.count('chord');
     }
-    function markCorrected(id){
-      const arr = window.REVIEW_STORE.load('chord');
-      const it = arr.find(x => x.id === id); if(it) it.corrected = true;
-      window.REVIEW_STORE.save('chord', arr); renderRev();
-    }
-
     function renderRev(){
       const list = document.getElementById('chr-reviewList'); if(!list) return; list.innerHTML = '';
       const items = window.REVIEW_STORE.load('chord');
       refreshReviewCount();
       if(items.length === 0){ list.innerHTML = '<div class="review-empty">🎉 目前沒有錯題，繼續保持你的好聽力！</div>'; return; }
       items.slice().reverse().forEach(item => {
-        const row = document.createElement('div'); row.className = 'review-item' + (item.corrected ? ' corrected' : '');
+        const row = document.createElement('div'); row.className = 'review-item';
         const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
         renderGrandStaff(staffMini, item.root, item.intervals, item.steps, 210, 210);
         const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.style.fontSize = '13.5px'; lbl.textContent = buildSymbol(item.root, item.qualityKey, item.intervals); staffMini.appendChild(lbl);
         const meta = document.createElement('div'); meta.className = 'review-meta';
         if(item.questionNum) meta.innerHTML += `<div class="q-num-badge">【第 ${item.questionNum} 題】</div>`;
         const userLabel = item.userAnswerKey ? QUALITIES[item.userAnswerKey].label : '（未作答）';
-        meta.innerHTML += `<div class="review-answers">${item.corrected ? `<span class="right-ans">✓ 已訂正為 ${QUALITIES[item.qualityKey].label}</span>` : `你的答案：<span class="wrong-ans">${userLabel}</span><br>正解答案：<span class="right-ans">${QUALITIES[item.qualityKey].label}</span>`}</div>`;
+        meta.innerHTML += `<div class="review-answers">你的答案：<span class="wrong-ans">${userLabel}</span><br>正解答案：<span class="right-ans">${QUALITIES[item.qualityKey].label}</span></div>`;
         const actions = document.createElement('div'); actions.className = 'review-actions';
         const repBtn = document.createElement('button'); repBtn.className = 'icon-btn'; repBtn.textContent = '🔁 分解琶音';
         repBtn.onclick = () => { window.stopAllPlayback(); playArpeggio(item.root, item.intervals); }; actions.appendChild(repBtn);
-        if(!item.corrected){
-          const corBtn = document.createElement('button'); corBtn.className = 'icon-btn'; corBtn.textContent = '✎ 重新作答';
-          corBtn.onclick = () => {
-            const l = LEVELS.find(x=>x.id===item.levelId)||LEVELS[6];
-            const old = row.querySelector('.correction-grid'); if(old) old.remove();
-            const grid = document.createElement('div'); grid.className = 'correction-grid';
-            l.pool.forEach(k => {
-              const b = document.createElement('button'); b.className = 'answer-btn'; b.style.padding='10px'; b.textContent = QUALITIES[k].label;
-              b.onclick = () => { if(k===item.qualityKey){ markCorrected(item.id); } else { b.classList.add('wrong'); b.disabled=true; } };
-              grid.appendChild(b);
-            });
-            row.appendChild(grid);
-          };
-          actions.appendChild(corBtn);
-        } else actions.innerHTML += '<span class="corrected-tag">✓ 已訂正</span>';
         row.appendChild(meta); row.appendChild(actions); list.appendChild(row);
       });
     }
@@ -866,6 +848,7 @@ function showPage(pageId) {
         document.getElementById('chr-enterBtn').onclick = () => {
           if(curLevel.id === CUSTOM_ID && activePool().length < 2) return;
           window.stopAllPlayback(); testSession = null; dictSession = null;
+          window.__staffSingleMode = (qtype === 'single');
           document.getElementById('chr-questionPanel').style.display = qtype === 'single' ? 'block' : 'none';
           document.getElementById('chr-dictPanel').style.display = qtype === 'dictation' ? 'block' : 'none';
           document.getElementById('chr-testSummary').style.display = 'none'; document.getElementById('chr-dictSummary').style.display = 'none';
@@ -995,6 +978,7 @@ function showPage(pageId) {
         });
         if(!sd) return;
         dictSession = { questions: sd.questions, maxReplays:1, replaysLeft: sd.played?0:1, submitted:false, hasPlayed:!!sd.played, activeIndex:0, exam:true, playbackStyle:'triple' };
+        window.__staffSingleMode = false;
         document.getElementById('chr-questionPanel').style.display = 'none';
         document.getElementById('chr-testSummary').style.display = 'none';
         document.getElementById('chr-dictSummary').style.display = 'none';
@@ -1129,7 +1113,7 @@ function showPage(pageId) {
       <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>
       <p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>
       <p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>
-      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照與即時訂正。</p>
+      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>
     </div>
     <p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
     <div class="help-foot"><button onclick="closeHelp('chr-helpModal')">我知道了</button></div>

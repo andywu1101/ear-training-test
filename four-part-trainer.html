@@ -176,7 +176,7 @@
   .feedback-text.wrong { color: var(--wrong); display: block; }
   .feedback-text.partial { color: #d97706; display: block; }
 
-  /* 訂正區 */
+  /* 錯題本區 */
   .review-section { padding: 16px 0; border-top: 1px dashed var(--panel-border); margin-top: 16px; display: none; }
   .review-section h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 12px; }
   .review-item { background: #fff; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
@@ -2367,7 +2367,7 @@ window.addEventListener('resize', setVH); setVH();
         if (!item || !pianoInst || this.isPlaying) return;
         this.isPlaying = true;
         const ctx = ensureAudio();
-        // 訂正播放：不播標準音、不停頓，直接聆聽和聲
+        // 錯題本重播：不播標準音、不停頓，直接聆聽和聲
         let t = ctx.currentTime + 0.1;
         let secPerBeat = 60 / this.bpm;
         let measureDur = 4 * secPerBeat;
@@ -2774,7 +2774,7 @@ window.addEventListener('resize', setVH); setVH();
     + '<p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>'
     + '<p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>'
     + '<p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>'
-    + '<p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照與即時訂正。</p>'
+    + '<p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>'
     + '</div>'
     + '<p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>'
     + '<div class="help-foot"><button data-help-close>我知道了</button></div></div>';

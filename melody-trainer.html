@@ -420,6 +420,23 @@ function forceResetCache() {
   if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
   alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
 }
+// 解答／錯題本：讓「你的作答」與「正解」兩張譜的水平捲軸同步移動
+function syncStaffScroll(idA, idB){
+  var a = document.getElementById(idA), b = document.getElementById(idB);
+  if(!a || !b) return;
+  a = a.closest('.review-staff'); b = b.closest('.review-staff');
+  if(!a || !b || a._syncBound) return;
+  a._syncBound = true; b._syncBound = true;
+  var syncing = false;
+  var link = function(from, to){
+    from.addEventListener('scroll', function(){
+      if(syncing){ syncing = false; return; }
+      syncing = true; to.scrollLeft = from.scrollLeft;
+    }, { passive: true });
+  };
+  link(a, b); link(b, a);
+}
+
 function showPage(pageId) {
   if (window.melStopAll) window.melStopAll();
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
@@ -1320,6 +1337,7 @@ function showPage(pageId) {
       setTimeout(() => {
         renderStaticStaff('mel-ansUser', item.userSeq, item.userPitch, item.correctSeq, item.correctPitch, item);
         renderStaticStaff('mel-ansCorrect', item.correctSeq, item.correctPitch, null, null, item);
+        syncStaffScroll('mel-ansUser', 'mel-ansCorrect');
       }, 60);
     },
 
@@ -1352,6 +1370,7 @@ function showPage(pageId) {
         setTimeout(() => {
           renderStaticStaff(`mel-rev-user-${uid}`, item.userSeq, item.userPitch, item.correctSeq, item.correctPitch, item);
           renderStaticStaff(`mel-rev-correct-${uid}`, item.correctSeq, item.correctPitch, null, null, item);
+          syncStaffScroll(`mel-rev-user-${uid}`, `mel-rev-correct-${uid}`);
         }, 50);
       });
     },
@@ -1578,7 +1597,7 @@ function showPage(pageId) {
       <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>
       <p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>
       <p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>
-      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照與即時訂正。</p>
+      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>
     </div>
     <p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
     <div class="help-foot"><button onclick="closeHelp('mel-helpModal')">我知道了</button></div>
