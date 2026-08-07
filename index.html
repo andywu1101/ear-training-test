@@ -57,6 +57,8 @@
   .badge-review { background: var(--wrong); color: var(--panel); }
   .badge-soon { background: var(--hairline); color: var(--ink-soft); }
   .footer-note{ margin-top: 14px; font-size: 13.5px; color: var(--ink-soft); text-align:center; line-height:1.7; }
+  .footer-link{ color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
+  .footer-link:hover{ text-decoration: underline; }
   /* 問題回報按鈕與版本號（選單最底部） */
   .report-wrap{ margin-top: 36px; text-align:center; }
   .report-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:13.5px; padding:10px 22px; border-radius:999px; background:transparent; color:var(--ink-soft); border:1px solid var(--panel-border); text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
@@ -327,10 +329,10 @@
           <p class="menu-card-desc">整合所有練習答錯的題目，一次檢視各項目的錯題數量與最近紀錄，並可跳回該練習複習。</p>
         </div>
       </div>
-    </div>    <p class="footer-note">已加入主畫面？可以直接從主畫面圖示開啟，體驗會更接近原生 App。</p>
+    </div>    <p class="footer-note">還沒加入主畫面？<a class="footer-link" href="https://youtu.be/fF4-J2NGAnw?t=27" target="_blank" rel="noopener">▸ 看看怎麼加入</a>，開啟體驗會更接近原生 App。</p>
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.78　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.79　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->

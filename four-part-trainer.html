@@ -2760,8 +2760,11 @@ window.addEventListener('resize', setVH); setVH();
     + '.help-common{margin-top:18px;padding-top:14px;border-top:1px dashed var(--panel-border);}'
     + '.help-common h3{color:var(--ink-soft);}'
     + '.help-common p{font-size:12.5px;line-height:1.75;color:var(--ink-soft);}'
-    + '.help-foot{margin-top:16px;text-align:center;}'
-    + '.help-foot button{font-family:var(--font-body);font-weight:700;font-size:14px;padding:11px 30px;border-radius:999px;background:var(--accent);color:var(--panel);border:none;cursor:pointer;touch-action:manipulation;}';
+    + '.help-foot{margin-top:16px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}'
+    + '.help-foot button,.help-foot .help-video{font-family:var(--font-body);font-weight:700;font-size:14px;padding:11px 26px;border-radius:999px;cursor:pointer;touch-action:manipulation;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;}'
+    + '.help-foot button{background:var(--accent);color:var(--panel);border:1px solid var(--accent);}'
+    + '.help-foot .help-video{background:#fff;color:var(--accent);border:1px solid var(--accent);}'
+    + '.help-foot .help-video:hover,.help-foot .help-video:active{background:var(--accent);color:var(--panel);}';
   var st=document.createElement('style'); st.textContent=hcss; document.head.appendChild(st);
   var hhtml = ''
     + '<div class="help-box"><button class="help-close" data-help-close aria-label="關閉">×</button>'
@@ -2777,7 +2780,8 @@ window.addEventListener('resize', setVH); setVH();
     + '<p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>'
     + '</div>'
     + '<p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>'
-    + '<div class="help-foot"><button data-help-close>我知道了</button></div></div>';
+    + '<div class="help-foot"><a class="help-video" href="https://youtu.be/fwHc6VuFatg?t=715" target="_blank" rel="noopener">▶ 看完整操作教學</a>'
+    + '<button data-help-close>我知道了</button></div></div>';
   var modal=document.createElement('div'); modal.className='help-modal'; modal.id='fpt-helpModal'; modal.innerHTML=hhtml; document.body.appendChild(modal);
   /* 彈窗開啟時鎖住背景捲動，避免手指滑到下層頁面 */
   function _lock(on){ document.body.style.overflow = on ? 'hidden' : ''; document.body.style.touchAction = on ? 'none' : ''; }

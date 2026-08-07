@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v78'; // v.78：完整教學影片連結、雙譜捲軸同步、移除錯題本訂正功能
+const CACHE_NAME = 'ear-training-shell-v79'; // v.79：玩法說明與加入主畫面提示，加上教學影片段落連結
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
