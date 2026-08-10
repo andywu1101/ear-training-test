@@ -1647,9 +1647,9 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         const zone = document.createElement('div');
         zone.className = 'pe-pick';
         zone.style.left = (nx - 9) + 'px';
-        zone.style.top = (stave.getYForLine(0) - 16) + 'px';
+        zone.style.top = (stave.getYForLine(0) - 18) + 'px';
         zone.style.width = Math.max(w, 18) + 'px';
-        zone.style.height = '100px';
+        zone.style.height = '86px';
         zone.style.pointerEvents = this.submitted ? 'none' : 'auto';
 
         const picked = this.selected.has(g);
@@ -1773,7 +1773,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
        並在每個錯音正上方標示實際聽到的音（例如 D♯ ↑半音）。 */
     drawAnswerSingle(containerId, d){
       const ACC_TXT = { 'n':'', '#':'♯', '##':'𝄪', 'b':'♭', 'bb':'𝄫' };
-      const cfg = Object.assign({}, d.cfg, { topPad: 20 });
+      const cfg = Object.assign({}, d.cfg, { topPad: 34 });   // 上方只留剛好放標籤與外框的空間
       const picked = new Set(d.picked);
 
       const marks = {};
@@ -1796,11 +1796,11 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         const nx = (typeof fn.getAbsoluteX === 'function') ? fn.getAbsoluteX() : stave.getX();
         const box = document.createElement('div');
         box.style.cssText = 'position:absolute; border-radius:7px;' + style;
-        const boxTop = stave.getYForLine(0) - 16;
+        const boxTop = stave.getYForLine(0) - 22;
         box.style.left = (nx - 10) + 'px';
         box.style.top = boxTop + 'px';
         box.style.width = '26px';
-        box.style.height = '100px';
+        box.style.height = '90px';
         overlay.appendChild(box);
         return { nx, stave, boxTop };
       };
@@ -1820,7 +1820,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         lab.style.cssText = 'position:absolute; font-family:var(--font-mono); font-size:10px; font-weight:700;'
           + 'white-space:nowrap; color:' + col + '; transform:translateX(-50%);';
         lab.style.left = (pos.nx + 3) + 'px';
-        lab.style.top = Math.max(0, pos.boxTop - 15) + 'px';
+        lab.style.top = Math.max(0, pos.boxTop - 30) + 'px';   // 標籤與外框之間的距離
         overlay.appendChild(lab);
       });
 
