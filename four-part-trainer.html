@@ -162,6 +162,7 @@
   .pitch-keypad { display: flex; flex-direction: column; gap: 8px; max-width: 500px; margin: 0 auto; }
   .pitch-row-acc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .pitch-row-notes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pitch-row-notes3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .pitch-row-oct { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .p-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; font-weight: 700; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); transition: 0.1s; }
   .p-btn:active { transform: scale(0.95); border-color: var(--accent); }
@@ -323,10 +324,11 @@
             <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('D')">D<span>Re</span></button>
             <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('E')">E<span>Mi</span></button>
             <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('F')">F<span>Fa</span></button>
+          </div>
+          <div class="pitch-row-notes3">
             <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('G')">G<span>Sol</span></button>
             <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('A')">A<span>La</span></button>
             <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('B')">B<span>Ti</span></button>
-            <button class="p-btn note-btn" onclick="window.fptModule.inputBassPitch('C_high')">C<span>高Do</span></button>
           </div>
           <div class="pitch-row-oct">
             <button class="p-btn oct-btn" onclick="window.fptModule.handleKbInput('bass_oct', -1)">▼ 低八度 <span id="oct-label-low">(Oct 2)</span></button>
@@ -424,6 +426,21 @@ function forceResetCache() {
   if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
   alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
 }
+/* 依「離前一個音最近」決定八度：候選為參考音上下各一個八度，
+   取音級距離最小的那一個（七個字母是奇數，不會出現平手）。 */
+function nearestOctFor(step, ref, fallbackOct, loOct, hiOct){
+  var L = ['C','D','E','F','G','A','B'];
+  if(!ref) return Math.min(Math.max(fallbackOct, loOct), hiOct);
+  var ri = ref.oct * 7 + L.indexOf(ref.step);
+  var best = null, bestD = 999;
+  for(var o = ref.oct - 1; o <= ref.oct + 1; o++){
+    if(o < loOct || o > hiOct) continue;
+    var d = Math.abs((o * 7 + L.indexOf(step)) - ri);
+    if(d < bestD){ bestD = d; best = o; }
+  }
+  return (best === null) ? Math.min(Math.max(ref.oct, loOct), hiOct) : best;
+}
+
 function showPage(pageId) {
   if (window.fptStopAll) window.fptStopAll();
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
@@ -1624,8 +1641,12 @@ window.addEventListener('resize', setVH); setVH();
 
     inputBassPitch: function(stepInput) {
       if (this.isSubmitted || !this.hasPlayed) return;
-      let step = stepInput; let oct = this.currentOctave;
-      if (stepInput === 'C_high') { step = 'C'; oct += 1; }
+      let step = stepInput;
+      // 八度自動選擇：以前一個小節已輸入的低音為基準，取最近的八度
+      let ref = null;
+      for(let i = this.activeSlot - 1; i >= 0; i--){ if(this.userBass[i]){ ref = this.userBass[i]; break; } }
+      if(!ref){ for(let i = this.activeSlot + 1; i < this.userBass.length; i++){ if(this.userBass[i]){ ref = this.userBass[i]; break; } } }
+      let oct = nearestOctFor(step, ref, 3, 1, 5);
       
       // 調號智慧連動：沒有明確點選升降記號時（accidentalExplicit=false），嚴格套用調號預設值；
       // 若明確按過 ♯／♭，以調號預設為基準疊加半音；♮ 強制還原；復原(default)回到調號值。
@@ -1798,6 +1819,7 @@ window.addEventListener('resize', setVH); setVH();
 
 
     generateQuestion: function() {
+      var _sc = document.getElementById('staffContainerOuter'); if(_sc) _sc.scrollLeft = 0;   // 新題目一律從第一小節開始顯示
       let poolKeys = [];
       if (this.keyPref === 'major') poolKeys = ALL_KEYS.filter(k => !k.isMin);
       else if (this.keyPref === 'minor') poolKeys = ALL_KEYS.filter(k => k.isMin);
@@ -2584,6 +2606,8 @@ window.addEventListener('resize', setVH); setVH();
           });
           let ua = document.getElementById(`rev-user-scroll-${id}`);
           let ca = document.getElementById(`rev-correct-scroll-${id}`);
+          if (ua) ua.scrollLeft = 0;
+          if (ca) ca.scrollLeft = 0;
           if (ua && ca) {
             let syncing = false;
             let link = (from, to) => from.addEventListener('scroll', () => {

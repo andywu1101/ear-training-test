@@ -102,6 +102,7 @@
   .pitch-keypad { display: flex; flex-direction: column; gap: 8px; max-width: 500px; margin: 0 auto; padding-bottom: 40px; }
   .pitch-row-acc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .pitch-row-notes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pitch-row-notes3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .pitch-row-oct { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .p-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; font-weight: 700; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); transition: 0.1s; }
   .p-btn:active { transform: scale(0.95); border-color: var(--accent); }
@@ -346,10 +347,11 @@
             <button class="p-btn note-btn" onclick="tpModule.inputPitch('D')">D<span>Re</span></button>
             <button class="p-btn note-btn" onclick="tpModule.inputPitch('E')">E<span>Mi</span></button>
             <button class="p-btn note-btn" onclick="tpModule.inputPitch('F')">F<span>Fa</span></button>
+          </div>
+          <div class="pitch-row-notes3">
             <button class="p-btn note-btn" onclick="tpModule.inputPitch('G')">G<span>Sol</span></button>
             <button class="p-btn note-btn" onclick="tpModule.inputPitch('A')">A<span>La</span></button>
             <button class="p-btn note-btn" onclick="tpModule.inputPitch('B')">B<span>Ti</span></button>
-            <button class="p-btn note-btn" onclick="tpModule.inputPitch('C_high')">C<span>高Do</span></button>
           </div>
           <div class="pitch-row-oct">
             <button class="p-btn oct-btn" onclick="tpModule.shiftOctave(-1)">▼ 低八度 <span id="oct-label-low"></span></button>
@@ -432,6 +434,35 @@ function syncStaffScroll(idA, idB){
     }, { passive: true });
   };
   link(a, b); link(b, a);
+}
+
+/* 依「離前一個音最近」決定八度：候選為參考音上下各一個八度，
+   取音級距離最小的那一個（七個字母是奇數，不會出現平手）。 */
+function nearestOctFor(step, ref, fallbackOct, loOct, hiOct){
+  var L = ['C','D','E','F','G','A','B'];
+  if(!ref) return Math.min(Math.max(fallbackOct, loOct), hiOct);
+  var ri = ref.oct * 7 + L.indexOf(ref.step);
+  var best = null, bestD = 999;
+  for(var o = ref.oct - 1; o <= ref.oct + 1; o++){
+    if(o < loOct || o > hiOct) continue;
+    var d = Math.abs((o * 7 + L.indexOf(step)) - ri);
+    if(d < bestD){ bestD = d; best = o; }
+  }
+  return (best === null) ? Math.min(Math.max(ref.oct, loOct), hiOct) : best;
+}
+
+/* 切換題目、進入解答頁與錯題本時，譜例一律從第一小節開始顯示 */
+function resetStaffScroll(){
+  var el = document.getElementById('staffContainerOuter');
+  if(el) el.scrollLeft = 0;
+}
+function resetReviewScroll(ids){
+  ids.forEach(function(id){
+    var d = document.getElementById(id);
+    if(!d) return;
+    var w = d.closest('.review-staff') || d.closest('.staff-scroll-container');
+    if(w) w.scrollLeft = 0;
+  });
 }
 
 function showPage(pageId) {
@@ -894,6 +925,7 @@ function showPage(pageId) {
     },
 
     generateQuestion: function() {
+      resetStaffScroll();
       let tTrack = this.generateTrack(true);
       this.questionSeq.top = tTrack.seq; this.questionPitch.top = tTrack.pitch;
       let bTrack = this.generateTrack(false);
@@ -1106,8 +1138,13 @@ function showPage(pageId) {
       let p = this.activePart;
       if (this.activeNoteIdx[p] === -1) return;
 
-      let step = stepInput; let oct = this.currentOctave;
-      if(stepInput === 'C_high') { step = 'C'; oct += 1; }
+      let step = stepInput;
+      // 八度自動選擇：基準取「同一聲部」該格的前一個音，沒有就用後一音
+      let arr = this.userPitch[p];
+      let ref = null;
+      for(let i = this.activeNoteIdx[p] - 1; i >= 0; i--){ if(arr[i]){ ref = arr[i]; break; } }
+      if(!ref){ for(let i = this.activeNoteIdx[p] + 1; i < arr.length; i++){ if(arr[i]){ ref = arr[i]; break; } } }
+      let oct = nearestOctFor(step, ref, (p === 'top' ? 4 : 3), 2, 6);
 
       this.userPitch[p][this.activeNoteIdx[p]] = { step: step, oct: oct, acc: this.currentAccidental };
       this.currentOctave = oct; this.updateOctaveLabels();
@@ -1410,6 +1447,7 @@ function showPage(pageId) {
         renderStaticGrand('tp-ansUser', item.uSeqT, item.uSeqB, item.uPitchT, item.uPitchB, item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, item);
         renderStaticGrand('tp-ansCorrect', item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, null, null, null, null, item);
         syncStaffScroll('tp-ansUser', 'tp-ansCorrect');
+        resetReviewScroll(['tp-ansUser','tp-ansCorrect']);
       }, 60);
     },
 
@@ -1443,6 +1481,7 @@ function showPage(pageId) {
           renderStaticGrand(`tp-rev-user-${uid}`, item.uSeqT, item.uSeqB, item.uPitchT, item.uPitchB, item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, item);
           renderStaticGrand(`tp-rev-correct-${uid}`, item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, null, null, null, null, item);
           syncStaffScroll(`tp-rev-user-${uid}`, `tp-rev-correct-${uid}`);
+          resetReviewScroll([`tp-rev-user-${uid}`, `tp-rev-correct-${uid}`]);
         }, 50);
       });
     },

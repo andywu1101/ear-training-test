@@ -384,6 +384,20 @@ function syncStaffScroll(idA, idB){
   link(a, b); link(b, a);
 }
 
+/* 切換題目、進入解答頁與錯題本時，譜例一律從第一小節開始顯示 */
+function resetStaffScroll(){
+  var el = document.getElementById('staffContainerOuter');
+  if(el) el.scrollLeft = 0;
+}
+function resetReviewScroll(ids){
+  ids.forEach(function(id){
+    var d = document.getElementById(id);
+    if(!d) return;
+    var w = d.closest('.review-staff') || d.closest('.staff-scroll-container');
+    if(w) w.scrollLeft = 0;
+  });
+}
+
 function showPage(pageId) {
   if (window.rhyStopAll) window.rhyStopAll();
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
@@ -769,6 +783,7 @@ function showPage(pageId) {
     },
 
     generateQuestion: function() {
+      resetStaffScroll();
       this.questionSeq = []; const pool = Array.from(this.selectedPatterns);
       for(let i=0; i<this.totalBeats; i++) this.questionSeq.push(pool[Math.floor(Math.random() * pool.length)]);
       this.lockedStartPitch = Math.random() < 0.5 ? 69 : 64;
@@ -1055,6 +1070,7 @@ function showPage(pageId) {
         renderStaticStaff('rhy-ansUser', item.userSeq, item.correctSeq, item);
         renderStaticStaff('rhy-ansCorrect', item.correctSeq, null, item);
         syncStaffScroll('rhy-ansUser', 'rhy-ansCorrect');
+        resetReviewScroll(['rhy-ansUser','rhy-ansCorrect']);
       }, 60);
     },
 
@@ -1088,6 +1104,7 @@ function showPage(pageId) {
           renderStaticStaff(`rhy-rev-user-${uid}`, item.userSeq, item.correctSeq, item);
           renderStaticStaff(`rhy-rev-correct-${uid}`, item.correctSeq, null, item);
           syncStaffScroll(`rhy-rev-user-${uid}`, `rhy-rev-correct-${uid}`);
+          resetReviewScroll([`rhy-rev-user-${uid}`, `rhy-rev-correct-${uid}`]);
         }, 50);
       });
     },

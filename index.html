@@ -56,6 +56,7 @@
   .badge-ready { background: var(--accent); color: var(--panel); }
   .badge-review { background: var(--wrong); color: var(--panel); }
   .badge-soon { background: var(--hairline); color: var(--ink-soft); }
+  .menu-new { position: absolute; right: 18px; bottom: 16px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 4px 10px; border-radius: 999px; background: var(--wrong); color: #fff; }
   .footer-note{ margin-top: 14px; font-size: 13.5px; color: var(--ink-soft); text-align:center; line-height:1.7; }
   .footer-link{ color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
   .footer-link:hover{ text-decoration: underline; }
@@ -282,15 +283,15 @@
         </div>
       </a>
 
-      <!-- 07 音高辨認（找錯音）：尚未開放 -->
-      <div class="menu-card disabled-feature">
-        <span class="menu-badge badge-soon">即將推出</span>
+      <a href="pitch-error-trainer.html" class="menu-card active-feature">
+        <span class="menu-badge badge-ready">開始練習</span>
         <div>
           <div class="menu-card-num">07</div>
           <h3 class="menu-card-title">音高辨認 (找錯音)</h3>
-          <p class="menu-card-desc">聆聽旋律，並在題目的譜例上找出錯誤的音高。</p>
+          <p class="menu-card-desc">聆聽旋律，並在題目的譜例上找出與譜例不相符的音高。</p>
         </div>
-      </div>
+        <span class="menu-new">New!</span>
+      </a>
 
       <!-- 08 音堆練習：尚未開放 -->
       <div class="menu-card disabled-feature">
@@ -332,7 +333,7 @@
     </div>    <p class="footer-note">還沒加入主畫面？<a class="footer-link" href="https://youtu.be/fF4-J2NGAnw?t=27" target="_blank" rel="noopener">▸ 看看怎麼加入</a>，開啟體驗會更接近原生 App。</p>
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.79　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.80　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -430,9 +431,9 @@ if (location.hash === '#menu') {
 /* ===== 統一錯題本儲存（與各練習頁共用同一組 localStorage key） ===== */
 window.REVIEW_STORE = {
   PREFIX: 'earTrainer.review.',
-  TYPES: ['interval','chord','rhythm','melody','twopart','fourpart'],
-  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行' },
-  TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html' },
+  TYPES: ['interval','chord','rhythm','melody','twopart','fourpart','pitcherr'],
+  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行', pitcherr:'音高辨認（找錯音）' },
+  TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html', pitcherr:'pitch-error-trainer.html' },
   load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
   clear(type){ try { localStorage.setItem(this.PREFIX+type, '[]'); } catch(e){} },
   count(type){ return this.load(type).length; },
@@ -499,6 +500,8 @@ var CHANGELOG = [
   { v: 'v.75', items: ['錯題本每個練習最多保留最近 50 筆，避免長期累積影響儲存'] },
   { v: 'v.77', items: ['Portaly 小額贊助正式開放'] },
   { v: 'v.78', items: ['選單頁教學連結更新為完整操作教學影片', '節奏、單旋律、兩聲部的解答頁與錯題本，現在兩張譜例會左右同步捲動', '取消錯題本的「重新作答訂正」，改為完整保留原始錯誤以利檢討'] }
+,
+  { v: 'v.80', items: ['新增「07 音高辨認（找錯音）」：聆聽演奏、對照譜例，找出被彈錯的音', '單旋律、兩聲部、四部和聲輸入音符時，會自動選擇離前一個音最近的八度，不再跨到遠處的八度；音高鍵盤的「高 Do」因此取消', '切換題目、進入解答頁與錯題本時，譜例一律從第一小節開始顯示'] }
 ];
 
 function showChangelog(){
