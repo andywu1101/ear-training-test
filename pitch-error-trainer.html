@@ -242,7 +242,7 @@
     </div>
 
     <h1>音高辨認（找錯音）— 設定</h1>
-    <p class="subtitle">聆聽旋律，並在題目的譜例上找出與譜例不相符的音高。節奏永遠正確，只有音高會被彈錯。</p>
+    <p class="subtitle">聆聽正確的演奏，並在題目的譜例上找出印錯的音高。節奏永遠正確，只有音高會錯。</p>
 
     <div class="switch-row">
       <div class="switch-group">
@@ -376,7 +376,7 @@
     <div class="practice-bottom-scroll">
       <div class="pe-result" id="pe-result"></div>
 
-      <p class="pe-tip">聆聽演奏，對照譜例，<b>點一下</b>你認為被彈錯的音符把它圈起來；<b>再點一次</b>可以取消。節奏永遠正確，只有音高會被彈錯。</p>
+      <p class="pe-tip">聆聽演奏，對照譜例，<b>點一下</b>你認為譜上印錯的音符把它圈起來；<b>再點一次</b>可以取消。節奏永遠正確，只有音高會錯。</p>
 
     </div>
   </div>
@@ -392,14 +392,14 @@
     <div class="answer-big-feedback" id="pe-ansFeedback"></div>
 
     <div class="unified-action-row" style="margin-bottom:14px;">
-      <button class="play-btn" id="pe-ansPlayCorrect">🔊 聽正確版</button>
-      <button class="action-btn" id="pe-ansPlayHeard" style="color:var(--wrong); border-color:var(--wrong);">👂 聽實際演奏（含錯音）</button>
+      <button class="play-btn" id="pe-ansPlayCorrect">🎧 聽正確演奏</button>
+      <button class="action-btn" id="pe-ansPlayHeard" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽譜例上寫的</button>
     </div>
 
-    <div class="review-label">正確樂譜（綠色＝你找到的、紅色＝漏掉的、虛線框＝圈錯的位置）：</div>
+    <div class="review-label">題目譜例（含錯音）：綠色＝你找到的　｜　紅色＝漏掉的　｜　紅色虛線框＝圈錯的位置；音符上方標示正確的音高。</div>
     <div class="review-staff"><div id="pe-ansScoreStaff"></div></div>
-    <div class="review-label" style="margin-top:8px;">實際演奏（紅色為被彈錯的音）：</div>
-    <div class="review-staff"><div id="pe-ansHeardStaff"></div></div>
+    <div class="review-label" style="margin-top:8px;">正確演奏（藍色為對應的正確音）：</div>
+    <div class="review-staff"><div id="pe-ansCorrectStaff"></div></div>
 
     <div class="pe-dbg" id="pe-ansDetail" style="margin-top:12px;"></div>
 
@@ -418,7 +418,7 @@
       <button class="reset-cache-btn" id="pe-clearReviewBtn">🗑️ 清空錯題本</button>
     </div>
     <h1>錯題本</h1>
-    <p class="subtitle">收錄沒有全部找出來的題目，重整或關閉後仍會保留。可對照正確樂譜與實際演奏，並分別聆聽。</p>
+    <p class="subtitle">收錄沒有全部找出來的題目，重整或關閉後仍會保留。可對照譜例與正確演奏，並分別聆聽。</p>
     <div id="pe-reviewList"></div>
     <p id="pe-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
   </div>
@@ -429,13 +429,13 @@
   <div class="help-box">
     <button class="help-close" onclick="closeHelp('pe-helpModal')" aria-label="關閉">×</button>
     <h2>音高辨認（找錯音）— 玩法說明</h2>
-    <p class="help-lead">聆聽旋律，並在題目的譜例上找出與譜例不相符的音高。</p>
+    <p class="help-lead">聆聽旋律，並在題目的譜例上找出錯誤的音高。</p>
     <h3>玩法</h3>
-    <p>譜例上顯示的是<b>正確的樂譜</b>，但播放的演奏會有幾個音<b>被彈錯音高</b>。<b>節奏永遠正確</b>，只有音高會錯。你的任務是聽出哪幾個音跟譜上不一樣，把它們圈起來。</p>
+    <p>播放的是<b>正確的演奏</b>，但譜例上有幾個音的<b>音高印錯了</b>。<b>節奏永遠正確</b>，只有音高會錯。你的任務是聽出哪幾個音跟聽到的不一樣，把譜上那幾個錯音圈起來。</p>
     <h3>設定</h3>
     <p>可選<b>練習模式</b>（播放次數不限）或<b>測驗模式</b>（限制次數）；譜號、拍號、小節數、速度可自訂。<b>有調性</b>模式會顯示調號、旋律有和聲進行並收在主音上，可再指定調號範圍與大小調；<b>無調性</b>則全部使用臨時記號。<b>錯音數量</b>會隨小節數調整上限。</p>
     <h3>作答</h3>
-    <p>按「<b>播放題目</b>」聆聽演奏（先給預備拍）。<b>點一下</b>音符即可圈選，<b>再點一次</b>取消。譜例下方會顯示本題的錯音個數與你已圈選的數量。「<b>🎵 標準音 A</b>」隨時可按，不佔播放次數。</p>
+    <p>按「<b>播放題目</b>」聆聽正確的演奏（先給預備拍）。<b>點一下</b>音符即可圈選，<b>再點一次</b>取消。譜例下方會顯示本題的錯音個數與你已圈選的數量。「<b>🎵 標準音 A</b>」隨時可按，不佔播放次數。</p>
     <h3>計分</h3>
     <p>找到一個錯音得 1 分，<b>圈錯一個扣 1 分</b>（單題不會低於 0 分），漏掉的不計分。所以不要全部圈起來碰運氣。</p>
     <div class="help-common">
@@ -1262,11 +1262,22 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       container.innerHTML = '';
       const marks = markMap || {};
       const allNotes = [];
-      const minMeasureWidth = 250;
+      const topPad = cfg.topPad || 0;      // 預留給標籤的上方空間
+
+      /* 音符愈多，小節就畫得愈寬，避免音符（與標籤）擠在一起 */
+      let maxNotesInBar = 0, cnt = 0, beats = 0;
+      seq.forEach(id => {
+        cnt += ALL_BLOCKS[id].lengths.length;
+        beats += ALL_BLOCKS[id].beats;
+        if(beats >= cfg.beatsPerBar){ if(cnt > maxNotesInBar) maxNotesInBar = cnt; cnt = 0; beats = 0; }
+      });
+      if(cnt > maxNotesInBar) maxNotesInBar = cnt;
+      const minMeasureWidth = Math.max(250, maxNotesInBar * 40);
+
       const totalWidth = (minMeasureWidth * cfg.barsCount) + 90;
       const usableWidth = totalWidth - 10;
       const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
-      renderer.resize(totalWidth, 130);
+      renderer.resize(totalWidth, 130 + topPad);
       const ctx = renderer.getContext();
       let xPos = 5;
       const barWidth = (usableWidth - 80) / cfg.barsCount;
@@ -1285,7 +1296,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       for(let b = 0; b < cfg.barsCount; b++){
         const isFirst = (b === 0);
         const sWidth = isFirst ? barWidth + 80 : barWidth;
-        const stave = new VF.Stave(xPos, 20, sWidth);
+        const stave = new VF.Stave(xPos, 20 + topPad, sWidth);
         if(isFirst){
           stave.addClef(cfg.clef);
           if(cfg.sig && cfg.sig !== 'C') stave.addKeySignature(cfg.sig);
@@ -1384,7 +1395,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     mode:'practice', clef:'treble', tonal:'tonal', krange:'all', kmode:'both',
     meter:'2/4', meterType:'simple', barsCount:2, beatsPerBar:2, bpm:80,
     errCount:2,
-    key:null, seq:[], correctPitch:[], heardPitch:[], errorIdx:[], errorGroups:[], altIdx:[], leadCount:0,
+    key:null, seq:[], correctPitch:[], errPitch:[], errorIdx:[], errorGroups:[], altIdx:[], leadCount:0,
     isPlaying:false, selected:null, submitted:false, replaysLeft:Infinity, maxReplays:Infinity,
     score:{ c:0, t:0 },
 
@@ -1491,10 +1502,16 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         }
         if(!mel) continue;
 
-        const correctPitch = []; const heardPitch = [];
+        const correctPitch = []; const errPitch = [];
         const wrongOfGroup = {};
-        /* 【B 模式】譜面顯示的永遠是正確樂譜，錯音只存在於聲音裡，
-           所以不會有「臨時記號＝錯音」這類看譜就能猜到的破綻。 */
+        /* 破綻防護：譜面上顯示的是含錯音的版本。若正確旋律完全沒有臨時記號，
+           那譜上唯一的臨時記號就一定是錯音，看譜就能猜中 ——
+           這種情況下錯音一律改用調內音，不產生任何臨時記號。 */
+        let hasAccidental = false;
+        if(key){
+          const km = keyAccOf(key);
+          hasAccidental = mel.notes.some(p => p.acc !== km[p.step]);
+        }
         let bad = false;
         errG.forEach(g => {
           if(bad) return;
@@ -1504,7 +1521,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           if(prev) nb.push(prev);
           if(next) nb.push(next);
           const w = this.tonal === 'tonal'
-            ? makeWrong(mel.notes[g], key, this.clef, prev, false, nb)
+            ? makeWrong(mel.notes[g], key, this.clef, prev, !hasAccidental, nb)
             : makeWrongAtonal(mel.notes[g], this.clef, prev, nb);
           if(!w){ bad = true; return; }
           wrongOfGroup[g] = w;
@@ -1513,12 +1530,12 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         info.groups.forEach((grp, g) => {
           grp.members.forEach(ni => {
             correctPitch[ni] = Object.assign({}, mel.notes[g]);
-            heardPitch[ni] = Object.assign({}, wrongOfGroup[g] || mel.notes[g]);
+            errPitch[ni] = Object.assign({}, wrongOfGroup[g] || mel.notes[g]);
           });
         });
 
         const errNoteIdx = errG.map(g => info.groups[g].members[0]).sort((x,y) => x - y);
-        built = { seq, info, key, mel, chordInfo, correctPitch, heardPitch, errorIdx: errNoteIdx, errorGroups: errG.slice().sort((x,y)=>x-y) };
+        built = { seq, info, key, mel, chordInfo, correctPitch, errPitch, errorIdx: errNoteIdx, errorGroups: errG.slice().sort((x,y)=>x-y) };
       }
 
       if(!built){
@@ -1533,7 +1550,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       this.key = built.key;
       this.chordInfo = built.chordInfo;
       this.correctPitch = built.correctPitch;
-      this.heardPitch = built.heardPitch;
+      this.errPitch = built.errPitch;
       this.errorIdx = built.errorIdx;
       this.errorGroups = built.errorGroups;
       this.altIdx = built.mel.altIdx || [];
@@ -1584,7 +1601,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           marks[ni] = this.selected.has(g) ? '#4b7a5b' : '#a6493b';
         });
       }
-      const notes = drawStaff('pe-staff', this.seq, this.correctPitch, cfg, marks);
+      const notes = drawStaff('pe-staff', this.seq, this.errPitch, cfg, marks);   // 譜面 = 含錯音的版本
       this.buildPickZones(notes);
       if(outer) outer.scrollLeft = keepScroll;
 
@@ -1630,9 +1647,9 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         const zone = document.createElement('div');
         zone.className = 'pe-pick';
         zone.style.left = (nx - 9) + 'px';
-        zone.style.top = (stave.getYForLine(0) - 22) + 'px';
+        zone.style.top = (stave.getYForLine(0) - 16) + 'px';
         zone.style.width = Math.max(w, 18) + 'px';
-        zone.style.height = '112px';
+        zone.style.height = '100px';
         zone.style.pointerEvents = this.submitted ? 'none' : 'auto';
 
         const picked = this.selected.has(g);
@@ -1700,7 +1717,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         window.REVIEW_STORE.add('pitcherr', {
           seq: this.seq,
           correctPitch: this.correctPitch,
-          heardPitch: this.heardPitch,
+          errPitch: this.errPitch,
           errorGroups: this.errorGroups.slice(),
           picked: Array.from(this.selected),
           groups: this.info.groups.map(g => ({ bar:g.bar, members:g.members.slice() })),
@@ -1730,64 +1747,101 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
       showPage('pe-answer');
       setTimeout(() => {
-        this.drawAnswerPair('pe-ansScoreStaff', 'pe-ansHeardStaff', {
-          seq: this.seq, correctPitch: this.correctPitch, heardPitch: this.heardPitch,
+        this.drawAnswerSingle('pe-ansScoreStaff', {
+          seq: this.seq, correctPitch: this.correctPitch, errPitch: this.errPitch,
           errorGroups: this.errorGroups, picked: Array.from(this.selected),
           groups: this.info.groups, errorIdx: this.errorIdx, cfg: this.staffCfg()
         });
-        syncStaffScroll('pe-ansScoreStaff', 'pe-ansHeardStaff');
-        ['pe-ansScoreStaff','pe-ansHeardStaff'].forEach(function(id){
-          const d = document.getElementById(id); const w = d && d.closest('.review-staff');
+        this.drawCorrectStaff('pe-ansCorrectStaff', {
+          seq: this.seq, correctPitch: this.correctPitch,
+          errorGroups: this.errorGroups, groups: this.info.groups, cfg: this.staffCfg()
+        });
+        syncStaffScroll('pe-ansScoreStaff', 'pe-ansCorrectStaff');
+        ['pe-ansScoreStaff','pe-ansCorrectStaff'].forEach(function(id){
+          const el = document.getElementById(id); const w = el && el.closest('.review-staff');
           if(w) w.scrollLeft = 0;
         });
       }, 60);
 
       document.getElementById('pe-ansDetail').textContent = this.answerDetail({
-        correctPitch: this.correctPitch, heardPitch: this.heardPitch, errorIdx: this.errorIdx
+        correctPitch: this.correctPitch, errPitch: this.errPitch, errorIdx: this.errorIdx
       }) + '\n找到 ' + r.hit + ' 個　｜　漏掉 ' + r.miss + ' 個　｜　誤圈 ' + r.wrong + ' 個';
     },
 
-    // 上下兩張譜：上＝正確樂譜（標出作答結果）、下＝實際演奏（標出被彈錯的音）
-    drawAnswerPair(idTop, idBottom, d){
-      const marksTop = {};
+    /* 單一譜例的解答呈現：
+       在正確樂譜上直接標出「找到／漏掉／圈錯」，
+       並在每個錯音正上方標示實際聽到的音（例如 D♯ ↑半音）。 */
+    drawAnswerSingle(containerId, d){
+      const ACC_TXT = { 'n':'', '#':'♯', '##':'𝄪', 'b':'♭', 'bb':'𝄫' };
+      const cfg = Object.assign({}, d.cfg, { topPad: 20 });
       const picked = new Set(d.picked);
+
+      const marks = {};
       d.errorGroups.forEach(g => {
         const ni = d.groups[g].members[0];
-        marksTop[ni] = picked.has(g) ? '#4b7a5b' : '#a6493b';
+        marks[ni] = picked.has(g) ? '#4b7a5b' : '#a6493b';
       });
-      const notes = drawStaff(idTop, d.seq, d.correctPitch, d.cfg, marksTop);
+      const notes = drawStaff(containerId, d.seq, d.errPitch, cfg, marks);   // 譜面 = 含錯音的版本
 
-      // 誤圈的位置用紅色虛線框標出來
-      const host = document.getElementById(idTop);
-      if(host && notes && notes.length){
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:absolute; inset:0; pointer-events:none;';
-        host.style.position = 'relative';
-        host.appendChild(overlay);
-        d.picked.forEach(g => {
-          if(d.errorGroups.indexOf(g) >= 0) return;
-          const fn = notes[d.groups[g].members[0]]; if(!fn) return;
-          const stave = fn.getStave(); if(!stave) return;
-          const nx = (typeof fn.getAbsoluteX === 'function') ? fn.getAbsoluteX() : stave.getX();
-          const box = document.createElement('div');
-          box.style.cssText = 'position:absolute; border:1.5px dashed var(--wrong); border-radius:7px; background:var(--wrong-soft);';
-          box.style.left = (nx - 9) + 'px';
-          box.style.top = (stave.getYForLine(0) - 22) + 'px';
-          box.style.width = '24px';
-          box.style.height = '112px';
-          overlay.appendChild(box);
-        });
-      }
+      const host = document.getElementById(containerId);
+      if(!host || !notes || !notes.length) return;
+      host.style.position = 'relative';
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:absolute; inset:0; pointer-events:none;';
+      host.appendChild(overlay);
 
-      const marksBottom = {};
-      d.errorIdx.forEach(i => { marksBottom[i] = '#a6493b'; });
-      drawStaff(idBottom, d.seq, d.heardPitch, d.cfg, marksBottom);
+      const boxAt = (g, style) => {
+        const fn = notes[d.groups[g].members[0]]; if(!fn) return null;
+        const stave = fn.getStave(); if(!stave) return null;
+        const nx = (typeof fn.getAbsoluteX === 'function') ? fn.getAbsoluteX() : stave.getX();
+        const box = document.createElement('div');
+        box.style.cssText = 'position:absolute; border-radius:7px;' + style;
+        const boxTop = stave.getYForLine(0) - 16;
+        box.style.left = (nx - 10) + 'px';
+        box.style.top = boxTop + 'px';
+        box.style.width = '26px';
+        box.style.height = '100px';
+        overlay.appendChild(box);
+        return { nx, stave, boxTop };
+      };
+
+      // 錯音：找到＝綠框、漏掉＝紅框，並在上方標示實際聽到的音
+      d.errorGroups.forEach(g => {
+        const found = picked.has(g);
+        const col = found ? 'var(--correct)' : 'var(--wrong)';
+        const pos = boxAt(g, 'border:1.5px solid ' + col + '; background:' + (found ? 'rgba(75,122,91,0.10)' : 'var(--wrong-soft)') + ';');
+        if(!pos) return;
+        const ni = d.groups[g].members[0];
+        const cp = d.correctPitch[ni], ep = d.errPitch[ni];
+        const diff = midiOf(cp) - midiOf(ep);   // 從譜上的錯音要往哪走才是正確音
+        const dirTxt = (diff > 0 ? '↑' : '↓') + (Math.abs(diff) === 1 ? '半音' : '全音');
+        const lab = document.createElement('div');
+        lab.textContent = '應為 ' + cp.step + (ACC_TXT[cp.acc] || '') + ' ' + dirTxt;
+        lab.style.cssText = 'position:absolute; font-family:var(--font-mono); font-size:10px; font-weight:700;'
+          + 'white-space:nowrap; color:' + col + '; transform:translateX(-50%);';
+        lab.style.left = (pos.nx + 3) + 'px';
+        lab.style.top = Math.max(0, pos.boxTop - 15) + 'px';
+        overlay.appendChild(lab);
+      });
+
+      // 圈錯的位置：紅色虛線框
+      d.picked.forEach(g => {
+        if(d.errorGroups.indexOf(g) >= 0) return;
+        boxAt(g, 'border:1.5px dashed var(--wrong); background:var(--wrong-soft);');
+      });
+    },
+
+    // 下方：正確演奏的譜例，對應位置用主色藍標出（與上方的綠／紅區隔）
+    drawCorrectStaff(containerId, d){
+      const marks = {};
+      d.errorGroups.forEach(g => { marks[d.groups[g].members[0]] = '#33415c'; });
+      drawStaff(containerId, d.seq, d.correctPitch, d.cfg, marks);
     },
 
     answerDetail(d){
       const ACC_TXT = { 'n':'', '#':'♯', '##':'𝄪', 'b':'♭', 'bb':'𝄫' };
       const nameOf = p => p.step + (ACC_TXT[p.acc] || '') + p.oct;
-      return d.errorIdx.map(i => '第 ' + (i+1) + ' 音：譜上 ' + nameOf(d.correctPitch[i]) + '　→　實際聽到 ' + nameOf(d.heardPitch[i])).join('\n');
+      return d.errorIdx.map(i => '第 ' + (i+1) + ' 音：譜上寫 ' + nameOf(d.errPitch[i]) + '　→　正確應為 ' + nameOf(d.correctPitch[i])).join('\n');
     },
 
     nextQuestion(){
@@ -1801,7 +1855,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
     currentItem(){
       return {
-        seq: this.seq, correctPitch: this.correctPitch, heardPitch: this.heardPitch,
+        seq: this.seq, correctPitch: this.correctPitch, errPitch: this.errPitch,
         bpm: this.bpm, meter: this.meter, meterType: this.meterType
       };
     },
@@ -1828,12 +1882,12 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         box.innerHTML =
           '<div class="review-label">' + (item.keyName || '無調性') + '｜' + item.meter + '｜' + item.barsCount + ' 小節｜' + item.bpm + ' BPM</div>'
           + '<div class="unified-action-row" style="margin:8px 0 12px;">'
-          + '<button class="play-btn pe-rv-correct">🔊 聽正確版</button>'
-          + '<button class="action-btn pe-rv-heard" style="color:var(--wrong); border-color:var(--wrong);">👂 聽實際演奏</button>'
+          + '<button class="play-btn pe-rv-correct">🎧 聽正確演奏</button>'
+          + '<button class="action-btn pe-rv-heard" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽譜例上寫的</button>'
           + '</div>'
-          + '<div class="review-label">正確樂譜（綠＝你找到的、紅＝漏掉的、虛線框＝圈錯的）：</div>'
+          + '<div class="review-label">題目譜例（含錯音）：綠＝你找到的　｜　紅＝漏掉的　｜　虛線框＝圈錯的；音符上方為正確的音高。</div>'
           + '<div class="review-staff"><div id="pe-rv-top-' + uid + '"></div></div>'
-          + '<div class="review-label" style="margin-top:8px;">實際演奏（紅色為被彈錯的音）：</div>'
+          + '<div class="review-label" style="margin-top:8px;">正確演奏：</div>'
           + '<div class="review-staff"><div id="pe-rv-bot-' + uid + '"></div></div>'
           + '<div class="pe-dbg" style="margin-top:10px;">' + escapeHtml(this.answerDetail(item)) + '</div>';
         list.appendChild(box);
@@ -1842,10 +1896,11 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         box.querySelector('.pe-rv-heard').onclick = () => this.playStatic(item, true);
 
         setTimeout(() => {
-          this.drawAnswerPair('pe-rv-top-' + uid, 'pe-rv-bot-' + uid, item);
+          this.drawAnswerSingle('pe-rv-top-' + uid, item);
+          this.drawCorrectStaff('pe-rv-bot-' + uid, item);
           syncStaffScroll('pe-rv-top-' + uid, 'pe-rv-bot-' + uid);
           ['pe-rv-top-' + uid, 'pe-rv-bot-' + uid].forEach(function(id){
-            const d = document.getElementById(id); const w = d && d.closest('.review-staff');
+            const el = document.getElementById(id); const w = el && el.closest('.review-staff');
             if(w) w.scrollLeft = 0;
           });
         }, 50);
@@ -1860,7 +1915,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
     /* ---------- 播放 ---------- */
     // 解答頁與錯題本用：依該題自身的速度與拍號播放（不動作答狀態、不佔次數）
-    playStatic(item, useHeard){
+    playStatic(item, useScore){
       if(!pianoInst) return;
       window.peStopAll();
       const ctx = ensureAudio();
@@ -1868,7 +1923,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       const secPerUnit = 60 / item.bpm;
       const numerator = parseInt(item.meter.split('/')[0], 10);
       const secPer16th = item.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
-      const src = useHeard ? item.heardPitch : item.correctPitch;
+      const src = useScore ? item.errPitch : item.correctPitch;   // useScore = 播出譜例上寫的（含錯音）
 
       for(let i = 0; i < numerator; i++){
         const o = ctx.createOscillator(), g = ctx.createGain();
@@ -1939,7 +1994,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         while(i < lens.length){
           let total = lens[i]; let tied = tn[i]; let next = i + 1;
           while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
-          const p = this.heardPitch[noteIdx + i];
+          const p = this.correctPitch[noteIdx + i];   // 播放 = 正確版
           if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: 3.5 });
           time += total * secPer16th; i = next;
         }
