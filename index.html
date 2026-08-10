@@ -458,7 +458,26 @@ function showPageId(id){
   document.getElementById(id).classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-function showMenu(){ showPageId('pageMenu'); updateHubBadge(); }
+function showMenu(){ showPageId('pageMenu'); updateHubBadge(); maybeAutoChangelog(); }
+
+/* 版本更新後，第一次從封面進入選單時自動跳出一次更新日誌。
+   比對的是「日誌清單裡的最新版本」而不是 App 版號 ——
+   這樣沒有列入日誌的小修版就不會打擾使用者。 */
+var CHANGELOG_SEEN_KEY = 'earTrainer.changelogSeen';
+function maybeAutoChangelog(){
+  if(!window.CHANGELOG || !CHANGELOG.length) return;
+  var latest = CHANGELOG[CHANGELOG.length - 1].v;
+  var seen = null;
+  try { seen = localStorage.getItem(CHANGELOG_SEEN_KEY); } catch(e){}
+  if(seen === latest) return;
+  // 等待期間不接受操作，避免使用者剛好點到卡片、彈窗蓋在下一頁上面
+  document.body.style.pointerEvents = 'none';
+  setTimeout(function(){
+    document.body.style.pointerEvents = '';
+    try { localStorage.setItem(CHANGELOG_SEEN_KEY, latest); } catch(e){}
+    showChangelog();
+  }, 400);
+}
 function showHub(){ renderHub(); showPageId('pageHub'); }
 function showCover(){ showPageId('pageCover'); }
 /* ===================================================================
@@ -480,7 +499,7 @@ var SPONSORS = [
 /* ===================================================================
  *  更新日誌：由舊到新排列（最新在最下方）。新增一版就在陣列末端加一筆。
  * =================================================================== */
-var CHANGELOG = [
+window.CHANGELOG = [
   { v: 'v.23', items: ['修正音程「複音程」模式下，完全一度與完全八度判定錯誤的問題'] },
   { v: 'v.31', items: ['新增「模擬測驗」：六大項綜合、滿分 100 分，含成績單與長期進步曲線'] },
   { v: 'v.41', items: ['贊助管道新增銀行轉帳與 TWQR 說明', '新增贊助者名單'] },
