@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v81'; // v.81：修正四部和聲記號外洩與八度選擇的邊界問題
+const CACHE_NAME = 'ear-training-shell-v82'; // v.82：大學檔新增「音高的辨認」與配分調整
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

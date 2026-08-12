@@ -448,6 +448,7 @@
   </div>
 </div>
 
+<script src="exam-common.js"></script>
 <script>
 function forceResetCache() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(r => r.forEach(x => x.unregister()));
@@ -1378,6 +1379,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         pianoInst = inst;
         document.getElementById('loadingBanner').style.display = 'none';
         peModule.updatePlayBtn();
+        if(peModule._examReady) peModule._examReady();
       })
       .catch(function(){
         document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>';
@@ -1396,6 +1398,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     meter:'2/4', meterType:'simple', barsCount:2, beatsPerBar:2, bpm:80,
     errCount:2,
     key:null, seq:[], correctPitch:[], errPitch:[], errorIdx:[], errorGroups:[], altIdx:[], leadCount:0,
+    noteBudget:null, pickLimit:0, _onPick:null,
     isPlaying:false, selected:null, submitted:false, replaysLeft:Infinity, maxReplays:Infinity,
     score:{ c:0, t:0 },
 
@@ -1477,7 +1480,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       window.peStopAll();
       const pool = this.rhythmPool();
       const totalBeats = this.barsCount * this.beatsPerBar;
-      const budget = Math.min((NOTE_CAP_PER_BAR[this.meter] || 10) * this.barsCount, NOTE_CAP_ABSOLUTE);
+      const budget = this.noteBudget || Math.min((NOTE_CAP_PER_BAR[this.meter] || 10) * this.barsCount, NOTE_CAP_ABSOLUTE);
 
       let built = null;
       for(let attempt = 0; attempt < 400 && !built; attempt++){
@@ -1672,14 +1675,24 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     toggle(g){
       if(this.submitted) return;
       if(this.selected.has(g)) this.selected.delete(g);
-      else this.selected.add(g);
+      else {
+        // 考試模式最多只能圈與錯音數相同的數量（避免全部圈滿拿滿分）
+        if(this.pickLimit && this.selected.size >= this.pickLimit){
+          const el = document.getElementById('pe-countHint');
+          if(el){ el.textContent = '最多只能圈選 ' + this.pickLimit + ' 個，請先取消一個再改圈別的'; el.style.color = 'var(--wrong)'; setTimeout(() => { el.style.color = ''; this.updateHint(); }, 1800); }
+          return;
+        }
+        this.selected.add(g);
+      }
       this.render();
+      if(this._onPick) this._onPick();
     },
 
     clearPicks(){
       if(this.submitted) return;
       this.selected.clear();
       this.render();
+      if(this._onPick) this._onPick();
     },
 
     updateHint(){
@@ -1860,6 +1873,193 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       };
     },
 
+    /* ---------- 模擬測驗模式 ---------- */
+    examBootstrap(){
+      const EXm = window.EXAM; if(!EXm) return;
+      const KEY = EXm.currentSection(); if(!KEY || KEY.indexOf('pitcherr') !== 0) return;
+      const cfg = EXm.configFor(KEY) || {};
+      const self = this;
+
+      ensureAudio(); window.peStopAll();
+      this.mode = 'test';
+      this.tonal = cfg.tonal || 'tonal';
+      this.krange = cfg.krange || '3';
+      this.kmode = cfg.kmode || 'both';
+      this.clef = cfg.clef || 'treble';
+      this.meter = cfg.meter || '4/4';
+      this.meterType = cfg.meterType || 'simple';
+      this.barsCount = cfg.bars || 4;
+      this.beatsPerBar = parseInt(this.meter.split('/')[0], 10);
+      if(this.meterType === 'compound') this.beatsPerBar /= 3;
+      this.bpm = cfg.bpm || 72;
+      this.errCount = cfg.errCount || 5;
+      this.noteBudget = cfg.noteBudget || null;
+      this.pickLimit = this.errCount;          // 最多只能圈與錯音數相同的數量
+
+      // 題目只產生一次，之後回到這一段題目不變
+      const sd = EXm.sectionData(KEY, function(){
+        self.selected = new Set();
+        self.submitted = false;
+        self.maxReplays = Infinity;
+        self.newQuestion();
+        return { questions: {
+          seq: self.seq.slice(),
+          correctPitch: JSON.parse(JSON.stringify(self.correctPitch)),
+          errPitch: JSON.parse(JSON.stringify(self.errPitch)),
+          errorGroups: self.errorGroups.slice(),
+          errorIdx: self.errorIdx.slice(),
+          keyName: self.key ? self.key.name : null,
+          keyObj: self.key ? JSON.parse(JSON.stringify(self.key)) : null
+        }, labels: {} };
+      });
+      if(!sd) return;
+
+      const q = sd.questions;
+      this.seq = q.seq.slice();
+      this.correctPitch = JSON.parse(JSON.stringify(q.correctPitch));
+      this.errPitch = JSON.parse(JSON.stringify(q.errPitch));
+      this.errorGroups = q.errorGroups.slice();
+      this.errorIdx = q.errorIdx.slice();
+      this.key = q.keyObj ? q.keyObj : null;
+      this.info = analyseSeq(this.seq, this.beatsPerBar);
+      this.selected = new Set((sd.answers && sd.answers.picked) ? sd.answers.picked : []);
+      this.submitted = false;
+      this.maxReplays = Infinity;   // 由考試的播放次數控制，不用練習模式那一套
+
+      showPage('pe-practice');
+      this.render();
+
+      // 版面：隱藏練習模式專用的按鈕
+      // 考試模式已於第一次播放前自動給標準音，不需要那顆按鈕
+      const hide = ['pe-submitBtn', 'pe-clearBtn', 'pe-nextBtn', 'pe-tuningBtn'];
+      hide.forEach(function(id){ const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+      const back = document.querySelector('#pagePEPractice .nav-back-btn'); if(back) back.style.display = 'none';
+      const badge = document.getElementById('pe-statusBadge');
+      if(badge) badge.textContent = (this.clef === 'treble' ? '高音' : '低音') + '｜' + this.meter + '｜' + this.barsCount + ' 小節｜' + this.bpm + ' BPM';
+      const sb = document.querySelector('#pagePEPractice .score-box'); if(sb) sb.style.display = 'none';
+
+      const host = document.getElementById('pagePEPractice');
+      const lockEl = document.querySelector('#pagePEPractice .practice-top-fixed');
+      if(lockEl && !lockEl.id) lockEl.id = 'exam-lockwrap';
+
+      const maxPlays = cfg.plays || 5;
+      let used = (sd.playCount || 0);
+      function headText(){ return '播放剩餘 <b>' + Math.max(0, maxPlays - used) + '</b> / ' + maxPlays + ' 次'; }
+      EXm.buildHeader(host, KEY, headText());
+
+      // 計分：每找到一個錯音得 1 分，誤圈不扣分
+      function saveNow(){
+        const picked = Array.from(self.selected);
+        EXm.saveAnswers(KEY, { picked: picked });
+        let hit = 0;
+        picked.forEach(function(g){ if(self.errorGroups.indexOf(g) >= 0) hit++; });
+        const max = EXm.maxFor(KEY);
+        EXm.saveResult(KEY, {
+          lostUnits: Math.max(0, self.errorGroups.length - hit),
+          max: max,
+          unanswered: picked.length ? 0 : 1,
+          detail: [{ correct: hit === self.errorGroups.length,
+                     your: '找到 ' + hit + ' 個',
+                     right: '共 ' + self.errorGroups.length + ' 個錯音' }]
+        });
+      }
+      saveNow();
+      this._onPick = saveNow;
+
+      // 作答提示改成考試用語
+      this.updateHint = function(){
+        const el = document.getElementById('pe-countHint');
+        if(!el) return;
+        el.textContent = '本題有 ' + self.errorGroups.length + ' 個錯音　｜　已圈選 ' + self.selected.size + ' / ' + self.pickLimit + ' 個';
+      };
+      this.updateHint();
+
+      const pb = document.getElementById('pe-playBtn');
+      function refreshPlayBtn(){
+        const left = maxPlays - used;
+        if(self.isPlaying || self._examTuning){ pb.textContent = '🔊 播放中...'; pb.disabled = true; return; }
+        pb.disabled = !pianoInst || left <= 0;
+        pb.textContent = left > 0 ? ('▶ 播放題目（剩餘 ' + left + ' 次）') : '▶ 已用完播放次數';
+        EXm.buildHeader(host, KEY, headText());
+      }
+      this.updatePlayBtn = function(){ refreshPlayBtn(); };
+      this._examReady = refreshPlayBtn;
+      refreshPlayBtn();
+
+      pb.onclick = function(){
+        ensureAudio();
+        if(!pianoInst || self.isPlaying || self._examTuning || used >= maxPlays) return;
+        const firstTime = (used === 0);
+        used++;
+        const ss = EXm.loadSession();
+        if(ss && ss.data && ss.data[KEY]){ ss.data[KEY].playCount = used; ss.data[KEY].played = true; EXm.saveSession(ss); }
+        EXm.setPlaying(true);
+
+        function runSeq(){
+          self._examTuning = false;
+          self.playCorrectOnce(function(){
+            EXm.setPlaying(false);
+            document.getElementById('pe-playCaption').textContent =
+              (maxPlays - used) > 0 ? ('✅ 播放完畢，可再播 ' + (maxPlays - used) + ' 次') : '✅ 播放次數已用完，請完成作答';
+            refreshPlayBtn();
+          });
+        }
+        if(firstTime){
+          // 考試模式第一次播放前給標準音 A440（2 秒），再進預備拍
+          self._examTuning = true; refreshPlayBtn();
+          document.getElementById('pe-playCaption').textContent = '🎵 標準音 A＝440Hz（2 秒）…';
+          pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: 3.5 });
+          pendingTimers.push(setTimeout(runSeq, 2600));
+        } else {
+          runSeq();
+        }
+        refreshPlayBtn();
+      };
+
+      EXm.guardVisibility(KEY, function(){ window.peStopAll(); self._examTuning = false; EXm.setPlaying(false); refreshPlayBtn(); });
+      EXm.buildBar(host, saveNow);
+    },
+
+    // 播放正確版一次（考試用；不動播放次數，結束後回呼）
+    playCorrectOnce(onEnd){
+      if(!pianoInst) return;
+      const ctx = ensureAudio();
+      let time = ctx.currentTime + 0.1;
+      const secPerUnit = 60 / this.bpm;
+      const numerator = parseInt(this.meter.split('/')[0], 10);
+      const secPer16th = this.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+      for(let i = 0; i < numerator; i++){
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'triangle';
+        o.frequency.value = (this.meterType === 'simple' ? i === 0 : i % 3 === 0) ? 1000 : 700;
+        g.gain.setValueAtTime(0.2, time + i * secPerUnit);
+        g.gain.exponentialRampToValueAtTime(0.01, time + i * secPerUnit + 0.05);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(time + i * secPerUnit); o.stop(time + i * secPerUnit + 0.05);
+      }
+      time += numerator * secPerUnit;
+      let noteIdx = 0;
+      this.seq.forEach(id => {
+        const block = ALL_BLOCKS[id];
+        const lens = block.lengths; const tn = block.tieNext || [];
+        let i = 0;
+        while(i < lens.length){
+          let total = lens[i]; let tied = tn[i]; let next = i + 1;
+          while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
+          const p = this.correctPitch[noteIdx + i];
+          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: 3.5 });
+          time += total * secPer16th; i = next;
+        }
+        noteIdx += lens.length;
+      });
+      this.isPlaying = true; this.updatePlayBtn();
+      document.getElementById('pe-playCaption').textContent = '🔊 播放中...';
+      pendingTimers.push(setTimeout(() => {
+        this.isPlaying = false;
+        if(typeof onEnd === 'function') onEnd();
+      }, (time - ctx.currentTime) * 1000 + 150));
+    },
+
     /* ---------- 錯題本 ---------- */
     refreshReviewCount(){
       const el = document.getElementById('pe-reviewCount');
@@ -2020,6 +2220,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
   document.addEventListener('DOMContentLoaded', function(){
     peModule.initSettings();
+    const EXm = window.EXAM;
+    const examMode = EXm && EXm.isExamMode();
     document.getElementById('pe-playBtn').onclick = () => peModule.play();
     document.getElementById('pe-tuningBtn').onclick = () => peModule.playTuning();
     document.getElementById('pe-clearBtn').onclick = () => peModule.clearPicks();
@@ -2030,6 +2232,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     document.getElementById('pe-ansPlayHeard').onclick = () => peModule.playStatic(peModule.currentItem(), true);
     document.getElementById('pe-clearReviewBtn').onclick = () => peModule.clearReview();
     peModule.refreshReviewCount();
+    if(examMode){ loadPiano(); peModule.examBootstrap(); return; }
     if(location.hash === '#review') showPage('pe-review');
     loadPiano();
   });
