@@ -980,14 +980,14 @@ function showPage(pageId) {
           let newN = this._noteCountOf(seqNow[b]);
           for (let k = 0; k < newN; k++) {
             let src = (k < oldN) ? this.userPitch[part][oldOff + k] : null;
-            newPitch.push(src ? src : { step: defStep, oct: defOct, acc: 'n' });
+            newPitch.push(src ? src : { step: defStep, oct: defOct, acc: 'n', entered: false });
           }
           oldOff += oldN;
         }
       } else {
         let totalNotes = this.getTotalNoteCount(part);
         for (let i = 0; i < totalNotes; i++) {
-          newPitch.push(this.userPitch[part][i] ? this.userPitch[part][i] : { step: defStep, oct: defOct, acc: 'n' });
+          newPitch.push(this.userPitch[part][i] ? this.userPitch[part][i] : { step: defStep, oct: defOct, acc: 'n', entered: false });
         }
       }
       this.userPitch[part] = newPitch;
@@ -1096,7 +1096,7 @@ function showPage(pageId) {
     _applyAccidentalToIdx: function(p, idx, acc) {
       let base = this.userPitch[p][idx];
       // 作答輸入不做異名同音轉換：你按什麼就顯示什麼（A♯ 就是 A♯）。對錯以音高比對，不受拼法影響。
-      let np = { step: base.step, oct: base.oct, acc: acc };
+      let np = { step: base.step, oct: base.oct, acc: acc, entered: !!base.entered };
       this.userPitch[p][idx] = np;
       let propagateIdx = idx;
       while (this.isNoteTiedToNext(p, propagateIdx)) {
@@ -1113,7 +1113,7 @@ function showPage(pageId) {
 
     shiftOctave: function(delta) {
       this.currentOctave += delta;
-      if(this.currentOctave < 2) this.currentOctave = 2; if(this.currentOctave > 6) this.currentOctave = 6;
+      if(this.currentOctave < 1) this.currentOctave = 1; if(this.currentOctave > 7) this.currentOctave = 7;
       this.updateOctaveLabels();
 
       let p = this.activePart;
@@ -1121,8 +1121,8 @@ function showPage(pageId) {
 
       if(targetIdx !== -1 && this.userPitch[p][targetIdx]) {
         this.userPitch[p][targetIdx].oct += delta;
-        if(this.userPitch[p][targetIdx].oct < 2) this.userPitch[p][targetIdx].oct = 2;
-        if(this.userPitch[p][targetIdx].oct > 6) this.userPitch[p][targetIdx].oct = 6;
+        if(this.userPitch[p][targetIdx].oct < 1) this.userPitch[p][targetIdx].oct = 1;
+        if(this.userPitch[p][targetIdx].oct > 7) this.userPitch[p][targetIdx].oct = 7;
 
         let propagateIdx = targetIdx;
         while(this.isNoteTiedToNext(p, propagateIdx)) {
@@ -1142,11 +1142,15 @@ function showPage(pageId) {
       // 八度自動選擇：基準取「同一聲部」該格的前一個音，沒有就用後一音
       let arr = this.userPitch[p];
       let ref = null;
-      for(let i = this.activeNoteIdx[p] - 1; i >= 0; i--){ if(arr[i]){ ref = arr[i]; break; } }
-      if(!ref){ for(let i = this.activeNoteIdx[p] + 1; i < arr.length; i++){ if(arr[i]){ ref = arr[i]; break; } } }
-      let oct = nearestOctFor(step, ref, (p === 'top' ? 4 : 3), 2, 6);
+      for(let i = this.activeNoteIdx[p] - 1; i >= 0; i--){ if(arr[i] && arr[i].entered){ ref = arr[i]; break; } }
+      if(!ref){
+        let nx = this.activeNoteIdx[p] + 1;
+        while(nx < arr.length && this.isNoteTiedToPrevious(p, nx)) nx++;
+        if(arr[nx] && arr[nx].entered) ref = arr[nx];
+      }
+      let oct = nearestOctFor(step, ref, (p === 'top' ? 4 : 3), 1, 7);
 
-      this.userPitch[p][this.activeNoteIdx[p]] = { step: step, oct: oct, acc: this.currentAccidental };
+      this.userPitch[p][this.activeNoteIdx[p]] = { step: step, oct: oct, acc: this.currentAccidental, entered: true };
       this.currentOctave = oct; this.updateOctaveLabels();
 
       let accToApply = this.currentAccidental;
@@ -1154,7 +1158,7 @@ function showPage(pageId) {
 
       let propagateIdx = this.activeNoteIdx[p];
       while(this.isNoteTiedToNext(p, propagateIdx)) {
-        if(propagateIdx + 1 < this.userPitch[p].length) { this.userPitch[p][propagateIdx + 1] = { step: step, oct: oct, acc: accToApply }; }
+        if(propagateIdx + 1 < this.userPitch[p].length) { this.userPitch[p][propagateIdx + 1] = { step: step, oct: oct, acc: accToApply, entered: true }; }
         propagateIdx++;
       }
 

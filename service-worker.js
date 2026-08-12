@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v80'; // v.80：新增 07 音高辨認（找錯音）、八度自動選擇、譜例回到第一小節
+const CACHE_NAME = 'ear-training-shell-v81'; // v.81：修正四部和聲記號外洩與八度選擇的邊界問題
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

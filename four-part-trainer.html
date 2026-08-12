@@ -1645,8 +1645,8 @@ window.addEventListener('resize', setVH); setVH();
       // 八度自動選擇：以前一個小節已輸入的低音為基準，取最近的八度
       let ref = null;
       for(let i = this.activeSlot - 1; i >= 0; i--){ if(this.userBass[i]){ ref = this.userBass[i]; break; } }
-      if(!ref){ for(let i = this.activeSlot + 1; i < this.userBass.length; i++){ if(this.userBass[i]){ ref = this.userBass[i]; break; } } }
-      let oct = nearestOctFor(step, ref, 3, 1, 5);
+      if(!ref && this.userBass[this.activeSlot + 1]) ref = this.userBass[this.activeSlot + 1];   // 只看緊鄰的下一格
+      let oct = nearestOctFor(step, ref, 3, 0, 6);
       
       // 調號智慧連動：沒有明確點選升降記號時（accidentalExplicit=false），嚴格套用調號預設值；
       // 若明確按過 ♯／♭，以調號預設為基準疊加半音；♮ 強制還原；復原(default)回到調號值。
@@ -1685,11 +1685,11 @@ window.addEventListener('resize', setVH); setVH();
          } else if (this.userBass[targetSlot]) {
             if (type === 'bass_oct') {
                 this.userBass[targetSlot].oct += val;
-                if (this.userBass[targetSlot].oct < 1) this.userBass[targetSlot].oct = 1;
-                if (this.userBass[targetSlot].oct > 5) this.userBass[targetSlot].oct = 5;
+                if (this.userBass[targetSlot].oct < 0) this.userBass[targetSlot].oct = 0;
+                if (this.userBass[targetSlot].oct > 6) this.userBass[targetSlot].oct = 6;
                 this.currentOctave += val;
-                if (this.currentOctave < 1) this.currentOctave = 1;
-                if (this.currentOctave > 5) this.currentOctave = 5;
+                if (this.currentOctave < 0) this.currentOctave = 0;
+                if (this.currentOctave > 6) this.currentOctave = 6;
                 this.updateOctaveLabels();
             } else if (type === 'bass_acc') {
                 // 明確點擊升降記號按鈕修改既有音符：
@@ -1699,7 +1699,8 @@ window.addEventListener('resize', setVH); setVH();
                 let currAcc = this.userBass[targetSlot].acc;
                 let appliedAcc = resolveAccidental(val, step0, this.keyObj, currAcc);
                 this.userBass[targetSlot].acc = appliedAcc;
-                this.setAccidental(val, true);
+                // 記號只作用在剛才那個音，不留給下一個音；按鈕高亮回到「跟調號走」
+                this.setAccidental('default', false);
             }
             // 重新計算 MIDI
             let step = this.userBass[targetSlot].step;
