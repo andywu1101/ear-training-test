@@ -1987,6 +1987,18 @@ window.addEventListener('resize', setVH); setVH();
           isSubmitted: true, showAnswer: true, customVoicings: self.questionVoicings, forceCorrectSlots: true });
         var ua = document.getElementById('ansUserScroll'), ca = document.getElementById('ansCorrectScroll');
         if(ua) ua.scrollLeft = 0; if(ca) ca.scrollLeft = 0;
+        // 兩個譜表捲軸同步（與交卷流程相同）
+        if(ua && ca && !ua._syncBound){
+          ua._syncBound = true;
+          var syncing = false;
+          var link = function(from, to){
+            from.addEventListener('scroll', function(){
+              if(syncing){ syncing = false; return; }
+              syncing = true; to.scrollLeft = from.scrollLeft;
+            }, { passive: true });
+          };
+          link(ua, ca); link(ca, ua);
+        }
       }, 80);
       return true;
     },

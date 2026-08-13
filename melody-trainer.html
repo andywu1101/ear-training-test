@@ -689,7 +689,7 @@ function showPage(pageId) {
   // 繪製主譜；靜態渲染（解答頁 / 錯題本）時透過 ctxOverride 指定該題自身的拍號、小節設定（clef 仍由參數指定）
 /* 小節寬度：取「所有相關序列中，單一小節音符最多的那一個」來決定。
      解答頁的兩張譜要傳入同一組序列，才會等寬、捲軸同步時對得齊。 */
-  const NOTE_W = 38;
+  const NOTE_W = 32;
   function maxNotesPerBar(seqs, beatsPerBar){
     let best = 0;
     (seqs || []).forEach(function(seq){

@@ -1300,7 +1300,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         if(beats >= cfg.beatsPerBar){ if(cnt > maxNotesInBar) maxNotesInBar = cnt; cnt = 0; beats = 0; }
       });
       if(cnt > maxNotesInBar) maxNotesInBar = cnt;
-      const minMeasureWidth = Math.max(250, maxNotesInBar * 38);
+      const minMeasureWidth = Math.max(250, maxNotesInBar * 32);
 
       const totalWidth = (minMeasureWidth * cfg.barsCount) + 90;
       const usableWidth = totalWidth - 10;
