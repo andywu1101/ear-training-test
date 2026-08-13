@@ -408,8 +408,8 @@
     <p class="subtitle">收錄答錯的兩聲部題，重整或關閉後仍會保留。可分別聆聽你的作答與正解，並對照紅色標錯音符。</p>
     <div id="tp-reviewList"></div>
       <div class="js-review-links" style="margin-top:20px;">
-        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
-        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+        <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
+        <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
       </div>
     <p id="tp-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
   </div>
@@ -694,7 +694,28 @@ function showPage(pageId) {
       }
       container.innerHTML = '';
 
-      const minMeasureWidth = 240;
+      /* 小節寬度依「該小節音符最多的那一個聲部」自動加寬，
+         避免兩個聲部都是十六分音符時擠成一團。 */
+      let maxNotesInBar = 0;
+      (function(){
+        const countByBar = function(seq){
+          const out = []; let cnt = 0, beats = 0;
+          (seq || []).forEach(function(id){
+            const blk = (id && id !== 'placeholder') ? ALL_BLOCKS[id] : null;
+            cnt += blk ? blk.lengths.length : 1;
+            beats += blk ? blk.beats : 1;
+            if(beats >= cfg.beatsPerBar){ out.push(cnt); cnt = 0; beats = 0; }
+          });
+          if(cnt) out.push(cnt);
+          return out;
+        };
+        const a = countByBar(uSeqT), b = countByBar(uSeqB);
+        for(let i = 0; i < Math.max(a.length, b.length); i++){
+          const n = Math.max(a[i] || 0, b[i] || 0);
+          if(n > maxNotesInBar) maxNotesInBar = n;
+        }
+      })();
+      const minMeasureWidth = Math.max(240, maxNotesInBar * 42);
       const requiredWidth = (minMeasureWidth * cfg.barsCount) + 90;  // +10：終止線較寬，右側多留空間
       const totalWidth = requiredWidth;
       const usableWidth = totalWidth - 30;
