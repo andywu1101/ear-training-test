@@ -2403,6 +2403,31 @@ function syncStaffScroll(idA, idB){
     });
   }catch(e){}
   if(isAnswering()) arm();
+
+  /* 直接攔截邊緣手勢：iOS 的返回是系統層級動作，歷史記號攔不住，
+     必須在手指開始橫move 時就取消。只擋「從左緣 30px 內開始的橫向滑動」，
+     點擊不受影響（等真的橫move 才取消，單純點按不會被吃掉）。 */
+  var EDGE = 30;
+  var startX = null, startY = null, blocking = false;
+  document.addEventListener('touchstart', function(e){
+    blocking = false; startX = null;
+    if(!isAnswering() || !e.touches || e.touches.length !== 1) return;
+    var t = e.touches[0];
+    if(t.clientX <= EDGE){ startX = t.clientX; startY = t.clientY; }
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e){
+    if(startX === null || !isAnswering()) return;
+    var t = e.touches[0];
+    var dx = t.clientX - startX, dy = t.clientY - startY;
+    if(!blocking){
+      if(Math.abs(dx) < 6 && Math.abs(dy) < 6) return;      // 還看不出方向，先不動作
+      blocking = (Math.abs(dx) > Math.abs(dy));             // 橫向為主才攔
+      if(!blocking){ startX = null; return; }               // 直向捲動照常
+    }
+    if(e.cancelable) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchend', function(){ startX = null; blocking = false; }, { passive: true });
+  document.addEventListener('touchcancel', function(){ startX = null; blocking = false; }, { passive: true });
 })();
 </script>
 <script>
