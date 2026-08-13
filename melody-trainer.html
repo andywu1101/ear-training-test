@@ -687,6 +687,25 @@ function showPage(pageId) {
   }
 
   // 繪製主譜；靜態渲染（解答頁 / 錯題本）時透過 ctxOverride 指定該題自身的拍號、小節設定（clef 仍由參數指定）
+/* 小節寬度：取「所有相關序列中，單一小節音符最多的那一個」來決定。
+     解答頁的兩張譜要傳入同一組序列，才會等寬、捲軸同步時對得齊。 */
+  const NOTE_W = 38;
+  function maxNotesPerBar(seqs, beatsPerBar){
+    let best = 0;
+    (seqs || []).forEach(function(seq){
+      if(!seq || !seq.length) return;
+      let cnt = 0, beats = 0;
+      seq.forEach(function(id){
+        const blk = (id && id !== 'placeholder') ? ALL_BLOCKS[id] : null;
+        cnt += blk ? blk.lengths.length : 1;
+        beats += blk ? blk.beats : 1;
+        if(beats >= beatsPerBar){ if(cnt > best) best = cnt; cnt = 0; beats = 0; }
+      });
+      if(cnt > best) best = cnt;
+    });
+    return best;
+  }
+
   function renderMainStaff(containerId, seq, pitchArray, interactive = false, correctSeq = null, correctPitch = null, clef = 'treble', activeTab = 'rhythm', activeSlot = 0, activeNote = 0, ctxOverride = null) {
     try {
       const container = document.getElementById(containerId); if (!container) return;
@@ -700,7 +719,10 @@ function showPage(pageId) {
       }
       container.innerHTML = '';
 
-      const minMeasureWidth = 240; const requiredWidth = (minMeasureWidth * cfg.barsCount) + 70;  // +10：終止線較寬，右側多留空間
+      const _refSeqs = [seq, correctSeq];
+      if(interactive && melModule && melModule.questionSeq) _refSeqs.push(melModule.questionSeq);
+      const minMeasureWidth = Math.max(240, maxNotesPerBar(_refSeqs, cfg.beatsPerBar) * NOTE_W);
+      const requiredWidth = (minMeasureWidth * cfg.barsCount) + 70;  // +10：終止線較寬，右側多留空間
       const totalWidth = requiredWidth; const usableWidth = totalWidth - 10;
       const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(totalWidth, 130);
       const ctx = renderer.getContext();
@@ -785,7 +807,7 @@ function showPage(pageId) {
             let fn = beatFirstNotes[i]; let nn = beatFirstNotes[i+1];
             let stave = fn.getStave(); if(!stave) continue;
             let nx = typeof fn.getAbsoluteX === 'function' ? fn.getAbsoluteX() : stave.getX() + fn.getTickContext().getX();
-            let x = nx - 12; let y = stave.getYForLine(0) - 20; let h = 110; let w = 30;
+            let x = nx - 12; let y = stave.getYForLine(0) - 18; let h = 86; let w = 30;
             if(nn && nn.getStave() === stave) {
               let n2x = typeof nn.getAbsoluteX === 'function' ? nn.getAbsoluteX() : stave.getX() + nn.getTickContext().getX();
               w = n2x - nx;
@@ -806,7 +828,7 @@ function showPage(pageId) {
             let fn = allIndividualNotes[i];
             let stave = fn.getStave(); if(!stave) continue;
             let nx = typeof fn.getAbsoluteX === 'function' ? fn.getAbsoluteX() : stave.getX() + fn.getTickContext().getX();
-            let x = nx - 8; let y = stave.getYForLine(0) - 20; let h = 110; let w = 22;
+            let x = nx - 8; let y = stave.getYForLine(0) - 18; let h = 86; let w = 22;
 
             let nn = null;
             for (let nextI = i + 1; nextI < allIndividualNotes.length; nextI++) {

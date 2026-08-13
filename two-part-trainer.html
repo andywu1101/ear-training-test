@@ -681,6 +681,25 @@ function showPage(pageId) {
   }
 
   // 繪製大譜表；靜態渲染（解答頁 / 錯題本）時透過 ctxOverride 指定該題自身的拍號、小節設定
+/* 小節寬度：取「所有相關序列中，單一小節音符最多的那一個」來決定。
+     解答頁的兩張譜要傳入同一組序列，才會等寬、捲軸同步時對得齊。 */
+  const NOTE_W = 38;
+  function maxNotesPerBar(seqs, beatsPerBar){
+    let best = 0;
+    (seqs || []).forEach(function(seq){
+      if(!seq || !seq.length) return;
+      let cnt = 0, beats = 0;
+      seq.forEach(function(id){
+        const blk = (id && id !== 'placeholder') ? ALL_BLOCKS[id] : null;
+        cnt += blk ? blk.lengths.length : 1;
+        beats += blk ? blk.beats : 1;
+        if(beats >= beatsPerBar){ if(cnt > best) best = cnt; cnt = 0; beats = 0; }
+      });
+      if(cnt > best) best = cnt;
+    });
+    return best;
+  }
+
   function renderGrandStaff(containerId, uSeqT, uSeqB, uPitchT, uPitchB, interactive, cSeqT, cSeqB, cPitchT, cPitchB, activeTab, activePart, activeSlot, activeNote, ctxOverride) {
     try {
       const container = document.getElementById(containerId); if (!container) return;
@@ -694,28 +713,9 @@ function showPage(pageId) {
       }
       container.innerHTML = '';
 
-      /* 小節寬度依「該小節音符最多的那一個聲部」自動加寬，
-         避免兩個聲部都是十六分音符時擠成一團。 */
-      let maxNotesInBar = 0;
-      (function(){
-        const countByBar = function(seq){
-          const out = []; let cnt = 0, beats = 0;
-          (seq || []).forEach(function(id){
-            const blk = (id && id !== 'placeholder') ? ALL_BLOCKS[id] : null;
-            cnt += blk ? blk.lengths.length : 1;
-            beats += blk ? blk.beats : 1;
-            if(beats >= cfg.beatsPerBar){ out.push(cnt); cnt = 0; beats = 0; }
-          });
-          if(cnt) out.push(cnt);
-          return out;
-        };
-        const a = countByBar(uSeqT), b = countByBar(uSeqB);
-        for(let i = 0; i < Math.max(a.length, b.length); i++){
-          const n = Math.max(a[i] || 0, b[i] || 0);
-          if(n > maxNotesInBar) maxNotesInBar = n;
-        }
-      })();
-      const minMeasureWidth = Math.max(240, maxNotesInBar * 42);
+      const _refSeqs = [uSeqT, uSeqB, cSeqT, cSeqB];
+      if(interactive && tpModule && tpModule.questionSeq){ _refSeqs.push(tpModule.questionSeq.top, tpModule.questionSeq.bottom); }
+      const minMeasureWidth = Math.max(240, maxNotesPerBar(_refSeqs, cfg.beatsPerBar) * NOTE_W);
       const requiredWidth = (minMeasureWidth * cfg.barsCount) + 90;  // +10：終止線較寬，右側多留空間
       const totalWidth = requiredWidth;
       const usableWidth = totalWidth - 30;
@@ -834,12 +834,12 @@ function showPage(pageId) {
 
                let x, y, h, w;
                if(type === 'slot') {
-                   x = nx - 12; y = stave.getYForLine(0) - 10; h = 80; w = 30;
+                   x = nx - 12; y = stave.getYForLine(0) - 15; h = 86; w = 30;
                    let nn = itemArr[i+1];
                    if(nn && nn.getStave() === stave) { w = (typeof nn.getAbsoluteX === 'function' ? nn.getAbsoluteX() : stave.getX() + nn.getTickContext().getX()) - nx; }
                    else { w = stave.getX() + stave.getWidth() - nx + 10; }
                } else {
-                   x = nx - 8; y = stave.getYForLine(0) - 10; h = 80; w = 22;
+                   x = nx - 8; y = stave.getYForLine(0) - 15; h = 86; w = 22;
                    let nn = null;
                    for(let nextI = i + 1; nextI < itemArr.length; nextI++) {
                        if(!tpModule.isNoteTiedToPrevious(sName, nextI)) { nn = itemArr[nextI]; break; }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v83'; // v.83：模擬考試回顧（第一段）
+const CACHE_NAME = 'ear-training-shell-v84'; // v.84：錯題本與譜例顯示優化、多項修正
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
