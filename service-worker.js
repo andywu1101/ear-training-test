@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v82'; // v.82：大學檔新增「音高的辨認」與配分調整
+const CACHE_NAME = 'ear-training-shell-v83'; // v.83：模擬考試回顧（第一段）
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

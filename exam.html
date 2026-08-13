@@ -83,6 +83,30 @@
   .review-acc{ margin-top:14px; }
   .acc-head{ width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; gap:10px; font-family:var(--font-body); font-weight:700; font-size:14px; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:13px 16px; cursor:pointer; touch-action:manipulation; }
   .acc-body{ display:none; padding:6px 4px 2px; }
+  /* 模擬考試回顧 */
+  .paper-item{ width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:14px 16px; margin-bottom:10px; cursor:pointer; font-family:var(--font-body); transition:all .15s ease; }
+  .paper-item:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  .paper-item.plain{ cursor:default; opacity:.7; }
+  .paper-item.plain:hover{ border-color:var(--panel-border); background:var(--panel); }
+  .pi-left{ display:flex; flex-direction:column; gap:3px; }
+  .pi-preset{ font-weight:700; font-size:14.5px; color:var(--ink); }
+  .pi-when{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-soft); }
+  .pi-old{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); border:1px dashed var(--panel-border); border-radius:999px; padding:2px 8px; margin-top:2px; align-self:flex-start; }
+  .pi-pct{ font-family:var(--font-mono); font-weight:700; font-size:18px; color:var(--accent); white-space:nowrap; }
+  .pi-pct small{ font-size:11px; color:var(--ink-soft); font-weight:500; }
+  .sec-item{ width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:13px 16px; margin-bottom:8px; font-family:var(--font-body); font-size:14px; color:var(--ink); }
+  .sec-item.can{ cursor:pointer; }
+  .sec-item.grp{ cursor:pointer; font-weight:700; }
+  .sec-item.grp:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  .grp-car{ font-size:11px; color:var(--ink-soft); margin-left:4px; }
+  .pooled-note{ display:block; font-family:var(--font-mono); font-size:11px; font-weight:500; color:var(--ink-soft); margin-top:3px; }
+  .sec-subs{ margin:0 0 8px 22px; }
+  .sec-item.sub{ background:transparent; font-size:13.5px; color:var(--ink-soft); margin-bottom:6px; }
+  .sec-item.sub.can:hover{ background:var(--accent-soft); }
+  .sec-item.can:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  .sec-score{ font-family:var(--font-mono); font-weight:700; white-space:nowrap; }
+  .sec-score.full{ color:var(--correct); }
+  .sec-score.part{ color:var(--wrong); }
   .acc-body.open{ display:block; }
   .q-item{ display:flex; align-items:center; gap:10px; font-size:13px; padding:8px 6px; border-top:1px dashed var(--hairline); }
   .q-item:first-child{ border-top:none; }
@@ -173,6 +197,32 @@
     <div id="resultReview" class="review-acc"></div>
     <div class="btn-col">
       <button class="big-btn" id="againBtn">再考一次 →</button>
+      <button class="ghost-btn" id="resultReviewBtn" style="display:none;">📝 回顧此考卷錯題</button>
+      <button class="ghost-btn" onclick="goPapers()">📚 模擬考錯題本目錄</button>
+      <button class="ghost-btn" onclick="goHistory()">📈 查看歷史趨勢</button>
+      <button class="ghost-btn" onclick="location.href='index.html#menu'">🏠 回選單</button>
+    </div>
+  </div>
+
+  <!-- 模擬考試回顧：考卷清單 -->
+  <div id="pagePapers" class="page-view">
+    <button class="nav-back-btn" onclick="location.href='index.html#hub'">← 返回</button>
+    <h1>模擬考錯題本目錄</h1>
+    <p class="subtitle">選一份考卷，逐大項回顧題目與你的作答。可重播、對照正解，沒有次數限制。</p>
+    <div id="paperList"></div>
+    <div id="paperFoot" style="text-align:right;margin-top:14px;"></div>
+  </div>
+
+  <!-- 模擬考試回顧：單份考卷的分項 -->
+  <div id="pagePaper" class="page-view">
+    <button class="nav-back-btn" onclick="goPapers()">← 考卷清單</button>
+    <h1 id="paperTitle">考卷回顧</h1>
+    <p class="subtitle" id="paperSub"></p>
+    <div id="paperHero"></div>
+    <div id="paperSections"></div>
+    <div class="btn-col" style="margin-top:18px;">
+      <button class="big-btn" id="paperAgainBtn">再考一次 →</button>
+      <button class="ghost-btn" onclick="goPapers()">📚 模擬考錯題本目錄</button>
       <button class="ghost-btn" onclick="goHistory()">📈 查看歷史趨勢</button>
       <button class="ghost-btn" onclick="location.href='index.html#menu'">🏠 回選單</button>
     </div>
@@ -182,7 +232,7 @@
   <div id="pageHistory" class="page-view">
     <button class="nav-back-btn" onclick="goStart()">← 返回</button>
     <h1>歷史趨勢</h1>
-    <p class="subtitle">縱軸為得分率 %。兩個檔位分開比較。</p>
+    <p class="subtitle">縱軸為分數（滿分 100）。兩個檔位分開比較。</p>
     <div class="hist-tabs" id="histTabs"></div>
     <div id="histStats"></div>
     <div class="chart-wrap" id="chartWrap"></div>
@@ -263,8 +313,8 @@
     var pname = (EX.PRESETS[presetOfRec(rec)]||{}).label || rec.scope || '標準考卷';
     qs('resultScope').textContent = pname;
     qs('resultHero').innerHTML =
-      '<div class="score-hero"><div class="pct">'+rec.pct+'<span style="font-size:28px;">%</span></div>' +
-      '<div class="raw">'+rec.total+' / '+rec.max+' 分</div></div>';
+      '<div class="score-hero"><div class="pct">'+rec.total+'<span style="font-size:28px;">分</span></div>' +
+      '<div class="raw">滿分 '+rec.max+'</div></div>';
     var rows = rowsOf(rec);
     qs('resultSections').innerHTML = rows.map(function(r){
       var w = r.max>0 ? Math.round(r.score/r.max*100) : 0;
@@ -300,15 +350,15 @@
       }).join('');
     qs('histStats').innerHTML = st ? (
       '<div class="stat-row">' +
-      '<div class="stat-chip"><div class="k">最佳</div><div class="v">'+st.best+'<small>%</small></div></div>' +
-      '<div class="stat-chip"><div class="k">最近</div><div class="v">'+st.last+'<small>%</small></div></div>' +
-      '<div class="stat-chip"><div class="k">平均</div><div class="v">'+st.avg+'<small>%</small></div></div>' +
+      '<div class="stat-chip"><div class="k">最佳</div><div class="v">'+st.best+'<small>分</small></div></div>' +
+      '<div class="stat-chip"><div class="k">最近</div><div class="v">'+st.last+'<small>分</small></div></div>' +
+      '<div class="stat-chip"><div class="k">平均</div><div class="v">'+st.avg+'<small>分</small></div></div>' +
       '<div class="stat-chip"><div class="k">次數</div><div class="v">'+st.count+'</div></div>' +
       '</div>') : '';
     qs('chartWrap').innerHTML = chartSVG(h.map(function(r){ return r.pct; }));
     qs('histList').innerHTML = h.slice().reverse().map(function(r){
       return '<div class="hist-item"><span class="hist-when">'+fmtDate(r.date)+'</span>' +
-        '<span class="hist-pct">'+r.pct+'% <small>('+r.total+'/'+r.max+')</small></span></div>';
+        '<span class="hist-pct">'+r.total+' <small>分</small></span></div>';
     }).join('') || '<div class="muted">這個檔位還沒有紀錄。</div>';
   }
 
@@ -328,10 +378,130 @@
       pcts.map(function(v,i){ return X(i).toFixed(1)+','+Y(v).toFixed(1); }).join(' ')+'"/>';
     var dots = pcts.map(function(v,i){ return '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="3.5" fill="#33415c"/>'; }).join('');
     var lastLbl='';
-    if(n){ var lv=pcts[n-1]; lastLbl='<text x="'+X(n-1).toFixed(1)+'" y="'+(Y(lv)-9).toFixed(1)+'" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700" fill="#33415c">'+lv+'%</text>'; }
-    return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="得分率趨勢圖">'+grid+line+dots+lastLbl+'</svg>';
+    if(n){ var lv=pcts[n-1]; lastLbl='<text x="'+X(n-1).toFixed(1)+'" y="'+(Y(lv)-9).toFixed(1)+'" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="12" font-weight="700" fill="#33415c">'+lv+'</text>'; }
+    return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="分數趨勢圖">'+grid+line+dots+lastLbl+'</svg>';
   }
   function clearHist(){ if(window.confirm('確定清空所有模擬測驗歷史紀錄嗎？此動作無法復原。')){ EX.clearHistory(); renderHistory(); renderStart(); } }
+
+  /* ---------- 模擬考試回顧 ---------- */
+  /* 成績單的分項列（rows）與考卷段落（queue）的對應：
+     rows 是依 preset.groups 產生的，順序與 groups 一致，
+     每一列的 keys 就是它對應的段落。 */
+  /* 已經接上「考卷回顧模式」的段落；其餘只顯示得分、不可點入。
+     每接好一個練習頁就把它加進來。 */
+  var REVIEW_READY = { pitcherr1: 1, pitcherr2: 1, interval: 1, chord: 1,
+                       rhythm1: 1, rhythm2: 1, rhythm3: 1,
+                       melody1: 1, melody2: 1, twopart: 1, fourpart: 1 };
+
+  /* 依大題編號把分項收攏成「母項 + 子項」。
+     母項顯示大題總分、可點擊收合；子項是各小題，點進去看譜。 */
+  function groupsOfPaper(p){
+    var preset = EX.PRESETS[p.preset || 'standard'] || EX.PRESETS.standard;
+    var byNo = {}, order = [];
+    (preset.groups || []).forEach(function(g, i){
+      var row = (p.rows || [])[i] || {};
+      var no = g.no || '';
+      if(!byNo[no]){ byNo[no] = { no: no, label: g.label || '', total: 0, max: 0, pooled: false, subs: [] }; order.push(no); }
+      var G = byNo[no];
+      G.label = g.label || G.label;
+      G.total += (row.score || 0);
+      G.max   += (row.max != null ? row.max : g.max) || 0;
+      var keys = g.keys || [];
+      if(keys.length <= 1){
+        var k = keys[0] || null;
+        G.subs.push({ key: k, score: row.score, max: (row.max != null ? row.max : g.max),
+                      can: !!(k && REVIEW_READY[k]) && !!(p.data && p.data[k]) });
+      } else {
+        /* 多題共用扣分池（高中檔的節奏）：只有一個總分，子項不顯示個別分數 */
+        G.pooled = true;
+        keys.forEach(function(k){
+          G.subs.push({ key: k, score: null, max: null,
+                        can: !!REVIEW_READY[k] && !!(p.data && p.data[k]) });
+        });
+      }
+    });
+    return order.map(function(n){ return byNo[n]; });
+  }
+
+  function togglePaperGroup(i){
+    var box = qs('paperGrp' + i); if(!box) return;
+    var open = box.style.display !== 'none';
+    box.style.display = open ? 'none' : '';
+    var car = qs('paperCar' + i); if(car) car.textContent = open ? '▸' : '▾';
+  }
+
+  function goPapers(){ renderPapers(); showView('pagePapers'); }
+
+  function renderPapers(){
+    var papers = EX.loadPapers();
+    var byId = {}; papers.forEach(function(x){ byId[x.id] = x; });
+    var hist = EX.loadHistory().slice().reverse();
+    if(!hist.length){
+      qs('paperList').innerHTML = '<div class="muted">還沒有考試紀錄，先考一份考卷吧。</div>';
+      qs('paperFoot').innerHTML = '';
+      return;
+    }
+    qs('paperList').innerHTML = hist.map(function(r){
+      var pid = presetOfRec(r);
+      var name = (EX.PRESETS[pid] || {}).short || pid;
+      var full = byId[r.id];
+      if(full){
+        return '<button class="paper-item" onclick="openPaper(\''+esc(r.id)+'\')">' +
+          '<span class="pi-left"><span class="pi-preset">'+esc(name)+'</span>' +
+          '<span class="pi-when">'+fmtDate(r.date)+'</span></span>' +
+          '<span class="pi-pct">'+r.total+'<small> 分</small></span></button>';
+      }
+      return '<div class="paper-item plain">' +
+        '<span class="pi-left"><span class="pi-preset">'+esc(name)+'</span>' +
+        '<span class="pi-when">'+fmtDate(r.date)+'</span>' +
+        '<span class="pi-old">舊紀錄 · 僅有成績</span></span>' +
+        '<span class="pi-pct">'+r.total+'<small> 分</small></span></div>';
+    }).join('');
+    var kb = EX.papersSizeKB();
+    qs('paperFoot').innerHTML =
+      '<span class="muted" style="font-size:12px;margin-right:10px;">已保留 '+papers.length+' / '+EX.PAPERS_CAP+' 份（約 '+kb+' KB）</span>' +
+      '<button class="danger-btn" onclick="clearPapersAll()">🗑️ 清空回顧資料</button>';
+  }
+
+  function clearPapersAll(){
+    if(!window.confirm('確定清空所有考卷回顧資料嗎？歷史成績與趨勢圖不會受影響。')) return;
+    EX.clearPapers(); renderPapers();
+  }
+
+  function openPaper(id){
+    var p = EX.getPaper(id); if(!p) return;
+    var pid = p.preset || 'standard';
+    qs('paperTitle').textContent = ((EX.PRESETS[pid]||{}).short || pid) + ' 考卷回顧';
+    qs('paperSub').textContent = fmtDate(p.date) + '　·　點選任一大項，即可回到該練習頁看譜、重播並對照正解。';
+    qs('paperHero').innerHTML =
+      '<div class="score-hero"><div class="pct">'+p.total+'<span style="font-size:28px;">分</span></div>' +
+      '<div class="raw">滿分 '+p.max+'</div></div>';
+    qs('paperSections').innerHTML = groupsOfPaper(p).map(function(G, gi){
+      var gFull = (G.max > 0 && G.total >= G.max);
+      var head = '<button class="sec-item grp" onclick="togglePaperGroup('+gi+')">' +
+        '<span>' + esc(G.no + '、' + G.label) + '</span>' +
+        '<span class="sec-score '+(gFull?'full':'part')+'">' + (Math.round(G.total*100)/100) + ' / ' + G.max +
+        ' <span class="grp-car" id="paperCar'+gi+'">▾</span></span></button>';
+      /* 子項只顯示題號，分數一律看母項就好（畫面比較乾淨） */
+      var subs = G.subs.map(function(x, si){
+        var name = '第 ' + (si + 1) + ' 題';
+        var sc = '<span class="sec-score">' + (x.can ? '▸' : '') + '</span>';
+        if(!x.can) return '<div class="sec-item sub">' + esc(name) + sc + '</div>';
+        return '<button class="sec-item sub can" onclick="openSection(\''+esc(id)+'\',\''+esc(x.key)+'\')">' + esc(name) + sc + '</button>';
+      }).join('');
+      return head + '<div class="sec-subs" id="paperGrp'+gi+'">' + subs + '</div>';
+    }).join('');
+
+    var ag = qs('paperAgainBtn');
+    if(ag){ ag.textContent = '再考一次（' + ((EX.PRESETS[pid]||{}).short || '') + '）→';
+            ag.onclick = function(){ startExam(pid); }; }
+    showView('pagePaper');
+  }
+
+  function openSection(id, key){
+    var def = EX.SECTIONS[key]; if(!def) return;
+    location.href = def.page + '?paper=' + encodeURIComponent(id) + '&section=' + encodeURIComponent(key);
+  }
 
   /* ---------- 進入點 ---------- */
   (function(){
@@ -339,14 +509,25 @@
     if(params.get('done')==='1'){
       var rec = EX.finalize();
       if(!rec){ var h = EX.loadHistory(); rec = h.length ? h[h.length-1] : null; }
+      /* 交卷後直接顯示「考卷回顧」—— 內容與舊成績單相同，但每一大項都能點進去複習。
+         只有在沒有完整考卷資料時（舊紀錄、或儲存空間不足）才退回舊的成績單。 */
+      if(rec && EX.getPaper(rec.id)){ openPaper(rec.id); return; }
       renderResult(rec); showView('pageResult');
       var again = qs('againBtn');
       if(again){ var pid = presetOfRec(rec||{}); again.textContent = '再考一次（'+((EX.PRESETS[pid]||{}).short||'')+'）→';
                  again.onclick = function(){ startExam(pid); }; }
       return;
     }
+    var hp = /^#paper=(.+)$/.exec(location.hash || '');
+    if(hp){ openPaper(decodeURIComponent(hp[1])); return; }
+    if(location.hash === '#papers'){ goPapers(); return; }
     renderStart(); showView('pageStart');
   })();
+  window.addEventListener('hashchange', function(){
+    var m = /^#paper=(.+)$/.exec(location.hash || '');
+    if(m){ openPaper(decodeURIComponent(m[1])); return; }
+    if(location.hash === '#papers') goPapers();
+  });
 </script>
 </body>
 </html>

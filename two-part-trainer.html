@@ -381,6 +381,18 @@
     <div class="unified-action-row" style="margin-top:18px;">
       <button class="action-btn btn-submit" id="tp-ansNextBtn" style="flex:1; padding:14px;">下一題 →</button>
     </div>
+    <div class="unified-action-row js-paper-links" style="margin-top:10px; display:none;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" id="tp-paperBack">📝 回顧此考卷錯題</button>
+    </div>
+    <div class="unified-action-row js-paper-links" style="margin-top:10px; display:none;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='exam.html#papers'">📚 模擬考錯題本目錄</button>
+    </div>
+    <div class="unified-action-row js-review-links" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="showPage('tp-review')">📕 本項錯題本</button>
+    </div>
+    <div class="unified-action-row js-review-links" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#hub-practice'">📘 錯題本目錄</button>
+    </div>
     <div class="unified-action-row" style="margin-top:10px;">
       <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
     </div>
@@ -463,6 +475,52 @@ function resetReviewScroll(ids){
     var w = d.closest('.review-staff') || d.closest('.staff-scroll-container');
     if(w) w.scrollLeft = 0;
   });
+}
+
+/* 考卷回顧：共用的頁首處理（標題、得分、隱藏「下一題」、顯示回顧按鈕） */
+function setPaperHead(p, KEY, badgeId, scoreId, fbId, nextBtnId, backBtnId, paperId){
+  var EXm = window.EXAM;
+  var preset = (EXm.PRESETS[p.preset || 'standard'] || {});
+  var secLabel = (EXm.SECTIONS[KEY] || {}).label || '';
+  var when = (function(ts){ try{ var d = new Date(ts);
+    return d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0');
+  }catch(e){ return ''; } })(p.date);
+
+  // 從成績單的分項列找出這一段的得分
+  var score = null, max = null;
+  (preset.groups || []).forEach(function(g, i){
+    if(g.keys && g.keys.length === 1 && g.keys[0] === KEY){
+      var row = (p.rows || [])[i] || {};
+      score = row.score; max = (row.max != null) ? row.max : g.max;
+    }
+  });
+
+  var badge = document.getElementById(badgeId);
+  if(badge) badge.textContent = (preset.short || '') + '　·　' + when + '　·　' + secLabel;
+  var sc = document.getElementById(scoreId);
+  if(sc && score != null) sc.textContent = score + ' / ' + max;
+  var fb = document.getElementById(fbId);
+  if(fb && score != null){
+    var full = (score >= max);
+    var base = (fb.className.indexOf('feedback-text') >= 0) ? 'feedback-text ' : 'answer-big-feedback ';
+    fb.className = base + (full ? 'correct' : 'wrong');
+    fb.textContent = full ? '✓ 這一項全對' : ('得分 ' + score + ' / ' + max);
+  }
+  var nb = document.getElementById(nextBtnId); if(nb) nb.style.display = 'none';
+  var bb = document.getElementById(backBtnId);
+  if(bb) bb.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); };
+  Array.prototype.forEach.call(document.querySelectorAll('.js-paper-links'), function(el){ el.style.display = ''; });
+  Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
+}
+
+/* 進入點：網址帶 ?paper=&section= 時，改走考卷回顧 */
+function bootPaperReview(mod){
+  try{
+    var q = new URLSearchParams(location.search);
+    var pid = q.get('paper'), sec = q.get('section');
+    if(!pid || !sec || !window.EXAM || !mod || !mod.paperReview) return false;
+    return !!mod.paperReview(pid, sec);
+  }catch(e){ return false; }
 }
 
 function showPage(pageId) {
@@ -1218,6 +1276,36 @@ function showPage(pageId) {
     },
 
     /* ===== 模擬測驗：考試模式 ===== */
+    paperReview: function(paperId, KEY){
+      const EXm = window.EXAM; if(!EXm) return false;
+      const p = EXm.getPaper(paperId); if(!p) return false;
+      const d = p.data && p.data[KEY]; if(!d || !d.questions) return false;
+      const cfg = (p.config && p.config[KEY]) || {};
+      const item = { meter: cfg.meter, meterType: cfg.meterType, barsCount: cfg.bars,
+                     beatsPerBar: (function(){ var b = parseInt((cfg.meter||'4/4').split('/')[0],10); return cfg.meterType==='compound' ? b/3 : b; })(),
+                     bpm: cfg.bpm || 70 };
+      const q = d.questions, a = d.answers || {};
+      const cSeqT = (q.seq && q.seq.top) ? q.seq.top.slice() : [];
+      const cSeqB = (q.seq && q.seq.bottom) ? q.seq.bottom.slice() : [];
+      const cPitT = (q.pitch && q.pitch.top) ? JSON.parse(JSON.stringify(q.pitch.top)) : [];
+      const cPitB = (q.pitch && q.pitch.bottom) ? JSON.parse(JSON.stringify(q.pitch.bottom)) : [];
+      const uSeqT = (a.seq && a.seq.top) ? a.seq.top.slice() : [];
+      const uSeqB = (a.seq && a.seq.bottom) ? a.seq.bottom.slice() : [];
+      const uPitT = (a.pitch && a.pitch.top) ? JSON.parse(JSON.stringify(a.pitch.top)) : [];
+      const uPitB = (a.pitch && a.pitch.bottom) ? JSON.parse(JSON.stringify(a.pitch.bottom)) : [];
+      setPaperHead(p, KEY, 'tp-ansBadge', 'tp-ansScore', 'tp-ansFeedback', 'tp-ansNextBtn', 'tp-paperBack', paperId);
+      showPage('tp-answer');
+      setTimeout(function(){
+        renderStaticGrand('tp-ansUser', uSeqT, uSeqB, uPitT, uPitB, cSeqT, cSeqB, cPitT, cPitB, item);
+        renderStaticGrand('tp-ansCorrect', cSeqT, cSeqB, cPitT, cPitB, null, null, null, null, item);
+        syncStaffScroll('tp-ansUser', 'tp-ansCorrect');
+        resetReviewScroll(['tp-ansUser','tp-ansCorrect']);
+      }, 60);
+      document.getElementById('tp-ansPlayUser').onclick = function(){ playStaticGrand(uSeqT, uSeqB, uPitT, uPitB, item); };
+      document.getElementById('tp-ansPlayCorrect').onclick = function(){ playStaticGrand(cSeqT, cSeqB, cPitT, cPitB, item); };
+      return true;
+    },
+
     examBootstrap: function() {
       const EXm = window.EXAM; if(!EXm) return;
       const KEY = EXm.currentSection(); if(KEY !== 'twopart') return;
@@ -1679,7 +1767,8 @@ function showPage(pageId) {
 
   window.tpModule = tpModule;
   tpModule.initSettings(); tpModule.setupEvents(); tpModule.refreshReviewCount(); loadPiano();
-  if(window.EXAM && window.EXAM.isExamMode()){ tpModule.examBootstrap(); }
+  if(bootPaperReview(tpModule)){ /* 考卷回顧 */ }
+  else if(window.EXAM && window.EXAM.isExamMode()){ tpModule.examBootstrap(); }
 
   /* 「🎵 標準音 A」按鈕：隨時可按，播放 A4（440Hz）2 秒，不影響題目播放次數 */
   (function(){
@@ -1741,6 +1830,17 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 <script>
 (function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
   setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+</script>
+<script>
+/* 考試作答中與考卷回顧模式：不顯示「錯題本」相關按鈕 */
+(function(){
+  try{
+    var p = new URLSearchParams(location.search);
+    if((window.EXAM && EXAM.isExamMode()) || p.get('paper')){
+      Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
+    }
+  }catch(e){}
+})();
 </script>
 <script>
 /* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */

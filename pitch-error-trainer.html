@@ -394,6 +394,7 @@
     <div class="unified-action-row" style="margin-bottom:14px;">
       <button class="play-btn" id="pe-ansPlayCorrect">🎧 聽正確演奏</button>
       <button class="action-btn" id="pe-ansPlayHeard" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽譜例上寫的</button>
+      <button class="action-btn" id="pe-ansTuning" style="display:none;" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
     </div>
 
     <div class="review-label">題目譜例（含錯音）：綠色＝你找到的　｜　紅色＝漏掉的　｜　紅色虛線框＝圈錯的位置；音符上方標示正確的音高。</div>
@@ -405,6 +406,16 @@
 
     <div class="unified-action-row" style="margin-top:18px;">
       <button class="action-btn btn-submit" id="pe-ansNextBtn" style="flex:1; padding:14px;">下一題 →</button>
+      <button class="action-btn btn-submit" id="pe-ansBackPaper" style="flex:1; padding:14px; display:none;">📝 回顧此考卷錯題</button>
+    </div>
+    <div class="unified-action-row js-review-links" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="showPage('pe-review')">📕 本項錯題本</button>
+    </div>
+    <div class="unified-action-row js-review-links" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#hub-practice'">📘 錯題本目錄</button>
+    </div>
+    <div class="unified-action-row" id="pe-ansPaperDir" style="margin-top:10px; display:none;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='exam.html#papers'">📚 模擬考錯題本目錄</button>
     </div>
     <div class="unified-action-row" style="margin-top:10px;">
       <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
@@ -1873,6 +1884,84 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       };
     },
 
+    /* ---------- 考卷回顧模式（從模擬考試回顧點進來） ---------- */
+    paperReviewBootstrap(paperId, KEY){
+      const EXm = window.EXAM; if(!EXm) return false;
+      const p = EXm.getPaper(paperId); if(!p) return false;
+      const d = p.data && p.data[KEY]; if(!d || !d.questions) return false;
+      const cfg = (p.config && p.config[KEY]) || {};
+      const q = d.questions;
+
+      this.mode = 'review';
+      this.clef = cfg.clef || 'treble';
+      this.meter = cfg.meter || '4/4';
+      this.meterType = cfg.meterType || 'simple';
+      this.barsCount = cfg.bars || 4;
+      this.beatsPerBar = parseInt(this.meter.split('/')[0], 10);
+      if(this.meterType === 'compound') this.beatsPerBar /= 3;
+      this.bpm = cfg.bpm || 72;
+
+      this.seq = (q.seq || []).slice();
+      this.correctPitch = JSON.parse(JSON.stringify(q.correctPitch || []));
+      this.errPitch = JSON.parse(JSON.stringify(q.errPitch || []));
+      this.errorGroups = (q.errorGroups || []).slice();
+      this.errorIdx = (q.errorIdx || []).slice();
+      this.key = q.keyObj || null;
+      this.info = analyseSeq(this.seq, this.beatsPerBar);
+      const picked = (d.answers && d.answers.picked) ? d.answers.picked.slice() : [];
+      this.selected = new Set(picked);
+
+      let hit = 0;
+      picked.forEach(g => { if(this.errorGroups.indexOf(g) >= 0) hit++; });
+      const need = this.errorGroups.length;
+
+      const presetName = (EXm.PRESETS[p.preset || 'standard'] || {}).short || '';
+      const secLabel = (EXm.SECTIONS[KEY] || {}).label || '';
+      const when = (function(ts){ try{ const dt = new Date(ts);
+        return dt.getFullYear() + '/' + String(dt.getMonth()+1).padStart(2,'0') + '/' + String(dt.getDate()).padStart(2,'0'); }catch(e){ return ''; } })(p.date);
+
+      const fb = document.getElementById('pe-ansFeedback');
+      fb.className = 'answer-big-feedback ' + (hit === need ? 'correct' : 'wrong');
+      fb.textContent = (hit === need ? '✓ 全部找到！' : ('得分 ' + hit + ' / ' + need));
+      document.getElementById('pe-ansScore').textContent = hit + ' / ' + need;
+      document.getElementById('pe-ansBadge').textContent = presetName + '　·　' + when + '　·　' + secLabel;
+
+      // 版面：回顧沒有「下一題」，改成回到那份考卷；開放標準音 A
+      const nb = document.getElementById('pe-ansNextBtn'); if(nb) nb.style.display = 'none';
+      const bp = document.getElementById('pe-ansBackPaper');
+      if(bp){ bp.style.display = ''; bp.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); }; }
+      const dirRow = document.getElementById('pe-ansPaperDir');
+      if(dirRow) dirRow.style.display = '';
+      const tu = document.getElementById('pe-ansTuning');
+      if(tu){ tu.style.display = ''; tu.onclick = () => this.playTuning(); }
+      const back = document.querySelector('#pagePEAnswer .nav-back-btn');
+      if(back){ back.textContent = '← 回到這份考卷'; back.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); }; }
+
+      showPage('pe-answer');
+      const self = this;
+      setTimeout(function(){
+        self.drawAnswerSingle('pe-ansScoreStaff', {
+          seq: self.seq, correctPitch: self.correctPitch, errPitch: self.errPitch,
+          errorGroups: self.errorGroups, picked: picked,
+          groups: self.info.groups, errorIdx: self.errorIdx, cfg: self.staffCfg()
+        });
+        self.drawCorrectStaff('pe-ansCorrectStaff', {
+          seq: self.seq, correctPitch: self.correctPitch,
+          errorGroups: self.errorGroups, groups: self.info.groups, cfg: self.staffCfg()
+        });
+        syncStaffScroll('pe-ansScoreStaff', 'pe-ansCorrectStaff');
+        ['pe-ansScoreStaff','pe-ansCorrectStaff'].forEach(function(id){
+          const el = document.getElementById(id); const w = el && el.closest('.review-staff');
+          if(w) w.scrollLeft = 0;
+        });
+      }, 60);
+
+      document.getElementById('pe-ansDetail').textContent = this.answerDetail({
+        correctPitch: this.correctPitch, errPitch: this.errPitch, errorIdx: this.errorIdx
+      }) + '\n找到 ' + hit + ' 個　｜　漏掉 ' + (need - hit) + ' 個　｜　誤圈 ' + (picked.length - hit) + ' 個';
+      return true;
+    },
+
     /* ---------- 模擬測驗模式 ---------- */
     examBootstrap(){
       const EXm = window.EXAM; if(!EXm) return;
@@ -2222,16 +2311,19 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     peModule.initSettings();
     const EXm = window.EXAM;
     const examMode = EXm && EXm.isExamMode();
+    const _pp = new URLSearchParams(location.search);
+    const paperId = _pp.get('paper'), paperSec = _pp.get('section');
     document.getElementById('pe-playBtn').onclick = () => peModule.play();
     document.getElementById('pe-tuningBtn').onclick = () => peModule.playTuning();
     document.getElementById('pe-clearBtn').onclick = () => peModule.clearPicks();
     document.getElementById('pe-submitBtn').onclick = () => peModule.submit();
     document.getElementById('pe-nextBtn').onclick = () => peModule.nextQuestion();
     document.getElementById('pe-ansNextBtn').onclick = () => peModule.nextQuestion();
-    document.getElementById('pe-ansPlayCorrect').onclick = () => peModule.playStatic(peModule.currentItem(), false);
+    document.getElementById('pe-ansPlayCorrect').onclick = () => peModule.playStatic(peModule.currentItem(), false);   // 聽正確演奏
     document.getElementById('pe-ansPlayHeard').onclick = () => peModule.playStatic(peModule.currentItem(), true);
     document.getElementById('pe-clearReviewBtn').onclick = () => peModule.clearReview();
     peModule.refreshReviewCount();
+    if(paperId && paperSec){ loadPiano(); if(peModule.paperReviewBootstrap(paperId, paperSec)) return; }
     if(examMode){ loadPiano(); peModule.examBootstrap(); return; }
     if(location.hash === '#review') showPage('pe-review');
     loadPiano();
@@ -2258,6 +2350,17 @@ function syncStaffScroll(idA, idB){
 <script>
 (function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
   setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+</script>
+<script>
+/* 考試作答中與考卷回顧模式：不顯示「錯題本」相關按鈕 */
+(function(){
+  try{
+    var p = new URLSearchParams(location.search);
+    if((window.EXAM && EXAM.isExamMode()) || p.get('paper')){
+      Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
+    }
+  }catch(e){}
+})();
 </script>
 <script>
 /* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */

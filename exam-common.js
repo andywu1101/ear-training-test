@@ -12,7 +12,9 @@
   var LS_SESSION = 'earTrainer.exam.session';
   var LS_HISTORY = 'earTrainer.exam.history';
   var LS_SCHEMA  = 'earTrainer.exam.schema';
+  var LS_PAPERS  = 'earTrainer.exam.papers';
   var HISTORY_CAP = 100;
+  var PAPERS_CAP  = 20;   // 完整考卷（含題目與作答）最多保留最近 20 份
 
   /* 考卷結構版本。段落或配分一改就換這個字串，
      未完成的考試會自動清掉（結構對不上會算錯分），歷史成績不受影響。 */
@@ -307,6 +309,36 @@
     });
   }
 
+  /* ===== 完整考卷（供「模擬考試回顧」逐題複習用） ===== */
+  function loadPapers() {
+    try { return JSON.parse(localStorage.getItem(LS_PAPERS) || '[]'); } catch (e) { return []; }
+  }
+  function savePapers(arr) {
+    try { localStorage.setItem(LS_PAPERS, JSON.stringify(arr)); } catch (e) {}
+  }
+  function getPaper(id) {
+    var a = loadPapers();
+    for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i];
+    return null;
+  }
+  function clearPapers() { savePapers([]); }
+  function papersSizeKB() {
+    try { return Math.round((localStorage.getItem(LS_PAPERS) || '').length / 1024); } catch (e) { return 0; }
+  }
+  /* 交卷時把整份考卷（出題設定＋題目＋作答）存起來。
+     存不下時（localStorage 滿）就從最舊的開始丟，丟到存得下為止。 */
+  function savePaper(rec, s) {
+    var arr = loadPapers();
+    arr.push({ id: rec.id, date: rec.date, preset: rec.preset, scope: rec.scope, play: rec.play,
+               total: rec.total, max: rec.max, pct: rec.pct, rows: rec.rows,
+               config: s.config || {}, data: s.data || {} });
+    while (arr.length > PAPERS_CAP) arr.shift();
+    for (var guard = 0; guard < PAPERS_CAP; guard++) {
+      try { localStorage.setItem(LS_PAPERS, JSON.stringify(arr)); return; }
+      catch (e) { if (arr.length <= 1) { try { localStorage.removeItem(LS_PAPERS); } catch (e2) {} return; } arr.shift(); }
+    }
+  }
+
   function finalize() {
     var s = loadSession(); if (!s) return null;
     var rows = buildScoreRows(s);
@@ -319,13 +351,14 @@
     var h = loadHistory(); h.push(rec);
     if (h.length > HISTORY_CAP) h = h.slice(h.length - HISTORY_CAP);
     try { localStorage.setItem(LS_HISTORY, JSON.stringify(h)); } catch (e) {}
+    savePaper(rec, s);          // 保留完整考卷供回顧
     clearSession();
     return rec;
   }
 
   /* ---------------- history ---------------- */
   function loadHistory() { try { return JSON.parse(localStorage.getItem(LS_HISTORY) || '[]'); } catch (e) { return []; } }
-  function clearHistory() { try { localStorage.removeItem(LS_HISTORY); } catch (e) {} }
+  function clearHistory() { try { localStorage.removeItem(LS_HISTORY); localStorage.removeItem(LS_PAPERS); } catch (e) {} }
   function historyStats(mode) {
     var h = loadHistory().filter(function (r) { return !mode || r.mode === mode; });
     if (!h.length) return null;
@@ -494,6 +527,7 @@
     gotoIndex: gotoIndex, gotoPrev: gotoPrev, gotoNext: gotoNext,
     unansweredReport: unansweredReport, computeResults: computeResults, finalize: finalize,
     loadHistory: loadHistory, clearHistory: clearHistory, historyStats: historyStats,
+    loadPapers: loadPapers, getPaper: getPaper, clearPapers: clearPapers, papersSizeKB: papersSizeKB, PAPERS_CAP: PAPERS_CAP,
     isExamMode: isExamMode,
     buildHeader: buildHeader, buildBar: buildBar, setPlaying: setPlaying, isLocked: isLocked,
     warnLocked: warnLocked, guardVisibility: guardVisibility

@@ -386,6 +386,8 @@
         <button class="icon-btn" id="chr-ansPlayArp">🔁 分解琶音</button>
       </div>
       <button class="next-btn show" id="chr-ansNextBtn" style="margin-top:16px;">下一題 →</button>
+      <button class="nav-back-btn js-review-links" style="width:100%; margin-top:10px;" onclick="showPage('chr-review')">📕 本項錯題本</button>
+      <button class="nav-back-btn js-review-links" style="width:100%; margin-top:10px;" onclick="location.href='index.html#hub-practice'">📘 錯題本目錄</button>
       <button class="nav-back-btn" style="width:100%; margin-top:10px;" onclick="location.href='index.html#menu'">🏠 回選單</button>
     </div>
   </div>
@@ -400,6 +402,11 @@
       <h2>錯題本</h2>
       <p class="hint">這裡收錄你答錯的和絃，重整或關閉後仍會保留。「分解琶音」會播放琶音方便逐音辨認。</p>
       <div id="chr-reviewList"></div>
+      <div class="js-paper-links" style="display:none; margin-top:16px;">
+        <button class="nav-back-btn" style="width:100%; margin-top:10px;" id="chr-paperBack">📝 回顧此考卷錯題</button>
+        <button class="nav-back-btn" style="width:100%; margin-top:10px;" onclick="location.href='exam.html#papers'">📚 模擬考錯題本目錄</button>
+        <button class="nav-back-btn" style="width:100%; margin-top:10px;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+      </div>
     </div>
   </div>
 </div>
@@ -952,6 +959,55 @@ function updateStaffHeader(pageId){
           if(window.confirm('確定要清空和絃辨認的錯題本嗎？此動作無法復原。')){ window.REVIEW_STORE.clear('chord'); renderRev(); refreshReviewCount(); }
         };
       },
+    /* 考卷回顧：逐題列出這一段的題目、你的答案與正解 */
+        paperReview: function(paperId, KEY){
+        const EXm = window.EXAM; if(!EXm) return false;
+        const p = EXm.getPaper(paperId); if(!p) return false;
+        const d = p.data && p.data[KEY]; if(!d || !d.questions) return false;
+        const qs = d.questions || [], ans = d.answers || [], labels = d.labels || {};
+        const preset = EXm.PRESETS[p.preset || 'standard'] || {};
+        const secLabel = (EXm.SECTIONS[KEY] || {}).label || '';
+        const when = (function(ts){ try{ var t = new Date(ts);
+          return t.getFullYear() + '/' + String(t.getMonth()+1).padStart(2,'0') + '/' + String(t.getDate()).padStart(2,'0');
+        }catch(e){ return ''; } })(p.date);
+
+        let cor = 0;
+        qs.forEach(function(q, i){ if(ans[i] && ans[i] === q.qualityKey) cor++; });
+
+        const head = document.querySelector('#pageChrReview .review-section h2');
+        if(head) head.textContent = (preset.short || '') + '　·　' + when + '　·　' + secLabel + '　' + cor + ' / ' + qs.length;
+        const hint = document.querySelector('#pageChrReview .hint');
+        if(hint) hint.textContent = '這是該次模擬測驗的逐題回顧。播放沒有次數限制。';
+        const clr = document.getElementById('chr-clearReviewBtn'); if(clr) clr.style.display = 'none';
+
+        const list = document.getElementById('chr-reviewList');
+        list.innerHTML = '';
+        qs.forEach(function(q, i){
+          const ua = ans[i] || null;
+          const ok = (ua === q.qualityKey);
+          const row = document.createElement('div'); row.className = 'review-item';
+          const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
+          renderGrandStaff(staffMini, q.root, q.intervals, q.steps, 210, 210);
+          const meta = document.createElement('div'); meta.className = 'review-meta';
+          meta.innerHTML = '<div class="q-num-badge">【第 ' + (i+1) + ' 題】' + (ok ? '✓' : '✗') + '</div>' +
+            '<div class="review-answers">你的答案：<span class="' + (ok ? 'right-ans' : 'wrong-ans') + '">' +
+            (ua ? (labels[ua] || ua) : '（未作答）') + '</span><br>正解答案：<span class="right-ans">' +
+            (labels[q.qualityKey] || q.qualityKey) + '</span></div>';
+          const actions = document.createElement('div'); actions.className = 'review-actions';
+          const b = document.createElement('button'); b.className = 'icon-btn'; b.textContent = '🔁 分解琶音';
+          b.onclick = function(){ window.stopAllPlayback(); playArpeggio(q.root, q.intervals); };
+          actions.appendChild(b);
+          row.appendChild(meta); row.appendChild(actions); list.appendChild(row);
+        });
+
+        const bb = document.getElementById('chr-paperBack');
+        if(bb) bb.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); };
+        Array.prototype.forEach.call(document.querySelectorAll('.js-paper-links'), function(el){ el.style.display = ''; });
+        Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
+        showPage('chr-review');
+        return true;
+      },
+
       examBootstrap: function(){
         var EXm = window.EXAM; if(!EXm) return;
         var KEY = 'chord';
@@ -1080,7 +1136,12 @@ function updateStaffHeader(pageId){
   window.chrModule = chrModule;
   chrModule.init();
   loadPiano();
-  if(window.EXAM && window.EXAM.isExamMode()){ chrModule.examBootstrap(); }
+  (function(){
+    var _q = new URLSearchParams(location.search);
+    var _pid = _q.get('paper'), _sec = _q.get('section');
+    if(_pid && _sec && chrModule.paperReview && chrModule.paperReview(_pid, _sec)) return;
+    if(window.EXAM && window.EXAM.isExamMode()){ chrModule.examBootstrap(); }
+  })();
   // 由 index 錯題本總覽「跳回複習」進入時，直接開啟錯題本頁
   if(location.hash === '#review') showPage('chr-review');
 })();
@@ -1132,6 +1193,17 @@ function _syncHelpLock(){
   document.body.style.touchAction = open ? 'none' : '';
 }
 document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document.querySelectorAll('.help-modal.open').forEach(function(m){ m.classList.remove('open'); }); } });
+</script>
+<script>
+/* 考試作答中與考卷回顧模式：不顯示「錯題本」相關按鈕 */
+(function(){
+  try{
+    var p = new URLSearchParams(location.search);
+    if((window.EXAM && EXAM.isExamMode()) || p.get('paper')){
+      Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
+    }
+  }catch(e){}
+})();
 </script>
 <script>
 /* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */

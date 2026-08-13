@@ -322,7 +322,7 @@
       </div>
 
       <!-- 整合錯題本入口 -->
-      <div class="menu-card review-hub-card" onclick="showHub()">
+      <div class="menu-card review-hub-card" onclick="showHubChoose()">
         <span class="menu-badge badge-review" id="hubBadge">0 題</span>
         <div>
           <div class="menu-card-num">★ 錯題本</div>
@@ -333,14 +333,39 @@
     </div>    <p class="footer-note">還沒加入主畫面？<a class="footer-link" href="https://youtu.be/fF4-J2NGAnw?t=27" target="_blank" rel="noopener">▸ 看看怎麼加入</a>，開啟體驗會更接近原生 App。</p>
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.82　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.83　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
-  <div id="pageHub" class="page-view">
+  <!-- 錯題本入口：練習 / 模擬考試 -->
+  <div id="pageHubChoose" class="page-view">
     <button class="nav-back-btn" onclick="showMenu()">← 回選單</button>
-    <h1>錯題本總覽</h1>
-    <p class="subtitle">這裡整合六項練習累積的錯題（儲存在本機瀏覽器）。點「跳回複習」會直接開啟該練習的錯題本。</p>
+    <h1>錯題本</h1>
+    <p class="subtitle">要複習平常練習累積的錯題，還是回顧考過的模擬考卷？</p>
+    <div class="menu-grid">
+      <div class="menu-card active-feature" onclick="showHub()">
+        <span class="menu-badge badge-review" id="hubChooseBadge">0 題</span>
+        <div>
+          <div class="menu-card-num">📘</div>
+          <h3 class="menu-card-title">錯題本目錄</h3>
+          <p class="menu-card-desc">七項練習答錯的題目，可重播、對照正解，並跳回該練習繼續複習。</p>
+        </div>
+      </div>
+      <div class="menu-card active-feature" onclick="location.href='exam.html#papers'">
+        <span class="menu-badge badge-ready" id="hubPaperBadge" style="display:none;"></span>
+        <div>
+          <div class="menu-card-num">📚</div>
+          <h3 class="menu-card-title">模擬考錯題本目錄</h3>
+          <p class="menu-card-desc">一張一張考卷回顧，逐大項看題目與你的作答，可重播、對照正解，沒有播放次數限制。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pageHub" class="page-view">
+    <button class="nav-back-btn" onclick="showHubChoose()">← 返回</button>
+    <h1>錯題本目錄</h1>
+    <p class="subtitle">這裡整合各項練習累積的錯題（儲存在本機瀏覽器）。點「跳回複習」會直接開啟該練習的錯題本。</p>
     <div class="hub-total" id="hubTotal"></div>
     <div id="hubGroups"></div>
   </div>
@@ -421,7 +446,13 @@
 
 <script>
 /* 從練習頁返回時帶 #menu：直接顯示選單、跳過封面（封面只在首次啟動出現）。此段趁早執行，避免閃到封面。 */
-if (location.hash === '#menu') {
+if (location.hash === '#hub-practice') {
+  var _c1 = document.getElementById('pageCover'); var _h1 = document.getElementById('pageHub');
+  if(_c1 && _h1){ _c1.classList.remove('active'); _h1.classList.add('active'); setTimeout(function(){ if(window.renderHub) renderHub(); }, 0); }
+} else if (location.hash === '#hub') {
+  var _c0 = document.getElementById('pageCover'); var _h0 = document.getElementById('pageHubChoose');
+  if(_c0 && _h0){ _c0.classList.remove('active'); _h0.classList.add('active'); }
+} else if (location.hash === '#menu') {
   var _c = document.getElementById('pageCover'); var _m = document.getElementById('pageMenu');
   if (_c) _c.classList.remove('active'); if (_m) _m.classList.add('active');
 }
@@ -479,6 +510,17 @@ function maybeAutoChangelog(){
   }, 400);
 }
 function showHub(){ renderHub(); showPageId('pageHub'); }
+function showHubChoose(){
+  showPageId('pageHubChoose');
+  var b = document.getElementById('hubChooseBadge');
+  if(b) b.textContent = window.REVIEW_STORE.total() + ' 題';
+  var pb = document.getElementById('hubPaperBadge');
+  if(pb){
+    var n = 0;
+    try { n = (JSON.parse(localStorage.getItem('earTrainer.exam.papers') || '[]') || []).length; } catch(e){}
+    if(n){ pb.textContent = n + ' 份'; pb.style.display = ''; } else { pb.style.display = 'none'; }
+  }
+}
 function showCover(){ showPageId('pageCover'); }
 /* ===================================================================
  *  贊助者名單：要新增名字，複製下面一行、改成對方希望顯示的名稱即可。
@@ -525,6 +567,8 @@ window.CHANGELOG = [
   { v: 'v.81', items: ['修正四部和聲輸入低音時，前一個音的升降記號會誤套用到下一個音的問題', '修正跳著輸入音符、或音高接近可用音域邊界時，自動選擇的八度可能不是最近的問題'] }
 ,
   { v: 'v.82', items: ['模擬測驗「大學檔」新增第一大題「音高的辨認」（2 題，各 5 個錯音，共 10 分）', '大學檔配分調整：節奏 20→15 分、兩聲部 20→15 分，其餘不變，總分維持 100 分', '考卷結構調整，未完成的考試會自動重置；已完成的歷史成績不受影響'] }
+,
+  { v: 'v.83', items: ['新增「模擬考錯題本」：交卷後會完整保留考卷（最多 20 份），可一張一張回顧複習', '優化錯題本，現在有兩個入口：錯題本目錄（練習）、模擬考錯題本目錄', '各練習的解答頁新增「本項錯題本」與「錯題本目錄」按鈕', '優化模擬考分數顯示，看起來更加直觀'] }
 ];
 
 function showChangelog(){
@@ -591,7 +635,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDon
   }catch(e){}
 })();
 
-/* 模擬測驗卡片：顯示最佳／最近得分率 */
+/* 模擬測驗卡片：顯示最佳／最近分數 */
 (function(){
   try{
     if(!window.EXAM) return;
@@ -600,10 +644,10 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDon
     var pid = last.preset || (last.mode === 'standard-hs' ? 'highschool' : 'standard');
     var name = ((window.EXAM.PRESETS||{})[pid]||{}).short || '';
     var same = h.filter(function(r){ return (r.preset || (r.mode==='standard-hs'?'highschool':'standard')) === pid; });
-    var best = Math.max.apply(null, same.map(function(r){ return r.pct; }));
+    var best = Math.max.apply(null, same.map(function(r){ return r.total; }));
     var stat = document.getElementById('examCardStat');
-    if(stat) stat.textContent = ' ｜ 最近 '+last.pct+'%（'+name+'）';
-    var b = document.getElementById('examCardBadge'); if(b){ b.textContent = '最佳 '+best+'%'; b.style.display=''; }
+    if(stat) stat.textContent = ' ｜ 最近 '+last.total+' 分（'+name+'）';
+    var b = document.getElementById('examCardBadge'); if(b){ b.textContent = '最佳 '+best+' 分'; b.style.display=''; }
   }catch(e){}
 })();
 
