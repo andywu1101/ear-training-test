@@ -38,7 +38,7 @@
     -webkit-user-select: none; -moz-user-select: none; user-select: none;
   }
   /* 橫向捲動區維持 iOS 慣性捲動，並限定只能水平捲動不干擾頁面垂直捲動 */
-  .staff-scroll-container, .review-staff { touch-action: pan-x; -webkit-overflow-scrolling: touch; }
+  .staff-scroll-container, .review-staff { overscroll-behavior-x: contain; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
   body{ margin:0; background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height:100vh; padding: 20px 16px 64px; }
   /* 作答頁啟用時：body 不捲動、無多餘 padding，讓作答頁精準滿版 */
   body.practice-locked{ height:100dvh; height:calc(var(--app-vh,1vh)*100); overflow:hidden; padding:0 8px; min-height:0; }
@@ -2967,6 +2967,31 @@ window.addEventListener('resize', setVH); setVH();
       Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
     }
   }catch(e){}
+})();
+</script>
+<script>
+/* 作答時關閉手機的「左滑返回」：在瀏覽歷史放一個記號，
+   使用者一觸發返回就把它補回去，等於什麼都沒發生。
+   只在作答頁生效，離開作答頁自動解除；畫面上的返回按鈕不受影響。 */
+(function(){
+  var ANSWER_PAGE = 'pageFptPractice';
+  var armed = false;
+  function isAnswering(){
+    var el = document.getElementById(ANSWER_PAGE);
+    return !!(el && el.classList.contains('active'));
+  }
+  function arm(){ if(armed) return; armed = true; try{ history.pushState({ answerGuard: 1 }, ''); }catch(e){} }
+  window.addEventListener('popstate', function(){
+    if(isAnswering()){ try{ history.pushState({ answerGuard: 1 }, ''); }catch(e){} }
+    else { armed = false; }
+  });
+  try{
+    var obs = new MutationObserver(function(){ if(isAnswering()) arm(); else armed = false; });
+    Array.prototype.forEach.call(document.querySelectorAll('.page-view'), function(el){
+      obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+  }catch(e){}
+  if(isAnswering()) arm();
 })();
 </script>
 <script>
