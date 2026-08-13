@@ -199,6 +199,9 @@
     .fpt-play-sticky { position: static; }
     body.practice-locked .practice-top-fixed { padding-bottom: 16px; margin-bottom: 16px; }
   }
+
+  /* 左緣 24px 是防返回手勢的攔截區，作答頁的返回鍵往右挪一點避開 */
+  #pageFptPractice .nav-back-btn { margin-left: 18px; }
 </style>
 </head>
 <body>
@@ -3007,24 +3010,10 @@ window.addEventListener('resize', setVH); setVH();
      為了不吃掉左緣的操作，會先看手指按到什麼：
      按到按鈕、輸入元件或音符熱區就放行，只有按在空白處才攔。 */
   var EDGE = 24;
-  function isInteractive(x, y){
-    var el = document.elementFromPoint(x, y);
-    while(el && el !== document.body){
-      var tag = (el.tagName || '').toLowerCase();
-      if(tag === 'button' || tag === 'a' || tag === 'input' || tag === 'select' || tag === 'textarea' || tag === 'label') return true;
-      if(el.onclick) return true;
-      var cls = el.className || '';
-      if(typeof cls === 'string' && /pe-pick|slot|note|p-btn|rhythm-btn|answer-btn|icon-btn|pattern-item/.test(cls)) return true;
-      el = el.parentElement;
-    }
-    return false;
-  }
   document.addEventListener('touchstart', function(e){
     if(!isAnswering() || !e.touches || e.touches.length !== 1) return;
-    var t = e.touches[0];
-    if(t.clientX > EDGE) return;
-    if(isInteractive(t.clientX, t.clientY)) return;   // 按在可操作的東西上就放行
-    if(e.cancelable) e.preventDefault();
+    if(e.touches[0].clientX > EDGE) return;
+    if(e.cancelable) e.preventDefault();              // 左緣一律攔，返回手勢不會啟動
   }, { passive: false });
 })();
 </script>
