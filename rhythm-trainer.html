@@ -349,12 +349,16 @@
   <!-- 【節奏練習】錯題本頁 -->
   <div id="pageRhyReview" class="page-view">
     <div class="nav-header-row">
-      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <button class="nav-back-btn" onclick="showPage('rhy-settings')">← 返回設定頁</button>
       <button class="reset-cache-btn" id="rhy-clearReviewBtn">🗑️ 清空錯題本</button>
     </div>
     <h1>錯題本</h1>
     <p class="subtitle">收錄答錯的節奏題，重整或關閉後仍會保留。可分別聆聽你的作答與正解，並對照紅色標錯處。</p>
     <div id="rhy-reviewList"></div>
+      <div class="js-review-links" style="margin-top:20px;">
+        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
+        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+      </div>
     <p id="rhy-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
   </div>
 </div>
@@ -411,7 +415,7 @@ function resetReviewScroll(ids){
 }
 
 /* 考卷回顧：共用的頁首處理（標題、得分、隱藏「下一題」、顯示回顧按鈕） */
-function setPaperHead(p, KEY, badgeId, scoreId, fbId, nextBtnId, backBtnId, paperId){
+function setPaperHead(p, KEY, badgeId, scoreId, fbId, nextBtnId, backBtnId, paperId, pageId){
   var EXm = window.EXAM;
   var preset = (EXm.PRESETS[p.preset || 'standard'] || {});
   var secLabel = (EXm.SECTIONS[KEY] || {}).label || '';
@@ -442,6 +446,10 @@ function setPaperHead(p, KEY, badgeId, scoreId, fbId, nextBtnId, backBtnId, pape
   var nb = document.getElementById(nextBtnId); if(nb) nb.style.display = 'none';
   var bb = document.getElementById(backBtnId);
   if(bb) bb.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); };
+  /* 左上角的返回鍵也導回這份考卷（原本是「返回作答」或「回選單」） */
+  var topBack = pageId ? document.querySelector('#' + pageId + ' .nav-back-btn') : null;
+  if(topBack){ topBack.textContent = '← 回到這份考卷';
+               topBack.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); }; }
   Array.prototype.forEach.call(document.querySelectorAll('.js-paper-links'), function(el){ el.style.display = ''; });
   Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
 }
@@ -454,6 +462,18 @@ function bootPaperReview(mod){
     if(!pid || !sec || !window.EXAM || !mod || !mod.paperReview) return false;
     return !!mod.paperReview(pid, sec);
   }catch(e){ return false; }
+}
+
+/* 錯題本：舊的在上、新的在下，進入時直接跳到最下面（考卷回顧模式除外） */
+function scrollReviewToBottom(pageId){
+  try{
+    if(new URLSearchParams(location.search).get('paper')) return;
+    setTimeout(function(){
+      var el = document.getElementById(pageId);
+      if(el && el.scrollHeight > el.clientHeight + 4){ el.scrollTop = el.scrollHeight; }
+      else { window.scrollTo(0, document.documentElement.scrollHeight); }
+    }, 260);
+  }catch(e){}
 }
 
 function showPage(pageId) {
@@ -1023,7 +1043,7 @@ function showPage(pageId) {
                      bpm: cfg.bpm || 80, startPitch: d.questions.startPitch };
       const qSeq = (d.questions.seq || []).slice();
       const uSeq = Array.isArray(d.answers) ? d.answers.slice() : [];
-      setPaperHead(p, KEY, 'rhy-ansBadge', 'rhy-ansScore', 'rhy-ansFeedback', 'rhy-ansNextBtn', 'rhy-paperBack', paperId);
+      setPaperHead(p, KEY, 'rhy-ansBadge', 'rhy-ansScore', 'rhy-ansFeedback', 'rhy-ansNextBtn', 'rhy-paperBack', paperId, 'pageRhyAnswer');
       showPage('rhy-answer');
       setTimeout(function(){
         renderStaticStaff('rhy-ansUser', uSeq, qSeq, item);
@@ -1163,7 +1183,8 @@ function showPage(pageId) {
       const items = window.REVIEW_STORE.load('rhythm');
       if(items.length === 0){ if(empty) empty.style.display = 'block'; return; }
       if(empty) empty.style.display = 'none';
-      items.slice().reverse().forEach((item, ri) => {
+      scrollReviewToBottom('pageRhyReview');
+      items.forEach((item, ri) => {
         const uid = item.id || ('r'+ri);
         const box = document.createElement('div'); box.className = 'review-item';
         box.innerHTML = `

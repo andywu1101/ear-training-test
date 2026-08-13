@@ -446,12 +446,10 @@
 
 <script>
 /* 從練習頁返回時帶 #menu：直接顯示選單、跳過封面（封面只在首次啟動出現）。此段趁早執行，避免閃到封面。 */
-if (location.hash === '#hub-practice') {
-  var _c1 = document.getElementById('pageCover'); var _h1 = document.getElementById('pageHub');
-  if(_c1 && _h1){ _c1.classList.remove('active'); _h1.classList.add('active'); setTimeout(function(){ if(window.renderHub) renderHub(); }, 0); }
-} else if (location.hash === '#hub') {
-  var _c0 = document.getElementById('pageCover'); var _h0 = document.getElementById('pageHubChoose');
-  if(_c0 && _h0){ _c0.classList.remove('active'); _h0.classList.add('active'); }
+/* 錯題本相關的錨點要等下面的渲染函式定義好才能處理，這裡先記下來、順便把封面收起來避免閃爍 */
+if (location.hash === '#hub-practice' || location.hash === '#hub') {
+  window.__initHash = location.hash;
+  var _c1 = document.getElementById('pageCover'); if(_c1) _c1.classList.remove('active');
 } else if (location.hash === '#menu') {
   var _c = document.getElementById('pageCover'); var _m = document.getElementById('pageMenu');
   if (_c) _c.classList.remove('active'); if (_m) _m.classList.add('active');
@@ -708,6 +706,10 @@ function renderHub(){
 }
 
 updateHubBadge();
+
+/* 依進入時的錨點切到對應的錯題本頁面（放在最後，確保 renderHub 等函式都已定義） */
+if(window.__initHash === '#hub-practice') showHub();
+else if(window.__initHash === '#hub') showHubChoose();
 
 // PWA Service Worker 註冊與自動更新邏輯
 if('serviceWorker' in navigator){

@@ -267,13 +267,17 @@
   <!-- 【錯題紀錄頁】 -->
   <div id="pageFptReview" class="page-view">
     <div class="nav-header-row">
-      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <button class="nav-back-btn" onclick="showPage('fpt-settings')">← 返回設定頁</button>
       <button class="reset-cache-btn" id="fpt-clearReviewBtn">🗑️ 清空錯題本</button>
     </div>
     <h1>錯題本</h1>
     <p class="subtitle">這裡收錄你答錯的題目，可以重播聆聽、對照正解，反覆複習加強。</p>
     <div class="review-section" id="fpt-reviewSection" style="display:block;">
       <div id="fpt-reviewList"></div>
+      <div class="js-review-links" style="margin-top:20px;">
+        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
+        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+      </div>
       <p id="fpt-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
     </div>
   </div>
@@ -385,6 +389,7 @@
   <!-- 【解答頁】 -->
   <div id="pageFptAnswer" class="page-view">
     <div class="top-bar-practice" style="margin-bottom:12px;">
+      <button class="nav-back-btn" style="margin:0;" onclick="showPage('fpt-practice')">← 返回作答</button>
       <span class="practice-status-badge" id="fpt-answerBadge">解答</span>
       <div class="score-box" id="fpt-scoreNumAns">0/0</div>
     </div>
@@ -454,7 +459,7 @@ function nearestOctFor(step, ref, fallbackOct, loOct, hiOct){
 }
 
 /* 考卷回顧：共用的頁首處理（標題、得分、隱藏「下一題」、顯示回顧按鈕） */
-function setPaperHead(p, KEY, badgeId, scoreId, fbId, nextBtnId, backBtnId, paperId){
+function setPaperHead(p, KEY, badgeId, scoreId, fbId, nextBtnId, backBtnId, paperId, pageId){
   var EXm = window.EXAM;
   var preset = (EXm.PRESETS[p.preset || 'standard'] || {});
   var secLabel = (EXm.SECTIONS[KEY] || {}).label || '';
@@ -485,6 +490,10 @@ function setPaperHead(p, KEY, badgeId, scoreId, fbId, nextBtnId, backBtnId, pape
   var nb = document.getElementById(nextBtnId); if(nb) nb.style.display = 'none';
   var bb = document.getElementById(backBtnId);
   if(bb) bb.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); };
+  /* 左上角的返回鍵也導回這份考卷（原本是「返回作答」或「回選單」） */
+  var topBack = pageId ? document.querySelector('#' + pageId + ' .nav-back-btn') : null;
+  if(topBack){ topBack.textContent = '← 回到這份考卷';
+               topBack.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); }; }
   Array.prototype.forEach.call(document.querySelectorAll('.js-paper-links'), function(el){ el.style.display = ''; });
   Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
 }
@@ -497,6 +506,18 @@ function bootPaperReview(mod){
     if(!pid || !sec || !window.EXAM || !mod || !mod.paperReview) return false;
     return !!mod.paperReview(pid, sec);
   }catch(e){ return false; }
+}
+
+/* 錯題本：舊的在上、新的在下，進入時直接跳到最下面（考卷回顧模式除外） */
+function scrollReviewToBottom(pageId){
+  try{
+    if(new URLSearchParams(location.search).get('paper')) return;
+    setTimeout(function(){
+      var el = document.getElementById(pageId);
+      if(el && el.scrollHeight > el.clientHeight + 4){ el.scrollTop = el.scrollHeight; }
+      else { window.scrollTo(0, document.documentElement.scrollHeight); }
+    }, 260);
+  }catch(e){}
 }
 
 function showPage(pageId) {
@@ -1955,7 +1976,7 @@ window.addEventListener('resize', setVH); setVH();
       }
 
       const self = this;
-      setPaperHead(p, KEY, 'fpt-answerBadge', 'fpt-scoreNumAns', 'fpt-feedbackText', 'fpt-nextBtn', 'fpt-paperBack', paperId);
+      setPaperHead(p, KEY, 'fpt-answerBadge', 'fpt-scoreNumAns', 'fpt-feedbackText', 'fpt-nextBtn', 'fpt-paperBack', paperId, 'pageFptAnswer');
       showPage('fpt-answer');
       setTimeout(function(){
         self.renderStaff({ targetSvgId: 'fpt-ansUser-svg', bars: self.bars, keyObj: self.keyObj,
@@ -2666,8 +2687,9 @@ window.addEventListener('resize', setVH); setVH();
       if (this.reviewItems.length === 0) { if (empty) empty.style.display = 'block'; return; }
       if (empty) empty.style.display = 'none';
 
-      // 由新到舊排列
-      let items = [...this.reviewItems].reverse();
+      // 由舊到新排列，最新的在最下面
+      let items = [...this.reviewItems];
+      scrollReviewToBottom('pageFptReview');
       items.forEach(rItem => {
         let id = rItem.id;
         let box = document.createElement('div'); box.className = 'review-item';

@@ -386,13 +386,17 @@
   <!-- 【音程練習】錯題本頁 -->
   <div id="pageIntReview" class="page-view">
     <div class="top-bar-practice">
-      <button class="nav-back-btn" style="margin-bottom:0;" onclick="location.href='index.html#menu'">← 回選單</button>
+      <button class="nav-back-btn" style="margin-bottom:0;" onclick="showPage('int-settings')">← 返回設定頁</button>
       <button class="clear-review-btn" id="int-clearReviewBtn">🗑️ 清空錯題本</button>
     </div>
     <div class="review-section">
       <h2>錯題本</h2>
       <p class="hint">這裡收錄你答錯的音程，重整或關閉後仍會保留。點擊<b>「上行＋和聲」</b>會先後彈奏兩音再合奏，方便對照。</p>
       <div id="int-reviewList"></div>
+      <div class="js-review-links" style="margin-top:20px;">
+        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
+        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+      </div>
       <div class="js-paper-links" style="display:none; margin-top:16px;">
         <button class="nav-back-btn" style="width:100%; margin-top:10px;" id="int-paperBack">📝 回顧此考卷錯題</button>
         <button class="nav-back-btn" style="width:100%; margin-top:10px;" onclick="location.href='exam.html#papers'">📚 模擬考錯題本目錄</button>
@@ -422,6 +426,18 @@ function forceResetCache() {
   if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
   alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
 }
+/* 錯題本：舊的在上、新的在下，進入時直接跳到最下面（考卷回顧模式除外） */
+function scrollReviewToBottom(pageId){
+  try{
+    if(new URLSearchParams(location.search).get('paper')) return;
+    setTimeout(function(){
+      var el = document.getElementById(pageId);
+      if(el && el.scrollHeight > el.clientHeight + 4){ el.scrollTop = el.scrollHeight; }
+      else { window.scrollTo(0, document.documentElement.scrollHeight); }
+    }, 260);
+  }catch(e){}
+}
+
 function showPage(pageId) {
   if (window.stopAllPlayback) window.stopAllPlayback();
   updateStaffHeader(pageId);
@@ -764,7 +780,8 @@ function updateStaffHeader(pageId){
       const items = window.REVIEW_STORE.load('interval');
       refreshReviewCount();
       if(items.length === 0){ list.innerHTML = '<div class="review-empty">🎉 目前沒有錯題，繼續保持你的好聽力！</div>'; return; }
-      items.slice().reverse().forEach(item => {
+      scrollReviewToBottom('pageIntReview');
+      items.forEach(item => {
         const row = document.createElement('div'); row.className = 'review-item';
         const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
         renderGrandStaff(staffMini, item.root, item.intervals, item.steps, 210, 210);
@@ -967,6 +984,7 @@ function updateStaffHeader(pageId){
         if(hint) hint.textContent = '這是該次模擬測驗的逐題回顧。播放沒有次數限制。';
         const clr = document.getElementById('int-clearReviewBtn'); if(clr) clr.style.display = 'none';
 
+        showPage('int-review');   // 先切頁：showPage 會重畫練習錯題本，之後再由下面覆寫
         const list = document.getElementById('int-reviewList');
         list.innerHTML = '';
         qs.forEach(function(q, i){
@@ -989,9 +1007,11 @@ function updateStaffHeader(pageId){
 
         const bb = document.getElementById('int-paperBack');
         if(bb) bb.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); };
+        var topBack = document.querySelector('#pageIntReview .nav-back-btn');
+        if(topBack){ topBack.textContent = '← 回到這份考卷';
+                     topBack.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); }; }
         Array.prototype.forEach.call(document.querySelectorAll('.js-paper-links'), function(el){ el.style.display = ''; });
         Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
-        showPage('int-review');
         return true;
       },
 

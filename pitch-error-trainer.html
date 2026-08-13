@@ -425,12 +425,16 @@
   <!-- ================= 錯題本 ================= -->
   <div id="pagePEReview" class="page-view">
     <div class="nav-header-row">
-      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <button class="nav-back-btn" onclick="showPage('pe-settings')">← 返回設定頁</button>
       <button class="reset-cache-btn" id="pe-clearReviewBtn">🗑️ 清空錯題本</button>
     </div>
     <h1>錯題本</h1>
     <p class="subtitle">收錄沒有全部找出來的題目，重整或關閉後仍會保留。可對照譜例與正確演奏，並分別聆聽。</p>
     <div id="pe-reviewList"></div>
+      <div class="js-review-links" style="margin-top:20px;">
+        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
+        <button class="nav-back-btn" style="width:100%%; margin-top:10px;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+      </div>
     <p id="pe-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
   </div>
 </div>
@@ -466,6 +470,18 @@ function forceResetCache() {
   if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
   alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
 }
+/* 錯題本：舊的在上、新的在下，進入時直接跳到最下面（考卷回顧模式除外） */
+function scrollReviewToBottom(pageId){
+  try{
+    if(new URLSearchParams(location.search).get('paper')) return;
+    setTimeout(function(){
+      var el = document.getElementById(pageId);
+      if(el && el.scrollHeight > el.clientHeight + 4){ el.scrollTop = el.scrollHeight; }
+      else { window.scrollTo(0, document.documentElement.scrollHeight); }
+    }, 260);
+  }catch(e){}
+}
+
 function showPage(pageId) {
   if (window.peStopAll) window.peStopAll();
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
@@ -2164,7 +2180,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       this.refreshReviewCount();
       empty.style.display = items.length ? 'none' : 'block';
 
-      items.slice().reverse().forEach(item => {
+      scrollReviewToBottom('pagePEReview');
+      items.forEach(item => {
         const uid = item.id;
         const box = document.createElement('div');
         box.className = 'review-item';
