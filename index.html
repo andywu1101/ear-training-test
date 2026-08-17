@@ -161,6 +161,8 @@
   .author-item, .donate-item{ display:flex; align-items:center; justify-content:center; gap:9px; font-family:var(--font-body); font-weight:700; font-size:15.5px; padding:13px 18px; border-radius:14px; text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink); }
   .author-item:hover, .author-item:active{ border-color:var(--accent); background:var(--accent-soft); }
   .author-item .ai-ico{ display:inline-flex; align-items:center; }
+  /* 作者卡片的邀約文案：字級略小、行高放寬，手機上會折成 2–3 行 */
+  .author-invite{ font-size:14px; line-height:1.9; color:var(--ink-soft); margin:2px 4px 14px; text-align:center; }
   .donate-item.disabled{ color:var(--ink-soft); background:var(--panel); border-style:dashed; opacity:0.6; cursor:not-allowed; }
   /* 街口支付 QR 卡（整張可點） */
   .jkopay-card{ display:block; text-decoration:none; border:1px solid var(--panel-border); border-radius:16px; overflow:hidden; background:#fff; cursor:pointer; transition:all .15s ease; }
@@ -208,7 +210,7 @@
         <p class="cover-msg">這個工具永久免費，你可以自由使用，<br>也歡迎推薦給同學和老師。<br>如果它對你的教學或練習有幫助，<br>歡迎小額贊助支持後續開發與維護。</p>
         <button class="cover-start" onclick="showMenu()">開始練習 →</button>
         <div class="cover-foot">為音樂班、音樂系的學生與老師而做 🎵</div>
-        <div class="cover-author"><button type="button" class="author-link" onclick="showAuthor()">作者：伍祐恆 Heng_Heng Wu ▸</button></div>
+        <div class="cover-author"><button type="button" class="author-link" onclick="showAuthor()">作者：伍祐恆 Heng-Heng Wu ▸</button></div>
         <div class="cover-donate-wrap"><button class="donate-btn" onclick="showDonate()">❤ 小額贊助</button></div>
         <div class="cover-intro-wrap"><a class="intro-btn" href="https://youtu.be/fF4-J2NGAnw" target="_blank" rel="noopener">▶ 網站介紹與說明</a></div>
       </div>
@@ -434,8 +436,10 @@
   <div class="donate-box">
     <div class="dico">🎼</div>
     <h3>作者主頁</h3>
-    <p>伍祐恆 Heng_Heng Wu</p>
+    <p>伍祐恆 Heng-Heng Wu</p>
+    <p class="author-invite">如果想精進鋼琴演奏、樂理、視唱、聽寫能力，歡迎來找我上課，可以加 LINE 私訊喔！</p>
     <div class="donate-links">
+      <a class="author-item" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#06C755" d="M12 2.6c-5.5 0-10 3.6-10 8.1 0 3.9 3.6 7.2 8.4 7.9.33.07.78.22.89.5.1.26.07.66.03.92 0 0-.12.72-.14.87-.05.26-.21 1 .88.55 1.1-.46 5.9-3.48 8.05-5.96 1.48-1.63 2.19-3.28 2.19-5.11 0-4.5-4.5-8.1-10-8.1z"/></svg></span> 祐恆的 LINE</a>
       <a class="author-item" href="https://portaly.cc/heng-heng.music" target="_blank" rel="noopener"><span class="ai-ico">🔗</span> Portaly 主頁</a>
       <a class="author-item" href="https://www.youtube.com/@HengHengWu" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#FF0000" d="M23 7.6a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.5A3 3 0 0 0 1 7.6 31.3 31.3 0 0 0 .5 12 31.3 31.3 0 0 0 1 16.4a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 23.5 12 31.3 31.3 0 0 0 23 7.6z"/><path fill="#fff" d="M9.75 15.5l6-3.5-6-3.5z"/></svg></span> YouTube 頻道</a>
     </div>
@@ -567,7 +571,7 @@ window.CHANGELOG = [
 ,
   { v: 'v.83', items: ['新增「模擬考錯題本」：交卷後會完整保留考卷（最多 20 份），可一張一張回顧複習', '優化錯題本，現在有兩個入口：錯題本目錄（練習）、模擬考錯題本目錄', '各練習的解答頁新增「本項錯題本」與「錯題本目錄」按鈕', '優化模擬考分數顯示，看起來更加直觀'] },
   { v: 'v.84', items: ['錯題本改為由舊到新排列，進入時自動顯示最新一筆，並新增「返回設定頁」', '譜例寬度改為依音符密度自動調整，解答頁上下兩張譜等寬，捲軸同步時拍子對得齊', '統一各解答頁的按鈕排列與音符框選範圍', '修正模擬考錯題本中，音程與和絃會顯示到不相關內容的問題', '修正「錯題本目錄」點進去顯示空白、以及找錯音解答頁在手機無法上下捲動的問題', '作答時關閉手機的左滑返回手勢，避免捲動譜例時誤觸而離開頁面', '修正找錯音設定頁拖動播放速度時，上方數字不會跟著變的問題'] },
-  { v: 'v.85', items: ['新增「08 音堆練習」：聆聽同時彈出的音堆，把裡面的每一個音高寫到五線譜上，全部正確才算答對', '可選高音譜號、低音譜號或大譜表；音數 2～6 個，也可選「隨機」（不公開音數，難度最高）', '作答方式改為直接點譜：按住出現預覽音符、滑動調整位置、放開才填入，並以 ↑↓ 做半音微調', '譜例大小會依畫面可用空間自動調整，螢幕越大譜越大', '解答頁與錯題本可聆聽正確音堆與分解琶音，並對照自己的作答'] }
+  { v: 'v.85', items: ['全新推出「08 音堆練習」：聆聽同時彈出的音堆，將每一個正確音高寫到五線譜上', '特別優化音堆練習的播放音量，現在和聲的音高會聽得更清楚，低音不會再將高音蓋過去'] }
 ];
 
 function showChangelog(){
