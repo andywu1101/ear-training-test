@@ -774,6 +774,42 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
               const total = o.align + dx;
               if(Math.abs(total) > 0.05) o.g.setAttribute('transform', 'translate(' + total.toFixed(2) + ',0)');
             });
+
+            /* 加線（中央 C 那種上下加線）是 VexFlow 直接畫在譜表上的，不在音符群組裡，
+               不一起平移的話會跟符頭左右錯開。
+               大譜表的兩行位移量不同，所以每條加線要跟著「它所屬的那一行」走：
+               用符頭的垂直位置判斷加線離哪一行最近。
+               加線的特徵：單純的水平線段 "M x y L x y"，起點在譜號右側（譜線本身從 STAVE_X 起畫）。 */
+            const groupYs = info.map(o => {
+              const ys = [].slice.call(o.g.querySelectorAll('.vf-notehead path')).map(pth => {
+                const mm = (pth.getAttribute('d') || '').match(/M[0-9.]+ ([0-9.]+)/);
+                return mm ? parseFloat(mm[1]) : null;
+              }).filter(v => v !== null);
+              return { shift: o.align + dx, ys: ys };
+            });
+            if(groupYs.length){
+              [].slice.call(container.querySelectorAll('path')).forEach(pth => {
+                if(pth.closest && pth.closest('.vf-stavenote')) return;      // 音符群組內的已經移過了
+                const d = (pth.getAttribute('d') || '').trim();
+                const mm = d.match(/^M([0-9.]+) ([0-9.]+)L([0-9.]+) ([0-9.]+)$/);
+                if(!mm) return;
+                const x1 = parseFloat(mm[1]), y1 = parseFloat(mm[2]);
+                const x2 = parseFloat(mm[3]), y2 = parseFloat(mm[4]);
+                if(Math.abs(y1 - y2) > 0.01) return;                        // 只處理水平線
+                if(x1 <= STAVE_X + 2) return;                               // 排除五條譜線
+                if(x2 - x1 > 40) return;                                    // 排除譜線等長線條
+                let best = null, bestD = Infinity;
+                groupYs.forEach(gr => {
+                  gr.ys.forEach(gy => {
+                    const dd = Math.abs(gy - y1);
+                    if(dd < bestD){ bestD = dd; best = gr; }
+                  });
+                });
+                if(best && Math.abs(best.shift) > 0.05){
+                  pth.setAttribute('transform', 'translate(' + best.shift.toFixed(2) + ',0)');
+                }
+              });
+            }
           } else if(measureOnly){
             return { contentW: 0, startX: startX };
           }
