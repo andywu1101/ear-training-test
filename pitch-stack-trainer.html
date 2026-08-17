@@ -25,6 +25,19 @@
     --font-display: 'Fraunces', serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* 觸控裝置操作優化（比照 04 四部和聲）：
+     作答頁全面禁止長按選取與「拷貝／查詢／翻譯」callout 選單。
+     按住譜面拖曳是本頁的主要輸入方式，一旦被系統的選取手勢接管就無法作答；
+     pointer 事件的 preventDefault 擋不掉它，必須靠 -webkit-touch-callout。 */
+  #pagePSPractice, #pagePSPractice * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none; -moz-user-select: none; user-select: none;
+  }
+  button, .action-btn, .play-btn, .mode-btn, .ps-key, .nav-back-btn, .reset-cache-btn {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none; -moz-user-select: none; user-select: none;
+  }
 
   html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--font-body); }
   .wrap { height: 100%; display: flex; flex-direction: column; max-width: 820px; margin: 0 auto; width: 100%; }
@@ -122,8 +135,10 @@
               max-width: 900px; margin: 0 auto;
               background: #fff; border: 1px solid var(--hairline); border-radius: 14px;
               box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+  /* 底部避開 iPhone 的 home indicator，避免誤觸；順帶讓譜例外框收窄一點 */
   .ps-bottom { flex: 0 0 auto; background: var(--panel); border-top: 1px solid var(--panel-border);
-               padding: 8px 12px 12px; box-shadow: 0 -4px 12px rgba(0,0,0,0.04); }
+               padding: 8px 12px 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+               box-shadow: 0 -4px 12px rgba(0,0,0,0.04); }
   .ps-status-line { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;
                     font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
   .ps-status-line b { color: var(--accent); }
@@ -133,12 +148,12 @@
 
   @media (min-width: 768px) {
     .ps-topbar { padding: 12px 24px; }
-    .ps-bottom { padding: 12px 24px 16px; }
+    .ps-bottom { padding: 12px 24px 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
     .action-btn, .play-btn { font-size: 14px; padding: 12px 20px; }
   }
   @media (orientation: landscape) and (max-width: 900px) {
     .ps-key { height: 44px; font-size: 14px; }
-    .ps-bottom { padding: 6px 12px 8px; }
+    .ps-bottom { padding: 6px 12px 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
     .ps-status-line { margin-bottom: 5px; }
   }
 
@@ -164,11 +179,14 @@
   .ps-hit{ position:absolute; inset:0; cursor:crosshair; touch-action:none; border-radius:14px; }
   .ps-count-hint{ font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 700; text-align: center; margin-top: 2px; }
   /* 編輯鍵盤：↑↓ 半音微調與刪除 */
-  .ps-keypad{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 460px; margin: 0 auto; }
-  .ps-key{ background:#fff; border:2px solid var(--panel-border); border-radius:12px; font-weight:700; color:var(--ink); cursor:pointer; height:58px; font-size:15px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.03); transition:0.1s; }
+  .ps-keypad{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 7px; max-width: 460px; margin: 0 auto; }
+  .ps-key{ background:#fff; border:2px solid var(--panel-border); border-radius:11px; font-weight:700; color:var(--ink); cursor:pointer; height:52px; font-size:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.03); transition:0.1s; }
+  /* 選中模式：按下去會亮起來，此時點譜面是選音符而不是填新的音 */
+  .ps-key.k-pick.on{ background:var(--accent); border-color:var(--accent); color:var(--panel); }
+  .ps-key.k-pick.on .k-sub{ color:rgba(251,250,246,0.8); }
   .ps-key:active{ transform:scale(0.95); border-color:var(--accent); }
   .ps-key:disabled{ opacity:0.4; cursor:not-allowed; }
-  .ps-key .k-sub{ font-size:11px; color:var(--ink-soft); font-weight:500; margin-top:2px; }
+  .ps-key .k-sub{ font-size:10.5px; color:var(--ink-soft); font-weight:500; margin-top:2px; }
   .ps-key.k-del{ color:var(--wrong); }
   .ps-sel-info{ font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft); text-align:center; margin: 0 0 10px; }
   .ps-sel-info b{ color: var(--accent); font-size: 14px; }
@@ -265,6 +283,7 @@
     <div class="ps-bottom">
       <div class="ps-status-line"><span id="ps-countHint"></span><span id="ps-selInfo"></span></div>
       <div class="ps-keypad">
+        <button class="ps-key k-pick" id="ps-pickBtn">☝<span class="k-sub">選中</span></button>
         <button class="ps-key" id="ps-upBtn">↑<span class="k-sub">升高半音</span></button>
         <button class="ps-key" id="ps-downBtn">↓<span class="k-sub">降低半音</span></button>
         <button class="ps-key k-del" id="ps-delBtn">🗑<span class="k-sub">刪除</span></button>
@@ -498,32 +517,66 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     return 1;                     // C4 以上：不限
   }
 
-  function genStack(clef, n){
-    const { lo, hi } = midiRange(clef);
-    for(let attempt = 0; attempt < 400; attempt++){
+  /* 在指定的半音範圍內生成 k 個音，套用音區最小間隔、最大增四度、
+     不連續相同半音數、不連續兩個小二度等規則。
+     wide=true 時不套用最大間隔（用於整個音堆只有 2 個音的完全特例）。 */
+  function genInRange(lo, hi, k, wide){
+    if(k <= 0) return [];
+    for(let attempt = 0; attempt < 300; attempt++){
       const seq = [lo + Math.floor(Math.random() * (hi - lo + 1))];
       let ok = true;
-      for(let k = 1; k < n; k++){
+      for(let i = 1; i < k; i++){
         const last = seq[seq.length - 1];
         const prevGap = seq.length > 1 ? (last - seq[seq.length - 2]) : null;
+        const gapMin = wide ? 1 : minGap(last);
+        const gapMax = wide ? (hi - last) : 6;
         const cands = [];
-        const gapMin = (n === 2) ? 1 : minGap(last);
-        const gapMax = (n === 2) ? (hi - last) : 6;
         for(let d = gapMin; d <= gapMax; d++){
           const m = last + d;
           if(m > hi) break;
-          if(prevGap !== null && d === prevGap) continue;          // 不得連續相同半音數
-          if(prevGap === 1 && d === 1) continue;                   // 不得連續兩個小二度
-          // 後面還要放幾個音，先確認剩餘空間放得下（用最寬鬆的估計）
-          const rest = n - k - 1;
+          if(prevGap !== null && d === prevGap) continue;
+          if(prevGap === 1 && d === 1) continue;
+          const rest = k - i - 1;
           if(rest > 0 && m + rest * minGap(m) > hi) continue;
           cands.push(m);
         }
         if(!cands.length){ ok = false; break; }
         seq.push(cands[Math.floor(Math.random() * cands.length)]);
       }
-      // 確認這組音寫得出「每個音各佔一個音級」的譜面，寫不出來就重抽
-      if(ok && seq.length === n && trySpell(seq)) return seq;
+      if(ok && seq.length === k) return seq;
+    }
+    return null;
+  }
+
+  /* 大譜表的音區配額：兩個譜表都必須分到音。
+     沒有這條的話，音堆常常整團擠在其中一行（實測 3 音有八成沒跨過中央 C），
+     等於選了大譜表卻只用到一半。跨越中央 C 的那個銜接音程不受最大間隔限制，
+     音堆才真的散得開。 */
+  const GRAND_QUOTA = {
+    2: [[1, 1]],
+    3: [[1, 2], [2, 1]],
+    4: [[2, 2], [1, 3], [3, 1]],
+    5: [[2, 3], [3, 2]],
+    6: [[3, 3], [2, 4], [4, 2]]
+  };
+
+  function genStack(clef, n){
+    if(clef === 'grand'){
+      const opts = GRAND_QUOTA[n] || [[Math.floor(n / 2), Math.ceil(n / 2)]];
+      for(let attempt = 0; attempt < 200; attempt++){
+        const [lowN, highN] = opts[Math.floor(Math.random() * opts.length)];
+        const low = genInRange(36, 59, lowN, lowN === 1);     // 低音譜表 C2–B3
+        const high = genInRange(60, 83, highN, highN === 1);  // 高音譜表 C4–B5
+        if(!low || !high) continue;
+        const seq = low.concat(high);
+        if(trySpell(seq)) return seq;
+      }
+      return null;
+    }
+    const { lo, hi } = midiRange(clef);
+    for(let attempt = 0; attempt < 400; attempt++){
+      const seq = genInRange(lo, hi, n, n === 2);
+      if(seq && trySpell(seq)) return seq;
     }
     return null;
   }
@@ -541,8 +594,9 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
      縮放參數反而會讓臨時記號的定位跑掉。
      ============================================================ */
   const SP = 5;                       // VexFlow 原生：每音級 5px（線距 10px）
-  const VB_W = 140;                   // 畫布（viewBox）寬
-  const STAVE_X = 14, STAVE_W = 118;  // 大括號畫在譜表左外側，起點要留出空間
+  const VB_W_MIN = 140, VB_W_MAX = 340;   // 畫布（viewBox）寬的上下限
+  const STAVE_X = 14;                 // 大括號畫在譜表左外側，起點要留出空間
+  const RIGHT_PAD = 10;
 
   /* 各譜表的畫布高度與 line 0 的位置（單位：viewBox 座標）
      treble line0 = F5(dn38)、bass line0 = A3(dn26) */
@@ -560,13 +614,27 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
   /* pitches：{dn, acc} 陣列
      opts：{ colors:{index:顏色}, ghost:{dn,acc}, selectedIdx:n } */
+  /* 音堆的水平寬度差異很大：沒有臨時記號時很窄，四五個記號會排成階梯而變得很寬
+     （大譜表實測可達 120px 以上）。畫布若固定寬度，寬音堆會超出小節線被裁掉，
+     也不可能置中。所以先試畫一次量出實際寬度，再用容納得下的畫布正式畫。 */
   function drawStack(containerId, pitches, clef, opts){
+    const probe = renderStack(containerId, pitches, clef, opts, VB_W_MAX, true);
+    let vbW = VB_W_MIN;
+    if(probe && isFinite(probe.contentW)){
+      // 左右都要留下譜號那一段的空間，音堆才能置中而不疊到譜號
+      vbW = Math.max(VB_W_MIN, Math.min(VB_W_MAX, Math.ceil(probe.startX * 2 + probe.contentW + RIGHT_PAD)));
+    }
+    return renderStack(containerId, pitches, clef, opts, vbW, false);
+  }
+
+  function renderStack(containerId, pitches, clef, opts, VB_W, measureOnly){
     const container = document.getElementById(containerId);
     if(!container) return null;
     container.innerHTML = '';
     opts = opts || {};
     const geo = STAFF_GEO[clef] || STAFF_GEO.treble;
     const m = { base: geo.base, height: geo.height };
+    const STAVE_W = VB_W - STAVE_X - RIGHT_PAD;
 
     try{
       const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
@@ -596,6 +664,27 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         new VF.StaveConnector(trebleStave, bassStave).setType(C.BOLD_DOUBLE_RIGHT).setContext(ctx).draw();
       }
 
+      // 座標映射一律以 stave 實際回報的位置為準
+      const refS0 = (clef === 'bass') ? bassStave : trebleStave;
+      m.line0Y = refS0 ? refS0.getYForLine(0) : (clef === 'bass' ? geo.bassY : geo.trebleY);
+
+      /* 預覽時畫一條橫跨整個譜面的輔助線，並在左端標出音名。
+         觸控時指腹會蓋住符頭，有這條線就能從左右兩側看出落在哪一線／哪一間，
+         不必把手指移開確認。先畫線、後畫音符，音符會蓋在線上方。 */
+      if(opts.ghost){
+        try{
+          const gy = m.line0Y + (m.base - opts.ghost.dn) * SP;
+          ctx.save();
+          ctx.setLineWidth(0.7);
+          ctx.setStrokeStyle('rgba(51,65,92,0.42)');
+          ctx.beginPath(); ctx.moveTo(2, gy); ctx.lineTo(VB_W - 2, gy); ctx.stroke();
+          ctx.setFont('Arial', 7, 'bold');
+          ctx.setFillStyle('rgba(51,65,92,0.85)');
+          ctx.fillText(pitchName(opts.ghost), 3, gy - 2.5);
+          ctx.restore();
+        }catch(e){}
+      }
+
       // 依所屬譜表分組（大譜表以中央 C 為界，C4 以上走高音譜表）
       const list = pitches.map((p, i) => ({ p, i }));
       if(opts.ghost) list.push({ p: opts.ghost, i: -1, ghost: true });
@@ -609,6 +698,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       groups.treble.sort((a, b) => a.p.dn - b.p.dn);
       groups.bass.sort((a, b) => a.p.dn - b.p.dn);
 
+      let contentW = 0;
       const voices = [], drawJobs = [], realNotes = [];
       [['treble', trebleStave], ['bass', bassStave]].forEach(([where, stave]) => {
         if(!stave) return;
@@ -639,21 +729,54 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         const ref = trebleStave || bassStave;
         const startX = ref.getNoteStartX(), endX = ref.getX() + ref.getWidth();
         new VF.Formatter().joinVoices(voices).format(voices, Math.max(40, endX - startX - 16));
-        // 全音符擺在小節正中央。位移必須改 tick context：直接用 setXShift 只會移動符頭，
-        // 臨時記號會留在原地（會看到記號孤零零掉在譜號旁邊）。
-        if(realNotes.length){
-          let wMax = 0;
-          realNotes.forEach(n => { wMax = Math.max(wMax, n.getWidth()); });
-          const shift = Math.max(0, ((endX - startX) - wMax) / 2);
-          const tc = realNotes[0].getTickContext();
-          if(tc && shift > 0) tc.setX(tc.getX() + shift);      // 共用同一個 tick context，上下譜表自動對齊
-        }
         drawJobs.forEach(([voice, stave]) => voice.draw(ctx, stave));
+
+        /* 音符置中於「整個譜面」的中心，而不是「譜號之後那一段」的中心
+           （後者會讓音符明顯偏右，因為譜號佔掉左邊一大塊）。
+           位移量必須用畫完後的實際圖形範圍來算：getWidth() 回報的寬度
+           和符頭實際落點差了十幾像素，臨時記號的數量也會影響。
+           直接平移整個音符群組，符頭與臨時記號會一起移動、不會脫節。 */
+        try{
+          const noteGroups = [].slice.call(container.querySelectorAll('.vf-stavenote'));
+          /* 大譜表的兩行必須把「符頭」對齊在同一條垂直線上。
+             VexFlow 會把臨時記號插在符頭左邊並把整個音符往右推，兩行的記號數量
+             不同時被推的距離就不同；若只給兩行同一個位移量，等於把原本就沒對齊的
+             兩行整體平移，還是不會對齊。所以先各自補正到同一個符頭 x，再一起置中。 */
+          const info = noteGroups.map(g => {
+            const b = g.getBBox();
+            const heads = [].slice.call(g.querySelectorAll('.vf-notehead path')).map(pth => {
+              const mm = (pth.getAttribute('d') || '').match(/M(-?[0-9.]+)/);
+              return mm ? parseFloat(mm[1]) : null;
+            }).filter(x => x !== null);
+            return { g: g, box: b, headX: heads.length ? Math.min.apply(null, heads) : (b ? b.x : 0) };
+          }).filter(o => o.box && o.box.width);
+
+          if(info.length){
+            const headTarget = Math.max.apply(null, info.map(o => o.headX));   // 對齊到最右的那一行
+            info.forEach(o => { o.align = headTarget - o.headX; });            // 各自的補正量
+
+            let minX = Infinity, maxX = -Infinity;
+            info.forEach(o => {
+              minX = Math.min(minX, o.box.x + o.align);
+              maxX = Math.max(maxX, o.box.x + o.box.width + o.align);
+            });
+            contentW = maxX - minX;
+            if(measureOnly) return { contentW: contentW, startX: startX };   // 量測階段：只回報寬度
+
+            let dx = VB_W / 2 - (minX + maxX) / 2;
+            if(minX + dx < startX + 1) dx = startX + 1 - minX;      // 不得疊到譜號上
+            if(maxX + dx > endX - 3) dx = endX - 3 - maxX;          // 也不得超出小節線
+            info.forEach(o => {
+              const total = o.align + dx;
+              if(Math.abs(total) > 0.05) o.g.setAttribute('transform', 'translate(' + total.toFixed(2) + ',0)');
+            });
+          } else if(measureOnly){
+            return { contentW: 0, startX: startX };
+          }
+        }catch(e){}
       }
 
-      // 座標映射一律以 stave 實際回報的位置為準
-      const refS = (clef === 'bass') ? bassStave : trebleStave;
-      m.line0Y = refS ? refS.getYForLine(0) : (clef === 'bass' ? geo.bassY : geo.trebleY);
+      if(measureOnly) return { contentW: contentW, startX: STAVE_X + 31 };
 
       /* 交給 SVG 自己等比縮放：拿掉固定的 width/height，只留 viewBox，
          再用 CSS 讓它填滿容器。瀏覽器會自動等比放大並置中，
@@ -679,7 +802,26 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
      音訊
      音堆同時彈出，讓 soundfont 自然衰減到沒有聲音，即為播放一次。
      ============================================================ */
-  const STACK_SUSTAIN = 7;     // 秒。鋼琴取樣自然衰減所需的長度
+  /* 鋼琴音色檔的取樣長度實測是 3.19 秒（88 鍵全部一樣長），
+     duration 設得再大也生不出聲音，只會讓「播放完畢」延後跳出、白等一段空白。
+     這裡取 3.3 秒，讓提示在聲音結束後立刻出現。 */
+  const STACK_SUSTAIN = 3.3;
+
+  /* 音量補償
+     兩件事：
+     1. 音區傾斜——鋼琴低音泛音豐富、能量集中，會遮蔽上方的音；高音取樣本身偏小、
+        衰減也快。低音略降、高音略提，讓音堆裡每個音都聽得清楚。
+        幅度刻意保守（每八度 1.2 dB，全音域差約 4.7 dB），不把真實樂器的平衡拉平。
+     2. 音數正規化——六個音同時發聲時總增益會逼近削波，糊成一團反而更難聽辨。
+        以「4 音」為基準（與先前一致），音數越多每個音略降。
+     想調整聽感就改這兩個常數：TILT_DB 調音區傾斜、GAIN_NORM 調音數正規化。 */
+  const GAIN_BASE = 3.2, TILT_DB = 1.2, GAIN_NORM = 0.35;
+  const GAIN_MIN = 1.7, GAIN_MAX = 4.8;
+  function gainFor(midi, count){
+    const tilt = Math.pow(10, ((midi - 60) / 12) * TILT_DB / 20);
+    const norm = Math.pow(4 / Math.max(1, count || 1), GAIN_NORM);
+    return Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
+  }
   let audioCtx = null, pianoInst = null, pendingTimers = [];
   function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
   window.psStopAll = function(){
@@ -712,22 +854,25 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     const ctx = ensureAudio();
     if(!ctx || !pianoInst) return;
     const t = ctx.currentTime + 0.08;
-    midis.forEach(m => pianoInst.play(m, t, { duration: STACK_SUSTAIN, gain: 3.2 }));
+    const n = midis.length;
+    midis.forEach(m => pianoInst.play(m, t, { duration: STACK_SUSTAIN, gain: gainFor(m, n) }));
     if(onDone) pendingTimers.push(setTimeout(onDone, (STACK_SUSTAIN + 0.2) * 1000));
   }
   function playArpeggio(midis, onDone){
     const ctx = ensureAudio();
     if(!ctx || !pianoInst || !midis.length) return;
     let t = ctx.currentTime + 0.08;
-    midis.forEach(m => { pianoInst.play(m, t, { duration: 0.55, gain: 3.2 }); t += 0.46; });
+    const n = midis.length;
+    // 逐音時不會疊加，只做音區傾斜；最後的齊奏才套用音數正規化
+    midis.forEach(m => { pianoInst.play(m, t, { duration: 0.55, gain: gainFor(m, 1) }); t += 0.46; });
     t += 0.15;
-    midis.forEach(m => pianoInst.play(m, t, { duration: STACK_SUSTAIN, gain: 3.2 }));
+    midis.forEach(m => pianoInst.play(m, t, { duration: STACK_SUSTAIN, gain: gainFor(m, n) }));
     if(onDone) pendingTimers.push(setTimeout(onDone, (t - ctx.currentTime + STACK_SUSTAIN) * 1000));
   }
   function playTuningA(){
     const ctx = ensureAudio();
     if(!ctx || !pianoInst) return;
-    pianoInst.play(69, ctx.currentTime + 0.05, { duration: 2, gain: 3.2 });
+    pianoInst.play(69, ctx.currentTime + 0.05, { duration: 2, gain: GAIN_BASE });
   }
 
   /* ============================================================
@@ -742,6 +887,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     user: [],                 // 使用者填的音：{dn, acc}
     selectedIdx: -1,
     ghost: null,
+    pickMode: false,          // true＝選中模式：點譜面是選既有音符，不會填新的音
     isPlaying: false, submitted: false, played: false,
     score: { c: 0, t: 0 },
     _view: null,
@@ -794,6 +940,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       this.user = [];
       this.selectedIdx = -1;
       this.ghost = null;
+      this.pickMode = false;
       this.submitted = false;
       this.played = false;
       this.replaysLeft = this.maxReplays;
@@ -814,11 +961,15 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
                      + '　｜　已填 <b>' + this.user.length + '</b> 個';
       const sel = document.getElementById('ps-selInfo');
       if(this.selectedIdx >= 0 && this.user[this.selectedIdx]) sel.innerHTML = '選中：<b>' + pitchName(this.user[this.selectedIdx]) + '</b>';
+      else if(this.pickMode) sel.textContent = '選中模式：點譜上的音符';
       else sel.textContent = '在譜上按住再放開即可填入';
       const noSel = (this.selectedIdx < 0 || this.submitted);
       document.getElementById('ps-upBtn').disabled = noSel;
       document.getElementById('ps-downBtn').disabled = noSel;
       document.getElementById('ps-delBtn').disabled = noSel;
+      const pick = document.getElementById('ps-pickBtn');
+      pick.classList.toggle('on', this.pickMode && !this.submitted);
+      pick.disabled = this.submitted || !this.user.length;
     },
 
     updatePlayBtn(){
@@ -857,6 +1008,12 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       this.updateStatus();
     },
 
+    setPickMode(on){
+      this.pickMode = !!on;
+      if(this.pickMode){ this.ghost = null; }
+      this.render();
+    },
+
     /* ---------- 點譜輸入 ---------- */
     hitDn(clientY){
       const svg = document.querySelector('#ps-staff svg');
@@ -890,6 +1047,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         this.render();
         return;
       }
+      if(this.pickMode) return;           // 選中模式：點空白處不作為
       if(this.user.length >= this.maxNotes()){
         document.getElementById('ps-selInfo').textContent = '已經填滿 ' + this.maxNotes() + ' 個音，請先刪除再填';
         return;
@@ -899,7 +1057,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       document.getElementById('ps-selInfo').innerHTML = '預覽：<b>' + pitchName(this.ghost) + '</b>（放開填入）';
     },
     pointerMove(clientY){
-      if(this.submitted || !this.ghost) return;
+      if(this.submitted || this.pickMode || !this.ghost) return;
       const dn = this.hitDn(clientY);
       if(dn === null || dn === this.ghost.dn) return;
       this.ghost = { dn: dn, acc: 0 };
@@ -907,12 +1065,13 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       document.getElementById('ps-selInfo').innerHTML = '預覽：<b>' + pitchName(this.ghost) + '</b>（放開填入）';
     },
     pointerUp(){
-      if(this.submitted || !this.ghost) return;
+      if(this.submitted || this.pickMode || !this.ghost) return;
       const p = this.ghost;
       this.ghost = null;
       if(this.indexAtDn(p.dn) >= 0){ this.render(); return; }
       this.user.push(p);
       this.selectedIdx = this.user.length - 1;
+      if(this.user.length >= this.maxNotes()) this.pickMode = true;   // 填滿了就自動切成選中模式
       this.render();
     },
 
@@ -1069,6 +1228,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     document.getElementById('ps-upBtn').onclick = () => psModule.nudge(1);
     document.getElementById('ps-downBtn').onclick = () => psModule.nudge(-1);
     document.getElementById('ps-delBtn').onclick = () => psModule.del();
+    document.getElementById('ps-pickBtn').onclick = () => psModule.setPickMode(!psModule.pickMode);
 
     document.getElementById('ps-ansNextBtn').onclick = () => { showPage('ps-practice'); psModule.newQuestion(); };
     document.getElementById('ps-ansPlayCorrect').onclick = () => { window.psStopAll(); playMidis(psModule.correctMidis); };
@@ -1090,7 +1250,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     hit.addEventListener('pointermove', function(e){
       if(!tracking){
         // 滑鼠尚未按下時也給預覽（電腦版：指標移到哪就預覽哪）
-        if(e.pointerType === 'mouse' && !psModule.submitted && psModule.user.length < psModule.maxNotes()){
+        if(e.pointerType === 'mouse' && !psModule.submitted && !psModule.pickMode && psModule.user.length < psModule.maxNotes()){
           const dn = psModule.hitDn(e.clientY);
           if(dn !== null && (!psModule.ghost || psModule.ghost.dn !== dn) && psModule.indexAtDn(dn) < 0){
             psModule.ghost = { dn: dn, acc: 0 };
