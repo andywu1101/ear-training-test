@@ -27,7 +27,9 @@
   .page-view.active { display: block; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* 目錄頁背景：固定不動的淡音符點綴，捲動時卡片會從上面滑過 */
+  /* 目錄頁背景：固定不動的淡音符點綴，捲動時卡片會從上面滑過。
+     縱向位置用 --app-vh 而非 %：手機瀏覽器的工具列收合會改變視窗高度，
+     用百分比的話音符會在載入後跳一下位置。橫向用 % 沒有這個問題。 */
   .menu-notes{ position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
   .menu-note{ position: absolute; font-family: var(--font-display); color: var(--accent);
               opacity: 0.07; line-height: 1; user-select: none; }
@@ -247,11 +249,18 @@
   <div id="pageMenu" class="page-view">
     <button class="cover-back-btn" onclick="showCover()">← 封面</button>
     <div class="menu-notes" aria-hidden="true">
-      <span class="menu-note" style="top:4%; right:6%; font-size:104px;">♫</span>
-      <span class="menu-note" style="top:16%; left:-3%; font-size:132px;">♪</span>
-      <span class="menu-note" style="top:44%; right:-4%; font-size:150px;">𝄞</span>
-      <span class="menu-note" style="top:70%; left:2%; font-size:96px;">♩</span>
-      <span class="menu-note" style="bottom:4%; right:8%; font-size:118px;">♬</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 4); right:6%; font-size:104px;">♫</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 13); left:-3%; font-size:132px;">♪</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 22); right:26%; font-size:62px;">♩</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 31); left:12%; font-size:78px;">♬</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 40); right:-4%; font-size:150px;">𝄞</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 49); left:2%; font-size:92px;">♪</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 58); right:14%; font-size:70px;">♫</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 67); left:-2%; font-size:120px;">♩</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 74); right:4%; font-size:96px;">♬</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 83); left:16%; font-size:64px;">♪</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 90); right:22%; font-size:110px;">𝄞</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 95); left:1%; font-size:82px;">♫</span>
     </div>
 
     <h1>音樂聽力練習</h1>
@@ -493,6 +502,11 @@
 </div>
 
 <script>
+/* 視窗實際高度寫進 --app-vh：手機工具列收合時 100vh 會變，用這個值才不會讓固定定位的元素跳動 */
+(function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+</script>
+<script>
 /* 從練習頁返回時帶 #menu：直接顯示選單、跳過封面（封面只在首次啟動出現）。此段趁早執行，避免閃到封面。 */
 /* 錯題本相關的錨點要等下面的渲染函式定義好才能處理，這裡先記下來、順便把封面收起來避免閃爍 */
 if (location.hash === '#hub-practice' || location.hash === '#hub') {
@@ -617,7 +631,7 @@ window.CHANGELOG = [
   { v: 'v.83', items: ['新增「模擬考錯題本」：交卷後會完整保留考卷（最多 20 份），可一張一張回顧複習', '優化錯題本，現在有兩個入口：錯題本目錄（練習）、模擬考錯題本目錄', '各練習的解答頁新增「本項錯題本」與「錯題本目錄」按鈕', '優化模擬考分數顯示，看起來更加直觀'] },
   { v: 'v.84', items: ['錯題本改為由舊到新排列，進入時自動顯示最新一筆，並新增「返回設定頁」', '譜例寬度改為依音符密度自動調整，解答頁上下兩張譜等寬，捲軸同步時拍子對得齊', '統一各解答頁的按鈕排列與音符框選範圍', '修正模擬考錯題本中，音程與和絃會顯示到不相關內容的問題', '修正「錯題本目錄」點進去顯示空白、以及找錯音解答頁在手機無法上下捲動的問題', '作答時關閉手機的左滑返回手勢，避免捲動譜例時誤觸而離開頁面', '修正找錯音設定頁拖動播放速度時，上方數字不會跟著變的問題'] },
   { v: 'v.85', items: ['全新推出「08 音堆練習」：聆聽同時彈出的音堆，將每一個正確音高寫到五線譜上', '特別優化音堆練習的播放音量，現在和聲的音高會聽得更清楚，低音不會再將高音蓋過去'] },
-  { v: 'v.86', items: ['目錄改版：手機也改成一行兩張卡片，八個練習項目一個畫面看得完', '各練習項目的說明改由卡片右下角的 ▸ 開啟，版面更清爽', '修正音堆練習中，中央 C 等加線與音符沒有對齊的問題'] }
+  { v: 'v.86', items: ['主目錄介面優化：現在八個練習項目一目了然', '透過手機操作時，各練習項目的說明改由卡片右下角的 ▸ 開啟，版面更清爽', '修正音堆練習中，中央 C 等加線與音符沒有對齊的問題'] }
 ];
 
 function showChangelog(){
