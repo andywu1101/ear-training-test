@@ -79,9 +79,10 @@
   .badge-ready { background: var(--accent); color: var(--panel); }
   .badge-review { background: var(--wrong); color: var(--panel); }
   .badge-soon { background: var(--hairline); color: var(--ink-soft); }
-  /* New! 標籤跟在編號旁邊，窄卡片上才不會壓到標題 */
-  .menu-card-num .menu-new { position: static; margin-left: 6px; vertical-align: 1px; }
-  .menu-new { position: absolute; right: 18px; bottom: 16px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 4px 10px; border-radius: 999px; background: var(--wrong); color: #fff; }
+  /* New! 標籤放卡片右上角；電腦版右上角有「開始練習」徽章，往左讓開並與它切齊
+     （top、字級、內距都要和 .menu-badge 一致，否則兩顆會一高一低） */
+  .menu-new { position: absolute; top: 18px; right: 96px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 4px 10px; border-radius: 999px; background: var(--wrong); color: #fff; }
+  @media (max-width: 600px){ .menu-new { top: 12px; right: 12px; } }
   .footer-note{ margin-top: 14px; font-size: 13.5px; color: var(--ink-soft); text-align:center; line-height:1.7; }
   .footer-link{ color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
   .footer-link:hover{ text-decoration: underline; }
@@ -246,9 +247,11 @@
   <div id="pageMenu" class="page-view">
     <button class="cover-back-btn" onclick="showCover()">← 封面</button>
     <div class="menu-notes" aria-hidden="true">
-      <span class="menu-note" style="top:9%; left:-3%; font-size:132px;">♪</span>
-      <span class="menu-note" style="top:46%; right:-4%; font-size:150px;">𝄞</span>
-      <span class="menu-note" style="bottom:6%; left:4%; font-size:112px;">♬</span>
+      <span class="menu-note" style="top:4%; right:6%; font-size:104px;">♫</span>
+      <span class="menu-note" style="top:16%; left:-3%; font-size:132px;">♪</span>
+      <span class="menu-note" style="top:44%; right:-4%; font-size:150px;">𝄞</span>
+      <span class="menu-note" style="top:70%; left:2%; font-size:96px;">♩</span>
+      <span class="menu-note" style="bottom:4%; right:8%; font-size:118px;">♬</span>
     </div>
 
     <h1>音樂聽力練習</h1>
@@ -328,8 +331,9 @@
 
       <a href="pitch-stack-trainer.html" class="menu-card active-feature practice-card">
         <span class="menu-badge badge-ready">開始練習</span>
+        <span class="menu-new">New!</span>
         <div>
-          <div class="menu-card-num">08 <span class="menu-new">New!</span></div>
+          <div class="menu-card-num">08</div>
           <h3 class="menu-card-title">音堆練習</h3>
           <p class="menu-card-desc">聆聽同時彈出的音堆，把裡面的每一個音高寫到五線譜上。</p>
         </div>
