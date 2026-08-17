@@ -137,10 +137,11 @@
               box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
   /* 底部避開 iPhone 的 home indicator，避免誤觸；順帶讓譜例外框收窄一點。
      注意：env(safe-area-inset-bottom) 只有在 viewport meta 設了 viewport-fit=cover
-     才會有值，本專案沒有設（設了會牽動整頁版面），所以這裡用固定的 32px 保留空間，
+     才會有值，本專案沒有設（設了會牽動整頁版面），所以這裡用固定值保留空間：
+     直式 34px、橫式 24px，對齊 iPhone 實際的 safe-area-inset-bottom。
      env() 只當作有朝一日改用 cover 時的額外補償。 */
   .ps-bottom { flex: 0 0 auto; background: var(--panel); border-top: 1px solid var(--panel-border);
-               padding: 8px 12px 12px; padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+               padding: 8px 12px 12px; padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px));
                box-shadow: 0 -4px 12px rgba(0,0,0,0.04); }
   .ps-status-line { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;
                     font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
@@ -151,7 +152,7 @@
 
   @media (min-width: 768px) {
     .ps-topbar { padding: 12px 24px; }
-    .ps-bottom { padding: 12px 24px 16px; padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
+    .ps-bottom { padding: 12px 24px 16px; padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px)); }
     .action-btn, .play-btn { font-size: 14px; padding: 12px 20px; }
   }
   @media (orientation: landscape) and (max-width: 900px) {
