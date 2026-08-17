@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v84'; // v.84：錯題本與譜例顯示優化、多項修正
+const CACHE_NAME = 'ear-training-shell-v85'; // v.85：新增 08 音堆練習
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
@@ -13,6 +13,7 @@ const APP_SHELL = [
   './two-part-trainer.html',
   './four-part-trainer.html',
   './pitch-error-trainer.html',
+  './pitch-stack-trainer.html',
   './manifest.json'
 ];
 

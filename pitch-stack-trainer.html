@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>音堆練習 - 音樂聽力練習</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="聽力訓練">
+<meta name="theme-color" content="#33415c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
+<script src="soundfont-player.min.js"></script>
+<script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
+<script src="vexflow-min.js"></script>
+<script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
+<style>
+  :root{
+    --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
+    --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
+    --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--font-body); }
+  .wrap { height: 100%; display: flex; flex-direction: column; max-width: 820px; margin: 0 auto; width: 100%; }
+
+  .page-view { display: none; height: 100%; flex-direction: column; animation: fadeIn 0.2s ease-out; }
+  .page-view.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ================= 設定頁 / 解答頁 / 錯題本頁（可捲動） ================= */
+  #pagePSSettings, #pagePSAnswer, #pagePSReview { overflow-y: auto; padding: 20px 16px 64px; }
+  .nav-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .nav-back-btn, .reset-cache-btn {
+    display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid var(--panel-border); background: var(--panel); color: var(--ink); cursor: pointer; text-decoration: none;
+  }
+  .reset-cache-btn { color: #8a6d20; border-color: #ffd885; background: #fff8e6; margin-left: 8px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: 28px; margin: 0 0 8px; }
+  .subtitle { color: var(--ink-soft); font-size: 13.5px; margin: 0 0 20px; line-height: 1.5; }
+
+  .switch-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .switch-group { display: flex; flex-direction: column; gap: 8px; }
+  .switch-group-label { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+  .switch-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mode-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 10px; background: transparent; border: 1px solid var(--panel-border); color: var(--ink-soft); cursor: pointer; }
+  .mode-btn.active { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+
+  .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); cursor: pointer; }
+
+  .start-big-btn { width: 100%; font-weight: 700; font-size: 16px; padding: 16px; border-radius: var(--radius); background: var(--accent); color: var(--panel); border: none; cursor: pointer; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(51,65,92,0.2); transition: filter 0.2s; }
+  .start-big-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .review-entry-btn{ width:100%; padding:14px; border-radius:999px; font-weight:700; font-size:15px; background:transparent; color:var(--ink); border:1px solid var(--ink); cursor:pointer; margin-bottom:20px; }
+  .review-entry-btn:hover, .review-entry-btn:active{ background:var(--ink); color:var(--panel); }
+
+  /* ================= 作答頁 (上下分層) ================= */
+
+  .top-bar-practice { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .practice-status-badge { font-family: var(--font-mono); font-size: 12px; background: var(--panel); border: 1px solid var(--panel-border); padding: 6px 12px; border-radius: 999px; color: var(--ink-soft); }
+  .score-box { text-align: right; font-family: var(--font-mono); }
+  .score-box .num { font-size: 18px; font-weight: 700; color: var(--accent); line-height: 1; }
+
+
+  .unified-action-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .action-btn, .play-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s; }
+  .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
+  .play-btn, .btn-submit { background: var(--accent); color: var(--panel); border: none; }
+  .play-btn:disabled, .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; background: var(--ink-soft); }
+  .play-caption { font-size: 12px; color: var(--ink-soft); font-weight: 600; text-align: center; }
+
+  .answer-big-feedback{ font-family: var(--font-display); font-size: 22px; font-weight: 700; text-align:center; margin: 6px 0 14px; }
+  .answer-big-feedback.correct{ color: var(--correct); }
+  .answer-big-feedback.wrong{ color: var(--wrong); }
+
+  .review-item { background: #fff; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .review-label { font-size: 12px; font-weight: bold; color: var(--ink-soft); margin-bottom: 4px; }
+  .review-staff { overscroll-behavior-x: contain; background: var(--panel); border-radius: 8px; padding: 10px 4px; margin-bottom: 12px; border: 1px solid var(--hairline); width: 100%; overflow-x: auto; overflow-y: hidden; }
+
+  .loading-banner { text-align: center; font-size: 12px; color: var(--ink-soft); background: #fff; padding: 8px; border-radius: 8px; margin-bottom: 16px; }
+
+  @media (min-width: 768px) {
+    .wrap { border-left: 1px solid var(--hairline); border-right: 1px solid var(--hairline); background: var(--paper); box-shadow: 0 0 20px rgba(0,0,0,0.05); }
+    .action-btn, .play-btn { font-size: 14px; padding: 12px 20px; }
+  }
+
+  /* ===== 玩法說明按鈕與彈窗 ===== */
+  .help-btn{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-body); font-size:13px; font-weight:600; color:var(--accent); background:#fff; border:1px solid var(--accent-line); padding:8px 14px; border-radius:999px; cursor:pointer; touch-action:manipulation; white-space:nowrap; }
+  .help-btn:hover, .help-btn:active{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .help-modal{ display:none; position:fixed; inset:0; z-index:1000; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .help-modal.open{ display:flex; align-items:flex-start; justify-content:center; }
+  .help-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; max-width:560px; width:100%; margin:auto; padding:24px 22px 22px; box-shadow:0 20px 50px rgba(0,0,0,0.28); position:relative; animation:helpIn .2s ease-out; }
+  @keyframes helpIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .help-box h2{ font-family:var(--font-display); font-size:22px; font-weight:600; margin:0 30px 6px 0; }
+  .help-box h3{ font-family:var(--font-body); font-size:13.5px; font-weight:700; color:var(--accent); margin:16px 0 5px; }
+  .help-box p{ font-size:13.5px; line-height:1.8; color:var(--ink); margin:0 0 8px; }
+  .help-box .help-lead{ color:var(--ink-soft); font-size:13px; margin-bottom:4px; }
+  .help-box b{ font-weight:700; }
+  .help-close{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:50%; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink); font-size:20px; line-height:1; cursor:pointer; }
+  .help-close:hover{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .help-common{ margin-top:18px; padding-top:14px; border-top:1px dashed var(--panel-border); }
+  .help-common h3{ color:var(--ink-soft); }
+  .help-common p{ font-size:12.5px; line-height:1.75; color:var(--ink-soft); }
+  .help-foot{ margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+  .help-foot button{ font-family:var(--font-body); font-weight:700; font-size:14px; padding:11px 26px; border-radius:999px; cursor:pointer; touch-action:manipulation; background:var(--accent); color:var(--panel); border:1px solid var(--accent); }
+
+  /* ===== 作答頁版面：上（標題列）／中（譜例，吃滿剩餘空間）／下（作答控制） =====
+     譜例不設高度上限，改由程式量測中間區塊的實際高度，再回推每個音級的像素。 */
+  .ps-topbar { flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center;
+               padding: 8px 12px; border-bottom: 1px solid var(--panel-border); background: var(--paper); }
+  /* 譜例區：外框與譜面一律用絕對定位取得明確尺寸。
+     用 height:100% 會依賴整條父層鏈，在 flex 裡常常解析不出來而退化成 auto，
+     SVG 就會只依寬度撐開、高度爆出外框（大譜表特別明顯）。 */
+  .ps-stagewrap { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: var(--paper); }
+  /* 譜例外框：白底長方形，填滿中間區域；譜例由 SVG 的 viewBox 等比放大置中 */
+  .ps-stage { position: absolute; top: 10px; bottom: 10px; left: 10px; right: 10px;
+              max-width: 900px; margin: 0 auto;
+              background: #fff; border: 1px solid var(--hairline); border-radius: 14px;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+  .ps-bottom { flex: 0 0 auto; background: var(--panel); border-top: 1px solid var(--panel-border);
+               padding: 8px 12px 12px; box-shadow: 0 -4px 12px rgba(0,0,0,0.04); }
+  .ps-status-line { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;
+                    font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
+  .ps-status-line b { color: var(--accent); }
+  .ps-bottom .ps-keypad { margin-bottom: 8px; }
+  .ps-bottom .unified-action-row { margin-bottom: 0; }
+  .play-caption:empty { display: none; }
+
+  @media (min-width: 768px) {
+    .ps-topbar { padding: 12px 24px; }
+    .ps-bottom { padding: 12px 24px 16px; }
+    .action-btn, .play-btn { font-size: 14px; padding: 12px 20px; }
+  }
+  @media (orientation: landscape) and (max-width: 900px) {
+    .ps-key { height: 44px; font-size: 14px; }
+    .ps-bottom { padding: 6px 12px 8px; }
+    .ps-status-line { margin-bottom: 5px; }
+  }
+
+  /* 解答頁：寬螢幕左右並排，手機直式改成上下（手機並排會把譜擠得太小） */
+  .ps-compare { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  @media (min-width: 768px) { .ps-compare { grid-template-columns: 1fr 1fr; gap: 14px; } }
+  .ps-compare-col { min-width: 0; }
+  .ps-compare .review-staff { margin-bottom: 0; text-align: center; }
+
+  /* 解答頁／錯題本：譜例不可被 flex 壓縮 */
+  .review-staff { flex: 0 0 auto; }
+
+  /* 左緣 24px 是防返回手勢的攔截區，作答頁的返回鍵往右挪一點避開 */
+  #pagePSPractice .nav-back-btn { margin-left: 18px; }
+</style>
+<style>
+  /* ===== 08 音堆練習 專屬 ===== */
+  /* 譜面點擊層：整層接收指標事件，只取縱向位置決定音高 */
+  /* 譜面容器用絕對定位撐滿外框內緣，SVG 才有明確的高度可以填滿 */
+  #ps-staff{ position:absolute; top:12px; bottom:12px; left:16px; right:16px; }
+  #ps-staff svg{ display:block; width:100%; height:100%; }
+  .review-staff svg{ display:block; width:100%; height:100%; }
+  .ps-hit{ position:absolute; inset:0; cursor:crosshair; touch-action:none; border-radius:14px; }
+  .ps-count-hint{ font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 700; text-align: center; margin-top: 2px; }
+  /* 編輯鍵盤：↑↓ 半音微調與刪除 */
+  .ps-keypad{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 460px; margin: 0 auto; }
+  .ps-key{ background:#fff; border:2px solid var(--panel-border); border-radius:12px; font-weight:700; color:var(--ink); cursor:pointer; height:58px; font-size:15px; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.03); transition:0.1s; }
+  .ps-key:active{ transform:scale(0.95); border-color:var(--accent); }
+  .ps-key:disabled{ opacity:0.4; cursor:not-allowed; }
+  .ps-key .k-sub{ font-size:11px; color:var(--ink-soft); font-weight:500; margin-top:2px; }
+  .ps-key.k-del{ color:var(--wrong); }
+  .ps-sel-info{ font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft); text-align:center; margin: 0 0 10px; }
+  .ps-sel-info b{ color: var(--accent); font-size: 14px; }
+  .ps-detail{ font-family: var(--font-mono); font-size: 12px; line-height: 1.8; color: var(--ink-soft); background:#fff; border:1px dashed var(--panel-border); border-radius:8px; padding:10px 12px; margin-top:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="loading-banner" id="loadingBanner">🎹 正在載入高音質鋼琴音色，請稍候…</div>
+
+  <!-- ================= 設定頁 ================= -->
+  <div id="pagePSSettings" class="page-view active">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+        <button class="help-btn" onclick="openHelp('ps-helpModal')">❔ 玩法說明</button>
+        <button class="reset-cache-btn" onclick="forceResetCache()">🔄 重置快取</button>
+      </div>
+    </div>
+
+    <h1>音堆練習 — 設定</h1>
+    <p class="subtitle">聆聽同時彈出的音堆，把裡面的每一個音高都寫到五線譜上。全部正確才算答對。</p>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">練習模式</div>
+        <div class="switch-btns" id="ps-modeSwitch">
+          <button class="mode-btn active" data-mode="practice">練習模式</button>
+          <button class="mode-btn" data-mode="test">測驗模式 (限制次數)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">譜表選項</div>
+        <div class="switch-btns" id="ps-clefSwitch">
+          <button class="mode-btn active" data-clef="treble">高音譜號 (C4–B5)</button>
+          <button class="mode-btn" data-clef="bass">低音譜號 (C2–B3)</button>
+          <button class="mode-btn" data-clef="grand">大譜表 (C2–B5)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <div class="switch-group">
+        <div class="switch-group-label">音堆的音數</div>
+        <select id="ps-countSelect" class="select-box">
+          <option value="2">2 個音</option>
+          <option value="3" selected>3 個音</option>
+          <option value="4">4 個音</option>
+          <option value="5">5 個音</option>
+          <option value="6">6 個音</option>
+          <option value="random">隨機 2～6 個音（不顯示音數）</option>
+        </select>
+      </div>
+      <div class="switch-group" id="ps-testReplayWrapper" style="display:none;">
+        <div class="switch-group-label">限制播放次數</div>
+        <select id="ps-testReplaySelect" class="select-box">
+          <option value="1">1 次</option>
+          <option value="2">2 次</option>
+          <option value="3" selected>3 次</option>
+          <option value="4">4 次</option>
+          <option value="5">5 次</option>
+          <option value="6">6 次</option>
+          <option value="7">7 次</option>
+          <option value="8">8 次</option>
+          <option value="9">9 次</option>
+          <option value="10">10 次</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="start-big-btn" id="ps-enterBtn">🎯 確認設定，開始練習 →</button>
+    <button class="review-entry-btn" onclick="showPage('ps-review')">📕 錯題本（<span id="ps-reviewCount">0</span> 題）</button>
+  </div>
+
+  <!-- ================= 作答頁 ================= -->
+  <div id="pagePSPractice" class="page-view">
+    <div class="ps-topbar">
+      <button class="nav-back-btn" style="margin:0;" onclick="showPage('ps-settings')">← 返回設定頁</button>
+      <span class="practice-status-badge" id="ps-statusBadge">—</span>
+      <div class="score-box"><div class="num" id="ps-scoreNum">0 / 0</div></div>
+    </div>
+
+    <!-- 譜例區：不分層、不設高度上限，直接吃滿中間所有剩餘空間 -->
+    <div class="ps-stagewrap" id="ps-stageWrap">
+      <div class="ps-stage" id="ps-stage">
+        <div id="ps-staff"></div>
+        <div class="ps-hit" id="ps-hit"></div>
+      </div>
+    </div>
+
+    <div class="ps-bottom">
+      <div class="ps-status-line"><span id="ps-countHint"></span><span id="ps-selInfo"></span></div>
+      <div class="ps-keypad">
+        <button class="ps-key" id="ps-upBtn">↑<span class="k-sub">升高半音</span></button>
+        <button class="ps-key" id="ps-downBtn">↓<span class="k-sub">降低半音</span></button>
+        <button class="ps-key k-del" id="ps-delBtn">🗑<span class="k-sub">刪除</span></button>
+      </div>
+      <div class="unified-action-row">
+        <button class="play-btn" id="ps-playBtn" disabled>▶ 播放音堆</button>
+        <button class="action-btn" id="ps-tuningBtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <button class="action-btn btn-submit" id="ps-submitBtn">✔ 提交作答</button>
+      </div>
+      <div class="play-caption" id="ps-playCaption"></div>
+    </div>
+  </div>
+
+  <!-- ================= 解答頁 ================= -->
+  <div id="pagePSAnswer" class="page-view">
+    <div class="top-bar-practice" style="margin-bottom:14px;">
+      <button class="nav-back-btn" style="margin:0;" onclick="showPage('ps-practice')">← 返回作答</button>
+      <span class="practice-status-badge" id="ps-ansBadge">解答對照</span>
+      <div class="score-box"><div class="num" id="ps-ansScore">0 / 0</div></div>
+    </div>
+
+    <div class="answer-big-feedback" id="ps-ansFeedback"></div>
+
+    <div class="unified-action-row" style="margin-bottom:14px;">
+      <button class="play-btn" id="ps-ansPlayCorrect">🎧 聽正確音堆</button>
+      <button class="action-btn" id="ps-ansPlayArp">🔁 分解琶音</button>
+      <button class="action-btn" id="ps-ansPlayMine" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽我寫的</button>
+      <button class="action-btn" id="ps-ansTuning" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+    </div>
+
+    <div class="ps-compare">
+      <div class="ps-compare-col">
+        <div class="review-label">正確答案（綠色＝你答對的音）</div>
+        <div class="review-staff"><div id="ps-ansCorrectStaff"></div></div>
+      </div>
+      <div class="ps-compare-col">
+        <div class="review-label">你的作答（紅色＝多寫的音）</div>
+        <div class="review-staff"><div id="ps-ansMineStaff"></div></div>
+      </div>
+    </div>
+
+    <div class="ps-detail" id="ps-ansDetail"></div>
+
+    <div class="unified-action-row" style="margin-top:18px;">
+      <button class="action-btn btn-submit" id="ps-ansNextBtn" style="flex:1; padding:14px;">下一題 →</button>
+    </div>
+    <div class="unified-action-row js-review-links" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="showPage('ps-review')">📕 本項錯題本</button>
+    </div>
+    <div class="unified-action-row js-review-links" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#hub-practice'">📘 錯題本目錄</button>
+    </div>
+    <div class="unified-action-row" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+    </div>
+  </div>
+
+  <!-- ================= 錯題本 ================= -->
+  <div id="pagePSReview" class="page-view">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="showPage('ps-settings')">← 返回設定頁</button>
+      <button class="reset-cache-btn" id="ps-clearReviewBtn">🗑️ 清空錯題本</button>
+    </div>
+    <h1>錯題本</h1>
+    <p class="subtitle">收錄沒有完全答對的題目，重整或關閉後仍會保留。可對照正確答案與自己的作答，並分別聆聽。</p>
+    <div id="ps-reviewList"></div>
+    <div class="js-review-links" style="margin-top:20px;">
+      <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
+      <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+    </div>
+    <p id="ps-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
+  </div>
+</div>
+
+<!-- 玩法說明彈窗 -->
+<div class="help-modal" id="ps-helpModal" onclick="if(event.target===this) closeHelp('ps-helpModal')">
+  <div class="help-box">
+    <button class="help-close" onclick="closeHelp('ps-helpModal')" aria-label="關閉">×</button>
+    <h2>音堆練習 — 玩法說明</h2>
+    <p class="help-lead">聆聽同時彈出的音堆，把裡面的每一個音高寫到五線譜上。</p>
+    <h3>玩法</h3>
+    <p>每一題是<b>一個音堆</b>（所有音同時彈出），以<b>全音符</b>記在一個小節裡。你要聽出裡面有哪些音高，並把它們全部寫上去。<b>所有音高完全正確</b>才算答對，寫錯、漏掉或多寫都算錯。</p>
+    <h3>設定</h3>
+    <p>可選<b>練習模式</b>（播放次數不限）或<b>測驗模式</b>（自訂 1～10 次）。譜表可選高音譜號、低音譜號或大譜表。音數可指定 2～6 個，也可以選<b>隨機</b>——隨機時不會告訴你有幾個音，難度最高。</p>
+    <h3>作答</h3>
+    <p>在譜上<b>按住</b>會出現灰色預覽音符，<b>滑動</b>調整位置，<b>放開</b>才填入。剛填的音會是<b>選中狀態</b>，點譜上已填的音符也可以改選它。選中後用 <b>↑↓</b> 做半音微調（往上用升記號、往下用降記號，會跨到別的音上），或按 <b>🗑</b> 刪除。「<b>🎵 標準音 A</b>」隨時可按，不佔播放次數。</p>
+    <h3>記譜</h3>
+    <p>同音高的不同寫法（例如 F♯ 與 G♭）<b>視為相同</b>，不影響對錯，只要實際音高正確就好。</p>
+    <div class="help-common">
+      <h3>錯題本</h3>
+      <p>沒有完全答對的題目會自動收進「錯題本」，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。每個練習最多保留最近 50 筆。</p>
+      <h3>回報問題</h3>
+      <p style="margin-top:2px;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
+    </div>
+    <div class="help-foot"><button onclick="closeHelp('ps-helpModal')">我知道了</button></div>
+  </div>
+</div>
+
+<script>
+function forceResetCache() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(r => r.forEach(x => x.unregister()));
+  if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
+  alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
+}
+/* 錯題本：舊的在上、新的在下，進入時直接跳到最下面 */
+function scrollReviewToBottom(pageId){
+  try{
+    setTimeout(function(){
+      var el = document.getElementById(pageId);
+      if(el && el.scrollHeight > el.clientHeight + 4){ el.scrollTop = el.scrollHeight; }
+      else { window.scrollTo(0, document.documentElement.scrollHeight); }
+    }, 260);
+  }catch(e){}
+}
+
+function showPage(pageId) {
+  if (window.psStopAll) window.psStopAll();
+  document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+  if (pageId === 'ps-settings') { document.getElementById('pagePSSettings').classList.add('active'); if(window.psModule) psModule.refreshReviewCount(); }
+  else if (pageId === 'ps-practice') {
+    document.getElementById('pagePSPractice').classList.add('active');
+    if(window.psModule && psModule.correctMidis.length) requestAnimationFrame(() => psModule.render());
+  }
+  else if (pageId === 'ps-answer') document.getElementById('pagePSAnswer').classList.add('active');
+  else if (pageId === 'ps-review') { document.getElementById('pagePSReview').classList.add('active'); if(window.psModule) psModule.renderReviewPage(); }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ===== 統一錯題本儲存（與各練習頁共用同一組 localStorage key） ===== */
+window.REVIEW_STORE = {
+  PREFIX: 'earTrainer.review.',
+  load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
+  save(type, arr){ try { localStorage.setItem(this.PREFIX+type, JSON.stringify(arr)); } catch(e){} },
+  MAX_ITEMS: 50,
+  add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); while(a.length > this.MAX_ITEMS) a.shift(); this.save(type,a); return a; },
+  clear(type){ this.save(type, []); },
+  count(type){ return this.load(type).length; }
+};
+
+function escapeHtml(t){ return String(t).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+function openHelp(id){ const m=document.getElementById(id); if(m){ m.classList.add('open'); _syncHelpLock(); } }
+function closeHelp(id){ const m=document.getElementById(id); if(m){ m.classList.remove('open'); _syncHelpLock(); } }
+function _syncHelpLock(){
+  var open = document.querySelectorAll('.help-modal.open').length > 0;
+  document.body.style.overflow = open ? 'hidden' : '';
+  document.body.style.touchAction = open ? 'none' : '';
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document.querySelectorAll('.help-modal.open').forEach(function(m){ m.classList.remove('open'); }); _syncHelpLock(); } });
+
+(function(){
+  const VF = Vex.Flow;
+
+  /* ============================================================
+     音高模型
+     以「音級序號 dn」＋「臨時記號 acc」表示一個音。
+     dn = 八度 × 7 ＋ 音名序（C=0 D=1 E=2 F=3 G=4 A=5 B=6）
+     這樣譜上的縱向位置只由 dn 決定，acc 不影響位置。
+     ============================================================ */
+  const LETTERS = ['C','D','E','F','G','A','B'];
+  const DN_SEMI = [0, 2, 4, 5, 7, 9, 11];
+  const ACC_TEXT = { '-1': '♭', '0': '', '1': '♯' };
+
+  function dnNatMidi(dn){ return (Math.floor(dn/7) + 1) * 12 + DN_SEMI[((dn % 7) + 7) % 7]; }
+  function midiOf(p){ return dnNatMidi(p.dn) + p.acc; }
+  function pitchName(p){ return LETTERS[((p.dn % 7) + 7) % 7] + ACC_TEXT[String(p.acc)] + Math.floor(p.dn / 7); }
+  function vexKey(p){ return LETTERS[((p.dn % 7) + 7) % 7].toLowerCase() + '/' + Math.floor(p.dn / 7); }
+  function vexAcc(p){ return p.acc === 1 ? '#' : (p.acc === -1 ? 'b' : 'n'); }
+
+  /* 升號體系與降號體系的拼寫表（刻意不含 E♯／F♭／B♯／C♭） */
+  const SHARP_SPELL = [[0,0],[0,1],[1,0],[1,1],[2,0],[3,0],[3,1],[4,0],[4,1],[5,0],[5,1],[6,0]];
+  const FLAT_SPELL  = [[0,0],[1,-1],[1,0],[2,-1],[2,0],[3,0],[4,-1],[4,0],[5,-1],[5,0],[6,-1],[6,0]];
+
+  function spellMidi(midi, useFlat){
+    const pc = ((midi % 12) + 12) % 12;
+    const t = (useFlat ? FLAT_SPELL : SHARP_SPELL)[pc];
+    const letterIdx = t[0], acc = t[1];
+    const oct = Math.floor((midi - acc) / 12) - 1;
+    return { dn: oct * 7 + letterIdx, acc: acc };
+  }
+
+  /* ============================================================
+     音域（依譜表）
+     ============================================================ */
+  const RANGES = {
+    treble: { dnLo: 28, dnHi: 41 },   // C4 – B5
+    bass:   { dnLo: 14, dnHi: 27 },   // C2 – B3
+    grand:  { dnLo: 14, dnHi: 41 }    // C2 – B5
+  };
+  function midiRange(clef){
+    const r = RANGES[clef];
+    return { lo: dnNatMidi(r.dnLo), hi: dnNatMidi(r.dnHi) };
+  }
+
+  /* ============================================================
+     出題
+     規則（開工手冊第四部）：
+     - 音高不重複
+     - 相鄰兩音最小間隔依「較低音」所在音區：C2–B2 大三度、C3–B3 大二度、C4 以上不限
+     - 相鄰兩音最大間隔為增四度（6 半音），不得達到完全五度
+     - 相鄰兩個音程不得有相同的半音數
+     - 不得連續出現兩個小二度
+     - 2 音音堆為完全特例：最大與最小間隔皆不套用，只受音域限制
+     ============================================================ */
+  /* 找出一組讓每個音都落在不同音級（不會在譜上互相遮擋）的拼寫。
+     每個音最多兩種選擇：升號體系或降號體系（自然音只有一種）。
+     依序先試升號，因此找到的第一組解自然偏好升號寫法。
+     找不到解就回傳 null —— 例如 F–F♯–G♯–A：F 只能寫 F、A 只能寫 A，
+     中間兩個變化音都被逼到 G，這是單升降記號的極限，只能在出題時避開。 */
+  function trySpell(midis){
+    const cands = midis.map(m => {
+      const sharp = spellMidi(m, false), flat = spellMidi(m, true);
+      return (sharp.dn === flat.dn) ? [sharp] : [sharp, flat];
+    });
+    const used = {}, out = [];
+    function rec(i){
+      if(i === midis.length) return true;
+      for(const c of cands[i]){
+        if(used[c.dn]) continue;
+        used[c.dn] = 1; out[i] = c;
+        if(rec(i + 1)) return true;
+        used[c.dn] = 0;
+      }
+      return false;
+    }
+    return rec(0) ? out.slice() : null;
+  }
+
+  function minGap(lowMidi){
+    if(lowMidi < 48) return 4;    // C2–B2：大三度
+    if(lowMidi < 60) return 2;    // C3–B3：大二度
+    return 1;                     // C4 以上：不限
+  }
+
+  function genStack(clef, n){
+    const { lo, hi } = midiRange(clef);
+    for(let attempt = 0; attempt < 400; attempt++){
+      const seq = [lo + Math.floor(Math.random() * (hi - lo + 1))];
+      let ok = true;
+      for(let k = 1; k < n; k++){
+        const last = seq[seq.length - 1];
+        const prevGap = seq.length > 1 ? (last - seq[seq.length - 2]) : null;
+        const cands = [];
+        const gapMin = (n === 2) ? 1 : minGap(last);
+        const gapMax = (n === 2) ? (hi - last) : 6;
+        for(let d = gapMin; d <= gapMax; d++){
+          const m = last + d;
+          if(m > hi) break;
+          if(prevGap !== null && d === prevGap) continue;          // 不得連續相同半音數
+          if(prevGap === 1 && d === 1) continue;                   // 不得連續兩個小二度
+          // 後面還要放幾個音，先確認剩餘空間放得下（用最寬鬆的估計）
+          const rest = n - k - 1;
+          if(rest > 0 && m + rest * minGap(m) > hi) continue;
+          cands.push(m);
+        }
+        if(!cands.length){ ok = false; break; }
+        seq.push(cands[Math.floor(Math.random() * cands.length)]);
+      }
+      // 確認這組音寫得出「每個音各佔一個音級」的譜面，寫不出來就重抽
+      if(ok && seq.length === n && trySpell(seq)) return seq;
+    }
+    return null;
+  }
+
+  /* 正解的拼寫：優先升號；同一音堆內若兩音會落在同一個音級（在譜上互相遮擋），
+     改用降號寫其中一個。出題時已排除寫不出來的組合，這裡必定有解。 */
+  function spellStack(midis){
+    return trySpell(midis) || midis.map(m => spellMidi(m, false));
+  }
+
+  /* ============================================================
+     繪譜
+     一律用 VexFlow 的原生尺寸畫（每音級 5px），畫完再把整張 SVG 等比放大到
+     可用空間。這樣譜號、符頭、臨時記號、線距必定同比例；改 VexFlow 的字型
+     縮放參數反而會讓臨時記號的定位跑掉。
+     ============================================================ */
+  const SP = 5;                       // VexFlow 原生：每音級 5px（線距 10px）
+  const VB_W = 140;                   // 畫布（viewBox）寬
+  const STAVE_X = 14, STAVE_W = 118;  // 大括號畫在譜表左外側，起點要留出空間
+
+  /* 各譜表的畫布高度與 line 0 的位置（單位：viewBox 座標）
+     treble line0 = F5(dn38)、bass line0 = A3(dn26) */
+  const STAFF_GEO = {
+    treble: { trebleY: 21, bassY: null, height: 79,  base: 38 },
+    bass:   { trebleY: null, bassY: 11, height: 79,  base: 26 },
+    grand:  { trebleY: 21, bassY: 81,   height: 149, base: 38 }   // 中央 C 同時是兩譜表的加線
+  };
+
+  /* 把 y 座標（viewBox 座標）換算成音級。
+     大譜表刻意讓上下譜表的音級間距連續，三種譜表共用同一條公式。 */
+  function yToDn(y, m){
+    return Math.round(m.base - (y - m.line0Y) / SP);
+  }
+
+  /* pitches：{dn, acc} 陣列
+     opts：{ colors:{index:顏色}, ghost:{dn,acc}, selectedIdx:n } */
+  function drawStack(containerId, pitches, clef, opts){
+    const container = document.getElementById(containerId);
+    if(!container) return null;
+    container.innerHTML = '';
+    opts = opts || {};
+    const geo = STAFF_GEO[clef] || STAFF_GEO.treble;
+    const m = { base: geo.base, height: geo.height };
+
+    try{
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+      renderer.resize(VB_W, geo.height);
+      const ctx = renderer.getContext();
+      // space_above_staff_ln 預設 4，會讓 stave.y 和第五線差 4 個線距；設 0 才對得上座標公式
+      const staveOpt = { space_above_staff_ln: 0 };
+      const isGrand = (clef === 'grand');
+
+      function makeStave(y, clefName){
+        const st = new VF.Stave(STAVE_X, y, STAVE_W, staveOpt);
+        st.addClef(clefName);
+        // 大譜表的終止線改由 StaveConnector 貫穿上下譜表，單譜表才自己畫
+        st.setEndBarType(isGrand ? VF.Barline.type.NONE : VF.Barline.type.END);
+        st.setContext(ctx).draw();
+        return st;
+      }
+
+      let trebleStave = null, bassStave = null;
+      if(clef === 'treble' || isGrand) trebleStave = makeStave(geo.trebleY, 'treble');
+      if(clef === 'bass' || isGrand) bassStave = makeStave(geo.bassY, 'bass');
+
+      if(isGrand && trebleStave && bassStave){
+        const C = VF.StaveConnector.type;
+        new VF.StaveConnector(trebleStave, bassStave).setType(C.BRACE).setContext(ctx).draw();
+        new VF.StaveConnector(trebleStave, bassStave).setType(C.SINGLE_LEFT).setContext(ctx).draw();
+        new VF.StaveConnector(trebleStave, bassStave).setType(C.BOLD_DOUBLE_RIGHT).setContext(ctx).draw();
+      }
+
+      // 依所屬譜表分組（大譜表以中央 C 為界，C4 以上走高音譜表）
+      const list = pitches.map((p, i) => ({ p, i }));
+      if(opts.ghost) list.push({ p: opts.ghost, i: -1, ghost: true });
+      const groups = { treble: [], bass: [] };
+      list.forEach(item => {
+        let where = 'treble';
+        if(clef === 'bass') where = 'bass';
+        else if(isGrand && item.p.dn < 28) where = 'bass';
+        groups[where].push(item);
+      });
+      groups.treble.sort((a, b) => a.p.dn - b.p.dn);
+      groups.bass.sort((a, b) => a.p.dn - b.p.dn);
+
+      const voices = [], drawJobs = [], realNotes = [];
+      [['treble', trebleStave], ['bass', bassStave]].forEach(([where, stave]) => {
+        if(!stave) return;
+        const items = groups[where];
+        let tickable;
+        if(items.length){
+          const note = new VF.StaveNote({ clef: where, keys: items.map(it => vexKey(it.p)), duration: 'w' });
+          items.forEach((it, idx) => {
+            if(it.p.acc !== 0) note.addAccidental(idx, new VF.Accidental(vexAcc(it.p)));
+            let color = null;
+            if(it.ghost) color = 'rgba(38,36,32,0.34)';
+            else if(opts.colors && opts.colors[it.i]) color = opts.colors[it.i];
+            else if(opts.selectedIdx === it.i) color = 'var(--accent)';
+            if(color) note.setKeyStyle(idx, { fillStyle: color, strokeStyle: color });
+          });
+          tickable = note;
+          realNotes.push(note);
+        } else {
+          tickable = new VF.GhostNote({ duration: 'w' });
+        }
+        const voice = new VF.Voice({ num_beats: 4, beat_value: 4 }).setStrict(false).addTickables([tickable]);
+        voice.setStave(stave);
+        voices.push(voice);
+        drawJobs.push([voice, stave]);
+      });
+
+      if(voices.length){
+        const ref = trebleStave || bassStave;
+        const startX = ref.getNoteStartX(), endX = ref.getX() + ref.getWidth();
+        new VF.Formatter().joinVoices(voices).format(voices, Math.max(40, endX - startX - 16));
+        // 全音符擺在小節正中央。位移必須改 tick context：直接用 setXShift 只會移動符頭，
+        // 臨時記號會留在原地（會看到記號孤零零掉在譜號旁邊）。
+        if(realNotes.length){
+          let wMax = 0;
+          realNotes.forEach(n => { wMax = Math.max(wMax, n.getWidth()); });
+          const shift = Math.max(0, ((endX - startX) - wMax) / 2);
+          const tc = realNotes[0].getTickContext();
+          if(tc && shift > 0) tc.setX(tc.getX() + shift);      // 共用同一個 tick context，上下譜表自動對齊
+        }
+        drawJobs.forEach(([voice, stave]) => voice.draw(ctx, stave));
+      }
+
+      // 座標映射一律以 stave 實際回報的位置為準
+      const refS = (clef === 'bass') ? bassStave : trebleStave;
+      m.line0Y = refS ? refS.getYForLine(0) : (clef === 'bass' ? geo.bassY : geo.trebleY);
+
+      /* 交給 SVG 自己等比縮放：拿掉固定的 width/height，只留 viewBox，
+         再用 CSS 讓它填滿容器。瀏覽器會自動等比放大並置中，
+         不需要 JS 量測容器大小，也就不會有「量到一半版面還沒算完」的問題。 */
+      const svg = container.querySelector('svg');
+      if(svg){
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+        svg.setAttribute('viewBox', '0 0 ' + VB_W + ' ' + geo.height);
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        svg.style.width = '100%';
+        svg.style.height = '100%';
+        svg.style.display = 'block';
+      }
+      return { metrics: m, width: VB_W, height: geo.height };
+    }catch(e){
+      console.error('drawStack error:', e);
+      return null;
+    }
+  }
+
+  /* ============================================================
+     音訊
+     音堆同時彈出，讓 soundfont 自然衰減到沒有聲音，即為播放一次。
+     ============================================================ */
+  const STACK_SUSTAIN = 7;     // 秒。鋼琴取樣自然衰減所需的長度
+  let audioCtx = null, pianoInst = null, pendingTimers = [];
+  function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+  window.psStopAll = function(){
+    if(pianoInst) pianoInst.stop();
+    clearTimers();
+    if(window.psModule){ psModule.isPlaying = false; psModule.updatePlayBtn(); }
+  };
+  function ensureAudio(){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+    }catch(e){}
+    return audioCtx;
+  }
+  window.loadPiano = function(){
+    const ctx = ensureAudio(); if(!ctx) return;
+    Soundfont.instrument(ctx, 'acoustic_grand_piano', { nameToUrl: function(){ return 'acoustic_grand_piano-mp3.js'; } })
+      .catch(function(){ return Soundfont.instrument(ctx, 'acoustic_grand_piano'); })
+      .then(function(inst){
+        pianoInst = inst;
+        document.getElementById('loadingBanner').style.display = 'none';
+        psModule.updatePlayBtn();
+      })
+      .catch(function(){
+        document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>';
+      });
+  };
+
+  function playMidis(midis, onDone){
+    const ctx = ensureAudio();
+    if(!ctx || !pianoInst) return;
+    const t = ctx.currentTime + 0.08;
+    midis.forEach(m => pianoInst.play(m, t, { duration: STACK_SUSTAIN, gain: 3.2 }));
+    if(onDone) pendingTimers.push(setTimeout(onDone, (STACK_SUSTAIN + 0.2) * 1000));
+  }
+  function playArpeggio(midis, onDone){
+    const ctx = ensureAudio();
+    if(!ctx || !pianoInst || !midis.length) return;
+    let t = ctx.currentTime + 0.08;
+    midis.forEach(m => { pianoInst.play(m, t, { duration: 0.55, gain: 3.2 }); t += 0.46; });
+    t += 0.15;
+    midis.forEach(m => pianoInst.play(m, t, { duration: STACK_SUSTAIN, gain: 3.2 }));
+    if(onDone) pendingTimers.push(setTimeout(onDone, (t - ctx.currentTime + STACK_SUSTAIN) * 1000));
+  }
+  function playTuningA(){
+    const ctx = ensureAudio();
+    if(!ctx || !pianoInst) return;
+    pianoInst.play(69, ctx.currentTime + 0.05, { duration: 2, gain: 3.2 });
+  }
+
+  /* ============================================================
+     模組
+     ============================================================ */
+  const REVIEW_TYPE = 'pitchstack';
+
+  const psModule = {
+    mode: 'practice', clef: 'treble', countSel: '3', maxReplays: Infinity, replaysLeft: Infinity,
+    noteCount: 3, randomCount: false,
+    correct: [], correctMidis: [],
+    user: [],                 // 使用者填的音：{dn, acc}
+    selectedIdx: -1,
+    ghost: null,
+    isPlaying: false, submitted: false, played: false,
+    score: { c: 0, t: 0 },
+    _view: null,
+
+    /* ---------- 設定頁 ---------- */
+    initSettings(){
+      const self = this;
+      document.querySelectorAll('#ps-modeSwitch .mode-btn').forEach(b => b.onclick = () => {
+        self.mode = b.dataset.mode;
+        document.querySelectorAll('#ps-modeSwitch .mode-btn').forEach(x => x.classList.toggle('active', x === b));
+        document.getElementById('ps-testReplayWrapper').style.display = self.mode === 'test' ? 'flex' : 'none';
+      });
+      document.querySelectorAll('#ps-clefSwitch .mode-btn').forEach(b => b.onclick = () => {
+        self.clef = b.dataset.clef;
+        document.querySelectorAll('#ps-clefSwitch .mode-btn').forEach(x => x.classList.toggle('active', x === b));
+      });
+      document.getElementById('ps-countSelect').onchange = function(){ self.countSel = this.value; };
+      document.getElementById('ps-enterBtn').onclick = () => self.startSession();
+      document.getElementById('ps-clearReviewBtn').onclick = () => {
+        if(confirm('確定要清空音堆練習的錯題本嗎？此動作無法復原。')){
+          REVIEW_STORE.clear(REVIEW_TYPE); self.renderReviewPage(); self.refreshReviewCount();
+        }
+      };
+      this.refreshReviewCount();
+    },
+    refreshReviewCount(){
+      const el = document.getElementById('ps-reviewCount');
+      if(el) el.textContent = REVIEW_STORE.count(REVIEW_TYPE);
+    },
+
+    startSession(){
+      this.randomCount = (this.countSel === 'random');
+      this.maxReplays = (this.mode === 'test') ? Number(document.getElementById('ps-testReplaySelect').value) : Infinity;
+      this.score = { c: 0, t: 0 };
+      showPage('ps-practice');
+      this.newQuestion();
+    },
+
+    /* ---------- 出題 ---------- */
+    newQuestion(){
+      window.psStopAll();
+      this.noteCount = this.randomCount ? (2 + Math.floor(Math.random() * 5)) : Number(this.countSel);
+      let midis = genStack(this.clef, this.noteCount);
+      if(!midis){ // 理論上不會發生，保底再試一次最小音數
+        midis = genStack(this.clef, 2) || [60, 64];
+        this.noteCount = midis.length;
+      }
+      this.correctMidis = midis.slice().sort((a, b) => a - b);
+      this.correct = spellStack(this.correctMidis);
+      this.user = [];
+      this.selectedIdx = -1;
+      this.ghost = null;
+      this.submitted = false;
+      this.played = false;
+      this.replaysLeft = this.maxReplays;
+      document.getElementById('ps-playCaption').textContent = '';
+      document.getElementById('ps-submitBtn').textContent = '✔ 提交作答';
+      this.render();
+      this.updateStatus();
+      this.updatePlayBtn();
+    },
+
+    updateStatus(){
+      const badge = document.getElementById('ps-statusBadge');
+      const clefText = { treble: '高音譜號', bass: '低音譜號', grand: '大譜表' }[this.clef];
+      badge.textContent = clefText + ' · ' + (this.mode === 'test' ? '測驗' : '練習');
+      document.getElementById('ps-scoreNum').textContent = this.score.c + ' / ' + this.score.t;
+      const hint = document.getElementById('ps-countHint');
+      hint.innerHTML = (this.randomCount ? '音數不公開' : ('共 <b>' + this.noteCount + '</b> 個音'))
+                     + '　｜　已填 <b>' + this.user.length + '</b> 個';
+      const sel = document.getElementById('ps-selInfo');
+      if(this.selectedIdx >= 0 && this.user[this.selectedIdx]) sel.innerHTML = '選中：<b>' + pitchName(this.user[this.selectedIdx]) + '</b>';
+      else sel.textContent = '在譜上按住再放開即可填入';
+      const noSel = (this.selectedIdx < 0 || this.submitted);
+      document.getElementById('ps-upBtn').disabled = noSel;
+      document.getElementById('ps-downBtn').disabled = noSel;
+      document.getElementById('ps-delBtn').disabled = noSel;
+    },
+
+    updatePlayBtn(){
+      const btn = document.getElementById('ps-playBtn');
+      if(!btn) return;
+      if(!pianoInst){ btn.disabled = true; btn.textContent = '🎹 音色載入中…'; return; }
+      if(this.isPlaying){ btn.disabled = true; btn.textContent = '♪ 播放中…'; return; }
+      const noLeft = (this.replaysLeft <= 0);
+      btn.disabled = noLeft;
+      btn.textContent = (this.maxReplays === Infinity)
+        ? '▶ 播放音堆'
+        : ('▶ 播放音堆（剩 ' + Math.max(0, this.replaysLeft) + ' 次）');
+    },
+
+    play(){
+      if(this.isPlaying || !pianoInst || this.replaysLeft <= 0) return;
+      this.replaysLeft--;
+      this.isPlaying = true;
+      this.updatePlayBtn();
+      document.getElementById('ps-playCaption').textContent = '♪ 聆聽中…';
+      const self = this;
+      playMidis(this.correctMidis, function(){
+        self.isPlaying = false;
+        self.played = true;
+        document.getElementById('ps-playCaption').textContent = '播放完畢';
+        self.updatePlayBtn();
+      });
+    },
+
+    /* ---------- 譜面渲染 ---------- */
+    render(){
+      const opts = { selectedIdx: this.selectedIdx };
+      if(this.ghost) opts.ghost = this.ghost;
+      this._view = drawStack('ps-staff', this.user, this.clef, opts);
+      // 點擊層由 CSS 貼齊譜面容器（inset:0），不需要設固定尺寸
+      this.updateStatus();
+    },
+
+    /* ---------- 點譜輸入 ---------- */
+    hitDn(clientY){
+      const svg = document.querySelector('#ps-staff svg');
+      if(!svg || !this._view) return null;
+      const box = svg.getBoundingClientRect();
+      if(!box.height) return null;
+      // preserveAspectRatio="meet"：內容等比置中，多出來的部分是留白，換算時要扣掉
+      const k = Math.min(box.width / this._view.width, box.height / this._view.height);
+      const padY = (box.height - this._view.height * k) / 2;
+      const y = (clientY - box.top - padY) / k;
+      const r = RANGES[this.clef];
+      let dn = yToDn(y, this._view.metrics);
+      if(dn < r.dnLo) dn = r.dnLo;
+      if(dn > r.dnHi) dn = r.dnHi;
+      return dn;
+    },
+    indexAtDn(dn){
+      for(let i = 0; i < this.user.length; i++){ if(this.user[i].dn === dn) return i; }
+      return -1;
+    },
+    maxNotes(){ return this.randomCount ? 6 : this.noteCount; },
+
+    pointerDown(clientY){
+      if(this.submitted) return;
+      const dn = this.hitDn(clientY);
+      if(dn === null) return;
+      const idx = this.indexAtDn(dn);
+      if(idx >= 0){                       // 點到既有音符 → 改成選中它
+        this.selectedIdx = idx;
+        this.ghost = null;
+        this.render();
+        return;
+      }
+      if(this.user.length >= this.maxNotes()){
+        document.getElementById('ps-selInfo').textContent = '已經填滿 ' + this.maxNotes() + ' 個音，請先刪除再填';
+        return;
+      }
+      this.ghost = { dn: dn, acc: 0 };
+      this.render();
+      document.getElementById('ps-selInfo').innerHTML = '預覽：<b>' + pitchName(this.ghost) + '</b>（放開填入）';
+    },
+    pointerMove(clientY){
+      if(this.submitted || !this.ghost) return;
+      const dn = this.hitDn(clientY);
+      if(dn === null || dn === this.ghost.dn) return;
+      this.ghost = { dn: dn, acc: 0 };
+      this.render();
+      document.getElementById('ps-selInfo').innerHTML = '預覽：<b>' + pitchName(this.ghost) + '</b>（放開填入）';
+    },
+    pointerUp(){
+      if(this.submitted || !this.ghost) return;
+      const p = this.ghost;
+      this.ghost = null;
+      if(this.indexAtDn(p.dn) >= 0){ this.render(); return; }
+      this.user.push(p);
+      this.selectedIdx = this.user.length - 1;
+      this.render();
+    },
+
+    /* ---------- ↑↓ 半音微調 ---------- */
+    nudge(dir){
+      if(this.submitted || this.selectedIdx < 0) return;
+      const cur = this.user[this.selectedIdx];
+      const { lo, hi } = midiRange(this.clef);
+      const next = midiOf(cur) + dir;
+      if(next < lo || next > hi) return;                 // 觸頂／觸底就停住
+      const np = spellMidi(next, dir < 0);               // 往上用升號體系、往下用降號體系
+      const dup = this.user.findIndex((p, i) => i !== this.selectedIdx && midiOf(p) === next);
+      if(dup >= 0) return;                               // 不允許兩個音高完全相同
+      this.user[this.selectedIdx] = np;
+      this.render();
+    },
+    del(){
+      if(this.submitted || this.selectedIdx < 0) return;
+      this.user.splice(this.selectedIdx, 1);
+      this.selectedIdx = this.user.length ? Math.min(this.selectedIdx, this.user.length - 1) : -1;
+      this.render();
+    },
+
+    /* ---------- 提交與計分 ---------- */
+    submit(){
+      if(this.submitted) return;
+      if(!this.user.length){ alert('請先在譜上填入至少一個音。'); return; }
+      window.psStopAll();
+      this.submitted = true;
+      const userMidis = this.user.map(midiOf).sort((a, b) => a - b);
+      const correctSet = this.correctMidis.slice();
+      const missing = correctSet.filter(m => userMidis.indexOf(m) < 0);
+      const extra = userMidis.filter(m => correctSet.indexOf(m) < 0);
+      const allRight = (missing.length === 0 && extra.length === 0);
+
+      this.score.t++;
+      if(allRight) this.score.c++;
+
+      if(!allRight){
+        REVIEW_STORE.add(REVIEW_TYPE, {
+          clef: this.clef,
+          correct: this.correct,
+          mine: this.user.slice(),
+          missing: missing.length,
+          extra: extra.length
+        });
+        this.refreshReviewCount();
+      }
+      this.selectedIdx = -1;
+      this.ghost = null;
+      this._lastResult = { allRight, missing, extra };
+      document.getElementById('ps-submitBtn').textContent = '📄 查看解答';
+      showPage('ps-answer');
+      this.showAnswer();
+    },
+
+    /* ---------- 解答頁 ---------- */
+    showAnswer(){
+      const r = this._lastResult || { allRight: false, missing: [], extra: [] };
+      const userMidis = this.user.map(midiOf);
+      const correctColors = {};
+      this.correct.forEach((p, i) => { if(userMidis.indexOf(midiOf(p)) >= 0) correctColors[i] = 'var(--correct)'; });
+      const mineColors = {};
+      this.user.forEach((p, i) => { if(this.correctMidis.indexOf(midiOf(p)) < 0) mineColors[i] = 'var(--wrong)'; });
+
+      const staffH = (this.clef === 'grand') ? 340 : 210;
+      ['ps-ansCorrectStaff', 'ps-ansMineStaff'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.style.height = staffH + 'px';
+      });
+      drawStack('ps-ansCorrectStaff', this.correct, this.clef, { colors: correctColors });
+      drawStack('ps-ansMineStaff', this.user, this.clef, { colors: mineColors });
+
+      const fb = document.getElementById('ps-ansFeedback');
+      fb.className = 'answer-big-feedback ' + (r.allRight ? 'correct' : 'wrong');
+      fb.textContent = r.allRight ? '✅ 完全正確！' : '❌ 沒有完全答對';
+      document.getElementById('ps-ansScore').textContent = this.score.c + ' / ' + this.score.t;
+
+      const lines = [];
+      lines.push('正確答案：' + this.correct.map(pitchName).join('　'));
+      lines.push('你的作答：' + (this.user.length ? this.user.map(pitchName).join('　') : '（空白）'));
+      if(r.missing.length) lines.push('漏掉：' + r.missing.map(m => pitchName(spellMidi(m, false))).join('　'));
+      if(r.extra.length) lines.push('多寫：' + r.extra.map(m => pitchName(spellMidi(m, false))).join('　'));
+      document.getElementById('ps-ansDetail').textContent = lines.join('\n');
+    },
+
+    /* ---------- 錯題本 ---------- */
+    renderReviewPage(){
+      const list = REVIEW_STORE.load(REVIEW_TYPE);
+      const host = document.getElementById('ps-reviewList');
+      const empty = document.getElementById('ps-reviewEmpty');
+      host.innerHTML = '';
+      empty.style.display = list.length ? 'none' : 'block';
+      const clefText = { treble: '高音譜號', bass: '低音譜號', grand: '大譜表' };
+      list.forEach((item, n) => {
+        const div = document.createElement('div');
+        div.className = 'review-item';
+        const bits = [];
+        if(item.missing) bits.push('少了 ' + item.missing + ' 個音');
+        if(item.extra) bits.push('多寫 ' + item.extra + ' 個音');
+        div.innerHTML =
+          '<div class="review-label">第 ' + (n + 1) + ' 題　｜　' + (clefText[item.clef] || '') +
+          '　｜　' + (item.correct ? item.correct.length : 0) + ' 個音' +
+          (bits.length ? ('　｜　' + bits.join('、')) : '') + '</div>' +
+          '<div class="review-label" style="margin-top:8px;">正確答案：' + (item.correct || []).map(pitchName).join('　') + '</div>' +
+          '<div class="review-staff"><div id="ps-rev-c-' + n + '"></div></div>' +
+          '<div class="review-label">你當時的作答：' + ((item.mine || []).length ? item.mine.map(pitchName).join('　') : '（空白）') + '</div>' +
+          '<div class="review-staff"><div id="ps-rev-m-' + n + '"></div></div>' +
+          '<div class="unified-action-row" style="margin-top:4px;">' +
+          '<button class="play-btn" data-rev-play="' + n + '">🎧 聽正確音堆</button>' +
+          '<button class="action-btn" data-rev-arp="' + n + '">🔁 分解琶音</button>' +
+          '<button class="action-btn" data-rev-mine="' + n + '" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽我寫的</button>' +
+          '</div>';
+        host.appendChild(div);
+        const rh = ((item.clef || 'treble') === 'grand') ? 300 : 190;
+        ['ps-rev-c-' + n, 'ps-rev-m-' + n].forEach(id => {
+          const el = document.getElementById(id); if(el) el.style.height = rh + 'px';
+        });
+        drawStack('ps-rev-c-' + n, item.correct || [], item.clef || 'treble', {});
+        drawStack('ps-rev-m-' + n, item.mine || [], item.clef || 'treble', {});
+      });
+      host.querySelectorAll('[data-rev-play]').forEach(b => b.onclick = () => {
+        const it = list[Number(b.dataset.revPlay)];
+        window.psStopAll();
+        playMidis((it.correct || []).map(midiOf));
+      });
+      host.querySelectorAll('[data-rev-arp]').forEach(b => b.onclick = () => {
+        const it = list[Number(b.dataset.revArp)];
+        window.psStopAll();
+        playArpeggio((it.correct || []).map(midiOf).sort((a, c) => a - c));
+      });
+      host.querySelectorAll('[data-rev-mine]').forEach(b => b.onclick = () => {
+        const it = list[Number(b.dataset.revMine)];
+        window.psStopAll();
+        playMidis((it.mine || []).map(midiOf));
+      });
+      scrollReviewToBottom('pagePSReview');
+    }
+  };
+  window.psModule = psModule;
+
+  /* ============================================================
+     事件綁定
+     ============================================================ */
+  document.addEventListener('DOMContentLoaded', function(){
+    psModule.initSettings();
+
+    document.getElementById('ps-playBtn').onclick = () => psModule.play();
+    document.getElementById('ps-tuningBtn').onclick = () => { ensureAudio(); playTuningA(); };
+    document.getElementById('ps-submitBtn').onclick = () => {
+      if(psModule.submitted) showPage('ps-answer');    // 已提交：回去看解答
+      else psModule.submit();
+    };
+
+    document.getElementById('ps-upBtn').onclick = () => psModule.nudge(1);
+    document.getElementById('ps-downBtn').onclick = () => psModule.nudge(-1);
+    document.getElementById('ps-delBtn').onclick = () => psModule.del();
+
+    document.getElementById('ps-ansNextBtn').onclick = () => { showPage('ps-practice'); psModule.newQuestion(); };
+    document.getElementById('ps-ansPlayCorrect').onclick = () => { window.psStopAll(); playMidis(psModule.correctMidis); };
+    document.getElementById('ps-ansPlayArp').onclick = () => { window.psStopAll(); playArpeggio(psModule.correctMidis); };
+    document.getElementById('ps-ansPlayMine').onclick = () => { window.psStopAll(); playMidis(psModule.user.map(midiOf)); };
+    document.getElementById('ps-ansTuning').onclick = () => { ensureAudio(); playTuningA(); };
+
+    /* 譜面點擊層：按下即預覽、滑動可修正、抬起才落筆。
+       用 pointer 事件同時涵蓋滑鼠與觸控；譜面本身 touch-action:none，
+       所以手指在譜上滑動不會捲動頁面。 */
+    const hit = document.getElementById('ps-hit');
+    let tracking = false;
+    hit.addEventListener('pointerdown', function(e){
+      tracking = true;
+      try{ hit.setPointerCapture(e.pointerId); }catch(err){}
+      psModule.pointerDown(e.clientY);
+      e.preventDefault();
+    });
+    hit.addEventListener('pointermove', function(e){
+      if(!tracking){
+        // 滑鼠尚未按下時也給預覽（電腦版：指標移到哪就預覽哪）
+        if(e.pointerType === 'mouse' && !psModule.submitted && psModule.user.length < psModule.maxNotes()){
+          const dn = psModule.hitDn(e.clientY);
+          if(dn !== null && (!psModule.ghost || psModule.ghost.dn !== dn) && psModule.indexAtDn(dn) < 0){
+            psModule.ghost = { dn: dn, acc: 0 };
+            psModule.render();
+          }
+        }
+        return;
+      }
+      psModule.pointerMove(e.clientY);
+      e.preventDefault();
+    });
+    hit.addEventListener('pointerup', function(e){
+      if(!tracking) return;
+      tracking = false;
+      psModule.pointerUp();
+      e.preventDefault();
+    });
+    hit.addEventListener('pointercancel', function(){ tracking = false; psModule.ghost = null; psModule.render(); });
+    hit.addEventListener('pointerleave', function(e){
+      if(tracking || e.pointerType !== 'mouse') return;
+      if(psModule.ghost){ psModule.ghost = null; psModule.render(); }
+    });
+
+    loadPiano();
+  });
+})();
+</script>
+<script>
+(function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+</script>
+<script>
+/* 作答時關閉手機的「左滑返回」：在瀏覽歷史放一個記號，
+   使用者一觸發返回就把它補回去，等於什麼都沒發生。
+   只在作答頁生效，離開作答頁自動解除；畫面上的返回按鈕不受影響。 */
+(function(){
+  var ANSWER_PAGE = 'pagePSPractice';
+  var armed = false;
+  function isAnswering(){
+    var el = document.getElementById(ANSWER_PAGE);
+    return !!(el && el.classList.contains('active'));
+  }
+  function arm(){ if(armed) return; armed = true; try{ history.pushState({ answerGuard: 1 }, ''); }catch(e){} }
+  window.addEventListener('popstate', function(){
+    if(isAnswering()){ try{ history.pushState({ answerGuard: 1 }, ''); }catch(e){} }
+    else { armed = false; }
+  });
+  try{
+    var obs = new MutationObserver(function(){
+      var on = isAnswering();
+      if(on) arm(); else armed = false;
+      try{
+        document.documentElement.style.overscrollBehaviorX = on ? 'none' : '';
+        document.body.style.overscrollBehaviorX = on ? 'none' : '';
+      }catch(e){}
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.page-view'), function(el){
+      obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+  }catch(e){}
+  if(isAnswering()) arm();
+
+  /* 攔截邊緣返回手勢。
+     touchmove 在 Safari 進入捲動狀態後會變成「不可取消」，攔不住；
+     touchstart 永遠可以取消，所以改在按下的當下就決定。 */
+  var EDGE = 24;
+  document.addEventListener('touchstart', function(e){
+    if(!isAnswering() || !e.touches || e.touches.length !== 1) return;
+    if(e.touches[0].clientX > EDGE) return;
+    if(e.cancelable) e.preventDefault();
+  }, { passive: false });
+})();
+</script>
+<script>
+/* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */
+(function(){
+  function setPlayback(){ try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} }
+  setPlayback();
+  var SILENT="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+  var done=false;
+  function unlock(){ if(done) return; done=true; setPlayback();
+    try{ var a=new Audio(SILENT); a.setAttribute("playsinline",""); a.volume=0.02; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){}
+    document.removeEventListener("touchend",unlock,true); document.removeEventListener("click",unlock,true);
+  }
+  document.addEventListener("touchend",unlock,true);
+  document.addEventListener("click",unlock,true);
+})();
+</script>
+</body>
+</html>
