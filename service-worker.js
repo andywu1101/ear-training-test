@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v86'; // v.86：新增 08 音堆練習、目錄改版
+const CACHE_NAME = 'ear-training-shell-v87'; // v.87：修正四部和聲的級數作答格被遮住
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

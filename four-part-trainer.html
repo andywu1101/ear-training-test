@@ -53,7 +53,14 @@
     max-height: 100dvh; max-height: calc(var(--app-vh, 1vh) * 100);
     overflow: hidden; padding-top: 8px;
   }
-  .fpt-staff-area { flex: 0 1 auto; min-height: 0; max-height: 40dvh; max-height: calc(var(--app-vh, 1vh) * 40); display: flex; flex-direction: column; overflow: hidden; }
+  /* 譜例區高度：譜例是固定像素（SVG 240px）＋級數作答格（top:245px、高 64px），
+     內容底緣在 309px，容器不夠高就會把級數格裁掉、答者看不到自己填了什麼。
+     所以取 52dvh，並保底 320px（小螢幕開瀏覽器時 52% 仍不夠），
+     再以 70dvh 為上限，避免橫式手機把鍵盤區整個擠掉。 */
+  .fpt-staff-area { flex: 0 1 auto; min-height: 0;
+    max-height: 52dvh;
+    max-height: min(max(calc(var(--app-vh, 1vh) * 52), 320px), calc(var(--app-vh, 1vh) * 70));
+    display: flex; flex-direction: column; overflow: hidden; }
   .fpt-staff-area .staff-scroll-container { flex: 0 1 auto; overflow-y: hidden; padding-top: 4px; margin-bottom: 4px; min-height: 0; }
   .fpt-keyboard-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
   /* 播放按鈕吸附在鍵盤區最上緣：隨時可見可按、跨裝置一致、不受上層譜例高度影響 */
@@ -111,8 +118,13 @@
 
   .unified-action-row { display: flex; gap: 12px; justify-content: center; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
   .fpt-staff-area .unified-action-row .play-btn { padding: 9px 16px; font-size: 13.5px; box-shadow: 0 2px 8px rgba(51,65,92,0.18); }
-  /* 吸附列的播放按鈕：與「編輯低音/級數」分頁按鈕同大小同字體，改用圓角長方形，更省空間 */
-  .fpt-play-sticky .play-btn { font-size: 13px; font-weight: 700; padding: 8px 22px; border-radius: 10px; box-shadow: none; }
+  /* 吸附列的播放按鈕：與「編輯低音/級數」分頁按鈕同大小同字體，改用圓角長方形，更省空間。
+     三顆一律排在同一行（不換行），窄螢幕靠縮小左右內距吸收，省下一整列的高度。 */
+  .fpt-play-sticky { flex-wrap: nowrap; gap: 6px; }
+  .fpt-play-sticky .play-btn, .fpt-play-sticky .action-btn {
+    font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 10px; box-shadow: none;
+    white-space: nowrap; flex: 0 1 auto; min-width: 0;
+  }
   .fpt-play-sticky .play-btn:disabled { box-shadow: none; }
   .action-btn, .play-btn { font-size: 14px; font-weight: 600; padding: 12px 20px; border-radius: 999px; cursor: pointer; transition: all 0.2s; border: none; }
   .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
@@ -306,7 +318,7 @@
     <div class="fpt-keyboard-area" style="padding: 0 4px;">
       <!-- 播放按鈕：吸附在鍵盤區最上緣，隨時可見可按，不受上層譜例高度限制 -->
       <div class="unified-action-row fpt-play-sticky">
-        <button class="play-btn" id="btn-play-all" disabled>🔊 完整四部 (SATB)</button>
+        <button class="play-btn" id="btn-play-all" disabled>🔊 完整四部</button>
         <button class="play-btn" id="btn-play-arp" disabled>🎵 分解＋完整</button>
         <button class="action-btn" id="tuningABtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
       </div>
@@ -2573,9 +2585,9 @@ window.addEventListener('resize', setVH); setVH();
         if (b) b.disabled = this.isPlaying || !pianoInst;
       });
       if (!this.isPlaying && this.mode === 'test' && this.testSession) {
-        document.getElementById('btn-play-all').textContent = `🔊 完整四部 (剩 ${this.testSession.replaysLeft} 次)`;
+        document.getElementById('btn-play-all').textContent = `🔊 完整四部（剩 ${this.testSession.replaysLeft} 次）`;
       } else if (!this.isPlaying) {
-        document.getElementById('btn-play-all').textContent = '🔊 完整四部 (SATB)';
+        document.getElementById('btn-play-all').textContent = '🔊 完整四部';
       }
     },
 
@@ -2937,7 +2949,7 @@ window.addEventListener('resize', setVH); setVH();
     + '<h2>四部和聲進行 — 玩法說明</h2>'
     + '<p class="help-lead">聽辨古典四部和聲的進行——判斷調性、寫出低音線條、標出功能級數與轉位（全音符 4/4 記譜）。</p>'
     + '<h3>設定</h3><p>可選調性（隨機 24 大小調／僅大調／僅小調）、小節數（6／8／10／12）、速度、難度 Lv1～Lv5（Lv1 本調三和絃原位，逐級加入轉位、七和絃、副屬／拿坡里，到 Lv5 增六和絃）。</p>'
-    + '<h3>作答</h3><p>按「完整四部（SATB）」或「分解＋完整」聆聽，接著完成三件事——① <b>調性</b>：在譜例最前面的「調性?」下拉選單，從共用同一組調號的大調與關係小調中二選一。② <b>編輯低音</b>：用音名鍵盤寫出每格低音；先打音名，再用升／降／還原／「復原回本調」與八度做事後修飾（輸入後自動跳下一格）。③ <b>編輯級數</b>：選羅馬數字級數與轉位（原位／6／64，七和絃 65／43／42），另有大小寫切換、減／半減／增、副屬、拿坡里 N6、增六（義／法／德）等修飾鍵。</p>'
+    + '<h3>作答</h3><p>按「完整四部」或「分解＋完整」聆聽，接著完成三件事——① <b>調性</b>：在譜例最前面的「調性?」下拉選單，從共用同一組調號的大調與關係小調中二選一。② <b>編輯低音</b>：用音名鍵盤寫出每格低音；先打音名，再用升／降／還原／「復原回本調」與八度做事後修飾（輸入後自動跳下一格）。③ <b>編輯級數</b>：選羅馬數字級數與轉位（原位／6／64，七和絃 65／43／42），另有大小寫切換、減／半減／增、副屬、拿坡里 N6、增六（義／法／德）等修飾鍵。</p>'
     + '<p>按提交 → 若還有未完成（調性未選、低音或級數未填）會列出提醒、仍可提交（未填算錯）→ 解答頁把你的作答與標準正解「雙譜表對照」、紅色標錯，可聆聽完整／分解正解。</p>'
     + '<div class="help-common"><h3>共通規則（六個練習都適用）</h3>'
     + '<p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>'
