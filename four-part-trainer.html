@@ -2224,7 +2224,13 @@ window.addEventListener('resize', setVH); setVH();
         overlay.style.zIndex = '10';
         container.parentElement.appendChild(overlay);
       }
-      overlay.style.height = (bassOnly ? 175 : 310) + 'px';
+      const OVERLAY_H = bassOnly ? 175 : 310;
+      overlay.style.height = OVERLAY_H + 'px';
+      /* 級數作答格與調性下拉都放在這層 overlay 裡，而 overlay 是絕對定位——
+         絕對定位的元素不會把父容器撐開，容器只會依 SVG 的高度（作答階段僅 100px）
+         決定自己多高，超出的部分就被 overflow:hidden 裁掉，級數格因此看不到。
+         這裡把外層容器的最小高度補到 overlay 的高度，容器才會留出足夠空間。 */
+      if (container.parentElement) container.parentElement.style.minHeight = OVERLAY_H + 'px';
       overlay.innerHTML = '';
 
       // 精確修復寬度計算
