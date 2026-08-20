@@ -215,7 +215,7 @@
   .sponsor-list{ position: relative; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; padding:14px 10px 40px; border:1px dashed var(--panel-border); border-radius:12px; }
   /* 固定行高與高度：避免中英文因字型行高不同而上下錯位 */
   .sponsor-list span{ display:inline-flex; align-items:center; justify-content:center; min-height:34px; line-height:1; font-size:15px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:999px; padding:0 14px; }
-  /* 金色樂友：金色漸層文字＋一道反光由左掃到右，每 4 秒一次。
+  /* 金色樂友：金色漸層文字＋一道反光由左掃到右，每 2 秒一次。
      ⚠ 選擇器必須寫成 .sponsor-list span.sponsor-gold —— 名牌的 .sponsor-list span
      規則帶有 background:var(--panel)，若只寫 .sponsor-gold 會被它蓋掉漸層，
      而文字又是 transparent，結果就是整個名字消失（但仍框選得到）。
@@ -229,10 +229,10 @@
     background-size: 300% 100%;
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: sponsorShine 4s ease-in-out infinite;
+    animation: sponsorShine 2s ease-in-out infinite;
   }
   @keyframes sponsorShine{
-    0%, 62% { background-position: 130% 0; }
+    0%, 55% { background-position: 130% 0; }
     100%    { background-position: -30% 0; }
   }
   @media (prefers-reduced-motion: reduce){
