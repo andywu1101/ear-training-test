@@ -2227,10 +2227,25 @@ window.addEventListener('resize', setVH); setVH();
       const OVERLAY_H = bassOnly ? 175 : 310;
       overlay.style.height = OVERLAY_H + 'px';
       /* 級數作答格與調性下拉都放在這層 overlay 裡，而 overlay 是絕對定位——
-         絕對定位的元素不會把父容器撐開，容器只會依 SVG 的高度（作答階段僅 100px）
-         決定自己多高，超出的部分就被 overflow:hidden 裁掉，級數格因此看不到。
-         這裡把外層容器的最小高度補到 overlay 的高度，容器才會留出足夠空間。 */
-      if (container.parentElement) container.parentElement.style.minHeight = OVERLAY_H + 'px';
+         絕對定位的元素不會把父容器撐開，容器只依 SVG 的高度（作答階段僅 100px）決定
+         自己多高，超出的部分就被 overflow:hidden 裁掉，級數格因此看不到。
+         而且譜例區這一整條容器鏈原本都寫著 min-height:0（＝允許被 flex 壓到任意小），
+         只補內層是沒有用的，外層照樣會把它壓扁再裁掉。
+         所以這裡依 overlay 的實際高度，把整條鏈的最小高度一次設好。 */
+      if (container.parentElement) {
+        const wrap = container.parentElement;                    // #staffInnerWrapper
+        wrap.style.minHeight = OVERLAY_H + 'px';
+        const scroller = wrap.parentElement;                     // .staff-scroll-container
+        if (scroller && scroller.classList.contains('staff-scroll-container')) {
+          const cs = getComputedStyle(scroller);
+          const pad = parseFloat(cs.paddingTop || 0) + parseFloat(cs.paddingBottom || 0);
+          scroller.style.minHeight = (OVERLAY_H + pad) + 'px';
+          const area = scroller.parentElement;                   // .fpt-staff-area
+          if (area && area.classList.contains('fpt-staff-area')) {
+            area.style.minHeight = (OVERLAY_H + pad + 6) + 'px';
+          }
+        }
+      }
       overlay.innerHTML = '';
 
       // 精確修復寬度計算
