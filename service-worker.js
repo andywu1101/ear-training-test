@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v87'; // v.87：修正四部和聲的級數作答格被遮住
+const CACHE_NAME = 'ear-training-shell-v87'; // v.87：四部和聲版面修正、金色樂友
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
