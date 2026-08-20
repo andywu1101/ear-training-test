@@ -57,11 +57,11 @@
      內容底緣在 309px，容器不夠高就會把級數格裁掉、答者看不到自己填了什麼。
      所以取 52dvh，並保底 320px（小螢幕開瀏覽器時 52% 仍不夠），
      再以 70dvh 為上限，避免橫式手機把鍵盤區整個擠掉。 */
-  .fpt-staff-area { flex: 0 1 auto; min-height: 0;
+  .fpt-staff-area { flex: 0 0 auto; min-height: 0;
     max-height: 52dvh;
     max-height: min(max(calc(var(--app-vh, 1vh) * 52), 320px), calc(var(--app-vh, 1vh) * 70));
     display: flex; flex-direction: column; overflow: hidden; }
-  .fpt-staff-area .staff-scroll-container { flex: 0 1 auto; overflow-y: hidden; padding-top: 4px; margin-bottom: 4px; min-height: 0; }
+  .fpt-staff-area .staff-scroll-container { flex: 0 0 auto; overflow-y: hidden; padding-top: 4px; margin-bottom: 4px; min-height: 0; }
   .fpt-keyboard-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
   /* 播放按鈕吸附在鍵盤區最上緣：隨時可見可按、跨裝置一致、不受上層譜例高度影響 */
   .fpt-play-sticky { position: sticky; top: 0; z-index: 20; background: var(--paper, #efeee6); padding: 6px 0 8px 0; margin-bottom: 4px; }
@@ -2234,7 +2234,11 @@ window.addEventListener('resize', setVH); setVH();
          所以這裡依 overlay 的實際高度，把整條鏈的最小高度一次設好。 */
       if (container.parentElement) {
         const wrap = container.parentElement;                    // #staffInnerWrapper
-        wrap.style.minHeight = OVERLAY_H + 'px';
+        /* 用 padding-bottom 把 overlay 超出 SVG 的那一段「實體」撐出來。
+           min-height 只是對排版的請求，在 flex 容器裡會被 iOS Safari 壓掉；
+           padding 是真正的內容高度，flex-basis:auto 會據實反映。 */
+        wrap.style.paddingBottom = Math.max(0, OVERLAY_H - SVG_H) + 'px';
+        wrap.style.minHeight = OVERLAY_H + 'px';                 // 雙保險
         const scroller = wrap.parentElement;                     // .staff-scroll-container
         if (scroller && scroller.classList.contains('staff-scroll-container')) {
           const cs = getComputedStyle(scroller);

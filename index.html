@@ -212,8 +212,65 @@
   .bank-row .bk{ font-size:13px; color:var(--ink-soft); flex-shrink:0; width:34px; text-align:left; }
   .bank-row b{ flex:1; font-family:var(--font-mono); letter-spacing:0.02em; text-align:left; }
   /* 贊助者名單 */
-  .sponsor-list{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; padding:14px 10px; border:1px dashed var(--panel-border); border-radius:12px; }
+  /* 金色樂友：金色漸層文字＋一道反光由左掃到右，每 4 秒一次。
+     系統開啟「減少動態效果」時只保留靜態金色，不做動畫。 */
+  .sponsor-gold{
+    font-weight: 700;
+    background: linear-gradient(100deg,
+      #b8860b 0%, #d4af37 32%, #fff3b0 46%, #ffffff 50%, #fff3b0 54%, #d4af37 68%, #b8860b 100%);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: #d4af37;
+    animation: sponsorShine 4s ease-in-out infinite;
+  }
+  @keyframes sponsorShine{
+    0%, 62% { background-position: 130% 0; }
+    100%    { background-position: -30% 0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .sponsor-gold{ animation: none; background-position: 50% 0; }
+  }
+  /* 名單框右下角的說明按鈕（金色小圓框） */
+  .sponsor-info-btn{
+    position: absolute; right: 6px; bottom: 6px;
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1px solid #d4af37; background: #fffdf5; color: #b8860b;
+    font-family: var(--font-display); font-size: 14px; font-weight: 600; font-style: italic;
+    line-height: 1; padding: 0; cursor: pointer; touch-action: manipulation;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sponsor-info-btn:hover, .sponsor-info-btn:active{ background:#d4af37; color:#fff; }
+  /* position:relative 供右下角的說明按鈕定位；padding-bottom 留出空間，避免壓到最後一位的名字 */
+  .sponsor-list{ position: relative; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; padding:14px 10px 40px; border:1px dashed var(--panel-border); border-radius:12px; }
   /* 固定行高與高度：避免中英文因字型行高不同而上下錯位 */
+  /* 金色樂友：金色漸層文字＋一道反光由左掃到右，每 4 秒一次。
+     系統開啟「減少動態效果」時只保留靜態金色，不做動畫。 */
+  .sponsor-gold{
+    font-weight: 700;
+    background: linear-gradient(100deg,
+      #b8860b 0%, #d4af37 32%, #fff3b0 46%, #ffffff 50%, #fff3b0 54%, #d4af37 68%, #b8860b 100%);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: #d4af37;
+    animation: sponsorShine 4s ease-in-out infinite;
+  }
+  @keyframes sponsorShine{
+    0%, 62% { background-position: 130% 0; }
+    100%    { background-position: -30% 0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .sponsor-gold{ animation: none; background-position: 50% 0; }
+  }
+  /* 名單框右下角的說明按鈕（金色小圓框） */
+  .sponsor-info-btn{
+    position: absolute; right: 6px; bottom: 6px;
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1px solid #d4af37; background: #fffdf5; color: #b8860b;
+    font-family: var(--font-display); font-size: 14px; font-weight: 600; font-style: italic;
+    line-height: 1; padding: 0; cursor: pointer; touch-action: manipulation;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sponsor-info-btn:hover, .sponsor-info-btn:active{ background:#d4af37; color:#fff; }
   .sponsor-list span{ display:inline-flex; align-items:center; justify-content:center; min-height:34px; line-height:1; font-size:15px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:999px; padding:0 14px; }
   @media (max-width:480px){ .cover-title{ font-size:34px; } .cover-clef{ font-size:76px; } .cover-msg{ font-size:15px; padding:18px 18px; } }
 </style>
@@ -379,7 +436,8 @@
     </div>    <p class="footer-note">還沒加入主畫面？<a class="footer-link" href="https://youtu.be/fF4-J2NGAnw?t=27" target="_blank" rel="noopener">▸ 看看怎麼加入</a>，開啟體驗會更接近原生 App。</p>
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.88　·　更新日誌 ▸</button></p>
+    <div class="report-wrap"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.89　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -455,7 +513,9 @@
 
     <!-- 贊助者名單（名單有人時才會出現入口） -->
     <div class="donate-links" id="donateSponsors" style="display:none;">
-      <div id="sponsorList" class="sponsor-list"></div>
+      <div id="sponsorList" class="sponsor-list">
+        <button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>
+      </div>
       <p class="pay-note">每一位同意公開的贊助者，都會列在贊助者名單中，感謝你的支持 🙏</p>
       <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
     </div>
@@ -477,6 +537,17 @@
 </div>
 
 <!-- 作者主頁彈窗（Portaly 主頁 / YouTube 頻道，可擴充） -->
+<div class="donate-modal" id="goldInfoModal" onclick="if(event.target===this) closeGoldInfo()">
+  <div class="donate-box">
+    <div class="dico">✨</div>
+    <h3>金色樂友</h3>
+    <p>累積贊助滿 5,000 元的朋友，名字會以金色顯示。</p>
+    <p>這個 App 完全免費、沒有廣告，能持續維護與增加新的練習項目，靠的是各位的支持。</p>
+    <p>無論金額多少，每一份贊助我都由衷感謝 🙏</p>
+    <button class="donate-dismiss" onclick="closeGoldInfo()">關閉</button>
+  </div>
+</div>
+
 <div class="donate-modal" id="cardInfoModal" onclick="if(event.target===this) closeCardInfo()">
   <div class="donate-box">
     <div class="dico">🎵</div>
@@ -596,6 +667,7 @@ var SPONSORS = [
   { name: 'Tong' },
   { name: '漫曼' },
   { name: 'A. J.' },
+  { name: '尤○慧', gold: true },   // gold: true ＝金色樂友（累積贊助滿 5,000 元）
   // { name: '王小明' },   ← 要新增就複製這一行、拿掉前面的「//」、把名字改掉
 ];
 
@@ -634,7 +706,8 @@ window.CHANGELOG = [
   { v: 'v.85', items: ['全新推出「08 音堆練習」：聆聽同時彈出的音堆，將每一個正確音高寫到五線譜上', '特別優化音堆練習的播放音量，現在和聲的音高會聽得更清楚，低音不會再將高音蓋過去'] },
   { v: 'v.86', items: ['主目錄介面優化：現在八個練習項目一目了然', '透過手機操作時，各練習項目的說明改由卡片右下角的 ▸ 開啟，版面更清爽', '修正音堆練習中，中央 C 等加線與音符沒有對齊的問題'] },
   { v: 'v.87', items: ['修正四部和聲在手機瀏覽器中，譜例下方的級數作答格可能被遮住、看不到自己填了什麼的問題', '四部和聲的三顆播放按鈕改為同一列，作答區空間更充裕'] },
-  { v: 'v.88', items: ['再次修正四部和聲的級數作答格被裁切的問題，這次找到真正的原因並徹底解決'] }
+  { v: 'v.88', items: ['再次修正四部和聲的級數作答格被裁切的問題，這次找到真正的原因並徹底解決'] },
+  { v: 'v.89', items: ['贊助者名單新增「金色樂友」標示，累積贊助滿 5,000 元的朋友會以金色顯示', '選單底部新增「贊助者名單」入口', '再次修正四部和聲的級數作答格在手機瀏覽器中被裁切的問題'] }
 ];
 
 function showChangelog(){
@@ -676,12 +749,18 @@ function showPanel(which){
 }
 function renderSponsors(){
   var box = document.getElementById('sponsorList'); if(!box) return;
-  box.innerHTML = SPONSORS.map(function(s){ return '<span>'+escapeHtml(s.name)+'</span>'; }).join('');
+  box.innerHTML = SPONSORS.map(function(s){
+    return '<span'+(s.gold ? ' class="sponsor-gold"' : '')+'>'+escapeHtml(s.name)+'</span>';
+  }).join('')
+  /* (i) 說明按鈕跟著一起重畫，否則會被 innerHTML 蓋掉 */
+  + '<button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>';
 }
 function showDonate(){ showPanel(''); var m=document.getElementById('donateModal'); if(m) m.classList.add('open'); syncBodyLock(); }
 function closeDonate(){ var m=document.getElementById('donateModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
 function showAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.add('open'); syncBodyLock(); }
 /* 目錄卡片的說明彈窗：卡片本身是連結，(i) 按鈕已在 onclick 攔掉預設行為 */
+function showGoldInfo(){ var m=document.getElementById('goldInfoModal'); if(m) m.classList.add('open'); syncBodyLock(); }
+function closeGoldInfo(){ var m=document.getElementById('goldInfoModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
 function showCardInfo(btn){
   document.getElementById('cardInfoTitle').textContent = btn.getAttribute('data-title') || '項目說明';
   document.getElementById('cardInfoDesc').textContent  = btn.getAttribute('data-desc') || '';
@@ -701,7 +780,7 @@ function copyText(e, text){
     else { _fallbackCopy(num); done(); }
   }catch(_){ _fallbackCopy(num); done(); }
 }
-document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDonate(); closeAuthor(); closeChangelog(); closeCardInfo(); } });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDonate(); closeAuthor(); closeChangelog(); closeCardInfo(); closeGoldInfo(); } });
 /* 贊助者名單：有人才顯示入口按鈕 */
 (function(){
   try{
