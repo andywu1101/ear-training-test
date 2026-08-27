@@ -807,6 +807,32 @@ window.addEventListener('resize', setVH); setVH();
     return semiToAcc(result);
   }
 
+  /* 內部一律用 ii°／vii° 當「代號」（十幾處和聲規則都靠這個字串判斷），
+     只在「顯示」與「比對」時轉成正確的記號。
+
+     半減七（ø）與全減七（°）的差別在第七音：
+       小調 ii  ＋七 = D–F–A♭–C   小三+小三+大三 → 半減七 iiø
+       大調 vii ＋七 = B–D–F–A    小三+小三+大三 → 半減七 viiø
+       小調 vii ＋七 = B–D–F–A♭   小三+小三+小三 → 全減七 vii°（維持不變）
+     三和絃（不含七音）一律仍是減三和絃，維持 °。 */
+  function isHalfDim7(sym, isMinor) {
+    if (!sym) return false;
+    const numerator = sym.includes('/') ? sym.split('/')[0] : sym;   // 副屬只看斜線前
+    if (!/7|65|43|42/.test(numerator)) return false;                 // 沒有七音就不是七和絃
+    const base = numerator.replace(/[0-9]/g, '');                    // 去掉轉位數字
+    return isMinor ? (base === 'ii°' || base === 'iiø')
+                   : (base === 'vii°' || base === 'viiø');
+  }
+  /* 顯示用：半減七的 ° 換成 ø（其餘原樣） */
+  function displayChord(sym, isMinor) {
+    if (!sym) return sym;
+    if (!isHalfDim7(sym, isMinor)) return sym;
+    const i = sym.indexOf('/');
+    const numerator = i >= 0 ? sym.slice(0, i) : sym;
+    const rest = i >= 0 ? sym.slice(i) : '';
+    return numerator.replace('°', 'ø') + rest;
+  }
+
   function normalizeChord(sym, isMinor) {
     if (!sym) return '';
     let s = sym.trim();
@@ -819,6 +845,13 @@ window.addEventListener('resize', setVH); setVH();
     if (upperS === 'N' || upperS === 'N6' || upperS === 'BII6' || upperS === '♭II6') return 'N6';
     if (isMinor) {
         if (upperS.startsWith('V') || upperS.startsWith('VII')) s = s.replace(/[♮♯#]/g, '');
+    }
+    // 半減七一律正規化成 ø：舊資料寫 ii°7、新資料寫 iiø7，兩者視為同一個答案
+    if (isHalfDim7(s, isMinor)) {
+      const i = s.indexOf('/');
+      const numerator = i >= 0 ? s.slice(0, i) : s;
+      const rest = i >= 0 ? s.slice(i) : '';
+      s = numerator.replace('°', 'ø') + rest;
     }
     return s;
   }
@@ -1887,6 +1920,16 @@ window.addEventListener('resize', setVH); setVH();
         if (!numerator && !isPendingHere) return; // 完全沒東西可修飾
         if (!numerator && isPendingHere && this.pendingSlashStage !== 2) return; // 分子還沒開始輸入
 
+        /* 把和絃拆成三段再組回去，這樣不論先按轉位還是先按性質記號，
+           結果都會是「級數 ＋ 性質記號 ＋ 轉位數字」的正確順序。
+           （舊寫法是一律接在字串最後，先按 7 再按 ø 會得到 ii7ø。） */
+        function splitSym(t) {
+          const m = String(t || '').match(/^([^0-9°ø+]*)([°ø+]*)([0-9]*)$/);
+          return m ? { deg: m[1], qual: m[2], inv: m[3] }
+                   : { deg: String(t || ''), qual: '', inv: '' };   // 認不得就整串當級數，不動它
+        }
+        const canSplit = /^[^0-9°ø+]*[°ø+]*[0-9]*$/.test(numerator);
+
         if (type === 'inv') {
           let isSev = document.getElementById('btn-sev-switch').classList.contains('active-toggle');
           let mappedInv = val;
@@ -1895,9 +1938,19 @@ window.addEventListener('resize', setVH); setVH();
             else if (val === '6') mappedInv = '65';
             else if (val === '64') mappedInv = '43';
           }
-          numerator = numerator.replace(/[0-9]/g, '') + mappedInv;
+          if (canSplit) {
+            const p = splitSym(numerator);
+            numerator = p.deg + p.qual + mappedInv;
+          } else {
+            numerator = numerator.replace(/[0-9]/g, '') + mappedInv;
+          }
         } else if (type === 'mod' || type === 'acc') {
-          numerator = numerator + val;
+          if (canSplit && (val === '°' || val === 'ø' || val === '+')) {
+            const p = splitSym(numerator);
+            numerator = p.deg + val + p.inv;      // 性質記號插在轉位數字之前
+          } else {
+            numerator = numerator + val;
+          }
         } else if (type === 'back') {
           numerator = numerator.slice(0, -1);
         }
@@ -2170,7 +2223,7 @@ window.addEventListener('resize', setVH); setVH();
                + ((this.activeTab === 'chord' && i === this.activeSlot) ? ' active-slot' : '')
                + ((this.activeTab === 'chord' && i !== this.activeSlot && this.lastEditedChordSlot === i) ? ' last-edited-slot' : '');
           }
-          slot.innerHTML = `<div class="slot-bar-num">${i+1}</div><div class="slot-value" style="font-size:15px;">${this.userSeq[i] || '—'}</div>`;
+          slot.innerHTML = `<div class="slot-bar-num">${i+1}</div><div class="slot-value" style="font-size:15px;">${displayChord(this.userSeq[i], this.keyObj && this.keyObj.isMin) || '—'}</div>`;
         }
       }
       this.checkSubmitState();
@@ -2405,6 +2458,7 @@ window.addEventListener('resize', setVH); setVH();
         slot.style.width = (slotWidth - 6) + 'px'; slot.style.height = '64px';
         
         let dispVal = opt.forceCorrectSlots ? (userSeq[i] || this.questionSeq[i] || '—') : (userSeq[i] || '—');
+        dispVal = displayChord(dispVal, (opt.keyObj || this.keyObj || {}).isMin) || '—';
         slot.innerHTML = `<div class="slot-bar-num">${i+1}</div><div class="slot-value" style="font-size:15px;">${dispVal}</div>`;
         overlay.appendChild(slot);
 
