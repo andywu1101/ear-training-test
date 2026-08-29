@@ -255,6 +255,13 @@
           <option value="4">4 小節 (上限)</option>
         </select>
       </div>
+      <div class="switch-group" id="rhy-tieWrapper">
+        <div class="switch-group-label">連結線 <span id="rhy-tieNote" style="color:var(--ink-soft); font-weight:400;"></span></div>
+        <div class="switch-btns" id="rhy-tieSwitch">
+          <button class="mode-btn active" data-tie="off">關閉</button>
+          <button class="mode-btn" data-tie="on">開啟</button>
+        </div>
+      </div>
       <div class="switch-group" id="testReplayWrapper" style="display:none;">
         <div class="switch-group-label">測驗重播次數</div>
         <select id="rhy-testReplaySelect" class="select-box">
@@ -297,8 +304,8 @@
       <div class="unified-action-row">
         <button class="play-btn" id="rhy-playBtn" disabled>▶ 播放題目</button>
         <span id="rhy-editBtns" style="display:flex; gap:8px;">
+          <button class="action-btn" id="rhy-tieBtn" style="display:none;">⌒ 連結線</button>
           <button class="action-btn" id="rhy-backspaceBtn">⌫ 刪除</button>
-          <button class="action-btn" id="rhy-clearBtn">🗑️ 清空</button>
           <button class="action-btn btn-submit" id="rhy-submitBtn" disabled>✔ 提交</button>
         </span>
       </div>
@@ -316,7 +323,7 @@
   <!-- 【節奏練習】解答頁（提交作答後） -->
   <div id="pageRhyAnswer" class="page-view">
     <div class="top-bar-practice" style="margin-bottom:14px;">
-      <button class="nav-back-btn" style="margin:0;" onclick="showPage('rhy-practice')">← 返回作答</button>
+      <button class="nav-back-btn" style="margin:0;" onclick="showPage('rhy-settings')">← 返回設定</button>
       <span class="practice-status-badge" id="rhy-ansBadge">解答對照</span>
       <div class="score-box"><div class="num" id="rhy-ansScore">0/0</div></div>
     </div>
@@ -521,29 +528,170 @@ function showPage(pageId) {
 
   const VF = Vex.Flow;
 
-  function createEnhancedTie(firstNote, lastNote) {
-    if (typeof firstNote.setExtraRightPx === 'function') {
-      firstNote.setExtraRightPx(30);
+  function createEnhancedTie(firstNote, lastNote, extraRight) {
+    const pad = (extraRight === undefined) ? 30 : extraRight;
+    if (pad && typeof firstNote.setExtraRightPx === 'function') {
+      firstNote.setExtraRightPx(pad);
     }
-    return new VF.StaveTie({
+    const t = new VF.StaveTie({
       first_note: firstNote,
       last_note: lastNote,
       first_indices: [0],
       last_indices: [0]
-    }).setDirection(1); // 1 代表 VF.Stem.UP
+    });
+    t.__firstNote = firstNote;   // 畫之前才依符桿方向決定弧線朝上或朝下
+    return t;
+  }
+
+  /* 連結線弧線畫在符頭側（符桿向上→弧線在下，符桿向下→弧線在上）。
+     ⚠ VexFlow 的 setDirection 語意與直覺相反：傳入的值要與符桿方向「同號」，
+     傳 1（符桿向上）畫出來的弧線才在符頭下方。
+     符桿方向會被 Beam 改寫，所以一定要在 beam 畫完之後、tie 畫之前才套用。 */
+  function applyTieDirections(ties) {
+    (ties || []).forEach(function(t){
+      let dir = 1;
+      try { if (t.__firstNote && typeof t.__firstNote.getStemDirection === 'function') dir = t.__firstNote.getStemDirection() || 1; } catch(e) {}
+      t.setDirection(dir);
+    });
+  }
+
+  /* ===== 跨拍連結線（tieAcross） =====
+     tieAcross[i] === true 表示第 i 拍的最後一音連到第 i+1 拍的第一音。
+     規則：只在小節內、不跨小節線；連鎖最多三個音（A⌒B⌒C 可，再延長不可）。 */
+
+  const TIE_UNIT = 3;   // 時值放大倍率：三連音的 4/3 乘 3 後才是整數，避免浮點誤差
+
+  // 第 i 拍是不是「小節內的拍界」（後面還有同小節的下一拍）
+  /* 拍界：第 i 拍與第 i+1 拍之間。連結線可以跨小節線，所以只要不是最後一拍就成立。
+     （小節末拍的連結線＝跨小節，判定時由 compareBars 另外檢查，見下方說明。） */
+  function isInnerBoundary(i, beatsPerBar, totalBeats) {
+    return i >= 0 && i < totalBeats - 1;
+  }
+
+  // 這個拍界是不是跨小節線
+  function isBarBoundary(i, beatsPerBar) {
+    return ((i + 1) % beatsPerBar) === 0;
+  }
+
+  // 把 tieAcross[i] 設為 true 之後，包含 i 的連續段長度（1 段＝2 個音相連）
+  function chainLenIfSet(tieAcross, i) {
+    let len = 1;
+    for (let k = i - 1; k >= 0 && tieAcross[k]; k--) len++;
+    for (let k = i + 1; k < tieAcross.length && tieAcross[k]; k++) len++;
+    return len;
+  }
+
+  // 這個拍界現在可不可以按下 ⌒（已經有 tie 時一律可按，代表取消）
+  function canToggleTie(seq, tieAcross, i, beatsPerBar) {
+    if (!isInnerBoundary(i, beatsPerBar, seq.length)) return false;
+    if (tieAcross[i]) return true;
+    if (seq[i] === 'placeholder' || seq[i + 1] === 'placeholder') return false;
+    return chainLenIfSet(tieAcross, i) <= 2;   // 最多 2 段＝3 個音
+  }
+
+  /* 把一個小節攤平成時值序列（整數，已乘 TIE_UNIT）。
+     blank 為 true 表示這一小節有沒填的拍，一律視為不相同。 */
+  function flattenBar(seq, tieAcross, from, to) {
+    const vals = []; let blank = false;
+    let pending = 0, active = false;
+    for (let i = from; i < to; i++) {
+      const id = seq[i];
+      if (!id || id === 'placeholder') {
+        if (active) { vals.push(pending); pending = 0; active = false; }
+        blank = true; continue;
+      }
+      const blk = ALL_BLOCKS[id]; if (!blk) { blank = true; continue; }
+      const L = blk.lengths, TN = blk.tieNext || [];
+      for (let j = 0; j < L.length; j++) {
+        const v = Math.round(L[j] * TIE_UNIT);
+        if (active) pending += v; else { pending = v; active = true; }
+        let tiedOut;
+        if (j < L.length - 1) tiedOut = !!TN[j];
+        else tiedOut = !!(tieAcross && tieAcross[i]) && (i + 1 < to) && seq[i + 1] && seq[i + 1] !== 'placeholder';
+        if (!tiedOut) { vals.push(pending); pending = 0; active = false; }
+      }
+    }
+    if (active) vals.push(pending);
+    return { vals: vals, blank: blank };
+  }
+
+  // 逐小節比對時值序列；回傳每一小節是否相同
+  /* 逐小節比對（方案 C）：小節內仍然各自攤平時值，不把跨小節的音合併起來，
+     另外再檢查「這個小節的末拍有沒有連到下一小節」是否與正解相同。
+     這樣「小節」仍是判定與標紅的單位，而跨小節連結線的對錯也會被抓到。
+     （已窮舉驗證：本系統的格子固定、等價記譜不存在，所以這樣的判定結果
+       與「整條攤平一次比完」完全相同。） */
+  function compareBars(userSeq, qSeq, tieU, tieQ, beatsPerBar, barsCount) {
+    const out = [];
+    const total = barsCount * beatsPerBar;
+    for (let b = 0; b < barsCount; b++) {
+      const from = b * beatsPerBar, to = from + beatsPerBar;
+      const u = flattenBar(userSeq, tieU, from, to);
+      const q = flattenBar(qSeq, tieQ, from, to);
+      let same = !u.blank && !q.blank && u.vals.length === q.vals.length && u.vals.every((v, k) => v === q.vals[k]);
+      const last = to - 1;                       // 這個小節的末拍
+      if (same && last < total - 1 && !!(tieU||[])[last] !== !!(tieQ||[])[last]) same = false;
+      out.push(same);
+    }
+    return out;
+  }
+
+  /* 標紅：時值序列相同的小節整段不標；不同的小節逐拍比對，
+     連結線不同時，前後兩拍都標紅（扣分只算前面那拍，見 examBootstrap）。 */
+  function markWrongBeats(userSeq, qSeq, tieU, tieQ, beatsPerBar, barsCount) {
+    const total = barsCount * beatsPerBar;
+    const wrong = new Array(total).fill(false);
+    const barOK = compareBars(userSeq, qSeq, tieU, tieQ, beatsPerBar, barsCount);
+    for (let b = 0; b < barsCount; b++) {
+      if (barOK[b]) continue;
+      const from = b * beatsPerBar, to = from + beatsPerBar;
+      for (let i = from; i < to; i++) {
+        if (userSeq[i] !== qSeq[i]) wrong[i] = true;
+        // 連結線不同時前後兩拍都標紅（跨小節時，紅色會落在下一小節的第一拍）
+        if (isInnerBoundary(i, beatsPerBar, total) && !!tieU[i] !== !!tieQ[i]) { wrong[i] = true; wrong[i + 1] = true; }
+      }
+    }
+    return wrong;
+  }
+
+  /* 播放事件：把整條攤平成「一次發聲」的清單。
+     midi 為 null 代表未填的一拍（靜default）。音高只在重新彈奏時才交替。 */
+  function buildPlayEvents(seq, tieAcross, pitchMode, startPitch, beatUnits, beatsPerBar) {
+    const ev = []; let cur = startPitch;
+    let pending = 0, active = false;
+    const flush = function(){ if(!active) return; ev.push({ midi: (pitchMode === 'dual' ? cur : 69), len: pending });
+      if (pitchMode === 'dual') cur = (cur === 69) ? 64 : 69; pending = 0; active = false; };
+    for (let i = 0; i < seq.length; i++) {
+      const id = seq[i];
+      if (!id || id === 'placeholder') { flush(); ev.push({ midi: null, len: beatUnits }); continue; }
+      const blk = ALL_BLOCKS[id]; if (!blk) { flush(); ev.push({ midi: null, len: beatUnits }); continue; }
+      const L = blk.lengths, TN = blk.tieNext || [];
+      for (let j = 0; j < L.length; j++) {
+        if (active) pending += L[j]; else { pending = L[j]; active = true; }
+        let tiedOut;
+        if (j < L.length - 1) tiedOut = !!TN[j];
+        else tiedOut = !!(tieAcross && tieAcross[i]) && isInnerBoundary(i, beatsPerBar, seq.length)
+                       && seq[i + 1] && seq[i + 1] !== 'placeholder';
+        if (!tiedOut) flush();
+      }
+    }
+    flush();
+    return ev;
   }
 
   const EXTRA_SPACING_IDS = ['4-1-1', '1-1-4', '4~1-1', '1-1~4'];
 
-  function getVexNotes(block, isWrong, pitchState) {
+  function getVexNotes(block, isWrong, pitchState, tiedFromPrevBeat, tieExtraRight) {
     let notes = []; let ties = []; let tuplet = null;
     let lengths = block.lengths;
     let tieNext = block.tieNext || [];
 
-    let currentK = 'a/4';
+    // 由前一拍連過來時，第一個音沿用上一個音的音高（不算重新彈奏，不交替）
+    let currentK = (tiedFromPrevBeat && pitchState && pitchState.lastKey) ? pitchState.lastKey : 'a/4';
     let updatePitch = () => {
        if (pitchState) {
            currentK = pitchState.currentPitch === 69 ? 'a/4' : 'e/4';
+           pitchState.lastKey = currentK;
        }
     };
     let advancePitch = () => {
@@ -554,11 +702,11 @@ function showPage(pageId) {
 
     if (block.isTuplet) {
       for(let i=0; i<3; i++) {
-        updatePitch();
+        if (!(i === 0 && tiedFromPrevBeat)) updatePitch();
         let n = new VF.StaveNote({keys:[currentK], duration:'8'});
         if(isWrong) n.setStyle({fillStyle: 'var(--wrong)', strokeStyle: 'var(--wrong)'});
         notes.push(n);
-        advancePitch();
+        if (!(i === 0 && tiedFromPrevBeat)) advancePitch();
       }
       tuplet = new VF.Tuplet(notes, {num_notes: 3, notes_occupied: 2, ratioed: false});
       let beams = [new VF.Beam(notes)];
@@ -568,7 +716,7 @@ function showPage(pageId) {
     let needsExtraSpacing = EXTRA_SPACING_IDS.includes(block.id);
 
     lengths.forEach((len, idx) => {
-      let tiedFromPrev = (idx > 0 && tieNext[idx-1]);
+      let tiedFromPrev = (idx > 0) ? !!tieNext[idx-1] : !!tiedFromPrevBeat;
       if (!tiedFromPrev) {
           updatePitch();
           advancePitch();
@@ -592,13 +740,59 @@ function showPage(pageId) {
 
     for (let idx = 0; idx < tieNext.length; idx++) {
       if (tieNext[idx] && idx + 1 < notes.length) {
-        ties.push(createEnhancedTie(notes[idx], notes[idx + 1]));
+        ties.push(createEnhancedTie(notes[idx], notes[idx + 1], tieExtraRight));
       }
     }
 
     const beamNotes = notes.filter(n => n.duration.includes('8') || n.duration.includes('16'));
     const beams = beamNotes.length > 1 ? [new VF.Beam(beamNotes)] : [];
     return { notes, ties, beams, tuplet };
+  }
+
+  /* 節奏型小圖（設定頁與作答鍵盤的按鈕）的音符排版。
+
+     絕大多數節奏型維持 VexFlow 原本的 FormatAndDraw，只有下列四個例外：
+     它們是「一個四分音符 ＋ 兩個十六分音符」的組合，Formatter 按時值比例分配的結果是
+     四分音符吃掉大半寬度、兩個十六分音符擠成一團（實測間距只有 15px），連結線也短到看不清。
+     這四個改成手動指定落點，間距依「時值^K」分配。
+     K = 1 是原本的純比例（差距過大），K = 0 是完全平均（看不出長短）。 */
+  const MINI_CUSTOM = { '4~1-1': 1, '1-1~4': 1, '4-1-1': 1, '1-1-4': 1 };
+  const MINI_GAP_K = 0.7;
+  const MINI_RIGHT_PAD = 12;   // 右緣留給最後一個符頭（畫布 260 ÷ scale 1.25 ＝ 有效寬度只有 208）
+  const MINI_HEAD_CENTRE = 28.5;   // 符頭視覺中心相對 tickContext 座標的偏移（實測）
+
+  function layoutMiniNotes(notes, lengths, stave) {
+    if (!notes.length) return;
+    const left = stave.getNoteStartX();
+    const right = stave.getX() + stave.getWidth() - MINI_RIGHT_PAD;
+    const put = function(note, absX){
+      const tc = note.getTickContext();
+      if (tc) tc.setX(absX - left);
+    };
+    /* 單音（6、4）置中。
+       ⚠ 實測：tickContext 設 T，符頭實際畫在 T + noteStartX + 23，符頭本身寬約 11，
+       所以符頭的視覺中心在 T + noteStartX + 28.5。
+       getWidth() 在這裡回傳幾乎 0、getNoteHeadBeginX() 也對不上，只能用實測值。 */
+    if (notes.length === 1) {
+      put(notes[0], stave.getX() + stave.getWidth() / 2 - MINI_HEAD_CENTRE);
+      return;
+    }
+
+    /* 每個音各佔一段寬度，寬度依「時值^K」分配。
+       最後一個音佔的那一段是尾端留白——四分音符擺在最後時（1-1-4），
+       它的長度就是靠這段留白表現的，不能把它推到右緣，否則前面的十六分音符反而被拉開。 */
+    let weights = [], total = 0;
+    for (let i = 0; i < notes.length; i++) {
+      const len = (lengths && lengths[i]) ? lengths[i] : 1;
+      const wgt = Math.pow(len, MINI_GAP_K);
+      weights.push(wgt); total += wgt;
+    }
+    if (!(total > 0)) return;
+    let x = left;
+    for (let i = 0; i < notes.length; i++) {
+      put(notes[i], x);
+      x += (right - left) * (weights[i] / total);
+    }
   }
 
   function drawMiniRhythm(container, blockId) {
@@ -614,9 +808,21 @@ function showPage(pageId) {
       ctx.scale(1.25, 1.25);
 
       const stave = new VF.Stave(5, 5, 200).setContext(ctx).draw();
-      const { notes, ties, beams, tuplet } = getVexNotes(block, false, null);
-      VF.Formatter.FormatAndDraw(ctx, stave, notes);
+      const custom = !!MINI_CUSTOM[blockId] || block.lengths.length === 1;
+      // 自訂排版時不要主譜那 30px 的連結線留白（小圖只有 200px，佔比太大）
+      const { notes, ties, beams, tuplet } = getVexNotes(block, false, null, false, custom ? 0 : undefined);
+
+      if (custom) {
+        const voice = new VF.Voice({ num_beats: 4, beat_value: 4 }).setStrict(false).addTickables(notes);
+        new VF.Formatter().joinVoices([voice]).format([voice], 200);
+        layoutMiniNotes(notes, block.lengths, stave);
+        voice.draw(ctx, stave);
+      } else {
+        VF.Formatter.FormatAndDraw(ctx, stave, notes);
+      }
+
       beams.forEach(b => b.setContext(ctx).draw());
+      applyTieDirections(ties);
       ties.forEach(t => t.setContext(ctx).draw());
       if(tuplet) tuplet.setContext(ctx).draw();
     } catch(e) {}
@@ -642,7 +848,7 @@ function showPage(pageId) {
     return best;
   }
 
-  function renderMainStaff(containerId, seq, interactive = false, correctSeq = null, startPitch = 69, ctxOverride = null) {
+  function renderMainStaff(containerId, seq, interactive = false, correctSeq = null, startPitch = 69, ctxOverride = null, tieAcross = null, correctTie = null) {
     try {
       const container = document.getElementById(containerId);
       if (!container) return;
@@ -659,6 +865,12 @@ function showPage(pageId) {
       }
 
       container.innerHTML = '';
+
+      const tieArr = tieAcross || [];
+      let crossTies = [], pendingCross = null;   // 跨小節連結線：等所有小節排版完才畫
+      const wrongBeats = correctSeq
+        ? markWrongBeats(seq, correctSeq, tieArr, correctTie || [], cfg.beatsPerBar, cfg.barsCount)
+        : null;
 
       const _refSeqs = [seq, correctSeq];
       if(interactive && rhyModule && rhyModule.questionSeq) _refSeqs.push(rhyModule.questionSeq);
@@ -697,6 +909,8 @@ function showPage(pageId) {
 
         let allNotes = []; let allBeams = []; let allTies = []; let allTuplets = [];
         let barKeys = bars[b] || [];
+        let barBeatNotes = {};   // 拍索引 → 該拍的音符陣列（供小節內跨拍連結線使用）
+        let barStartIdx = globalIdx;
 
         let filledBeats = barKeys.reduce((acc, k) => acc + (k === 'placeholder' ? 1 : ALL_BLOCKS[k].beats), 0);
         while(filledBeats < cfg.beatsPerBar) { barKeys.push('placeholder'); filledBeats++; }
@@ -705,11 +919,14 @@ function showPage(pageId) {
           let firstNoteOfBeat = null;
           if (id !== 'placeholder') {
             const block = ALL_BLOCKS[id];
-            let isWrong = correctSeq && (seq[globalIdx] !== correctSeq[globalIdx]);
-            const { notes, ties, beams, tuplet } = getVexNotes(block, isWrong, pitchState);
+            let isWrong = wrongBeats ? !!wrongBeats[globalIdx] : false;
+            const tiedIn = globalIdx > barStartIdx && !!tieArr[globalIdx - 1]
+                           && seq[globalIdx - 1] && seq[globalIdx - 1] !== 'placeholder';
+            const { notes, ties, beams, tuplet } = getVexNotes(block, isWrong, pitchState, tiedIn);
             allNotes.push(...notes); allBeams.push(...beams); allTies.push(...ties);
             if(tuplet) allTuplets.push(tuplet);
             firstNoteOfBeat = notes[0];
+            barBeatNotes[globalIdx] = notes;
           } else {
             let currentK = pitchState.currentPitch === 69 ? 'a/4' : 'e/4';
             let ghost = new VF.StaveNote({keys:[currentK], duration: 'qr'});
@@ -722,14 +939,39 @@ function showPage(pageId) {
           globalIdx++;
         });
 
+        // 小節內的跨拍連結線
+        for (let i = barStartIdx; i < globalIdx - 1; i++) {
+          if (!tieArr[i]) continue;
+          const a = barBeatNotes[i], c = barBeatNotes[i + 1];
+          if (!a || !c || !a.length || !c.length) continue;
+          allTies.push(createEnhancedTie(a[a.length - 1], c[0]));
+        }
+
+        /* 跨小節的連結線：兩端在不同的 stave，必須等兩個小節都排版完才能畫，
+           所以先記下來，等小節迴圈跑完再統一畫（弧線會橫跨小節線）。 */
+        if (pendingCross && barBeatNotes[barStartIdx] && barBeatNotes[barStartIdx].length) {
+          crossTies.push(createEnhancedTie(pendingCross, barBeatNotes[barStartIdx][0], 0));
+          pendingCross = null;
+        }
+        const barLastIdx = globalIdx - 1;
+        if (tieArr[barLastIdx] && barBeatNotes[barLastIdx] && barBeatNotes[barLastIdx].length) {
+          const arr = barBeatNotes[barLastIdx];
+          pendingCross = arr[arr.length - 1];
+        } else { pendingCross = null; }
+
         if (allNotes.length > 0) {
           VF.Formatter.FormatAndDraw(ctx, stave, allNotes);
           allBeams.forEach(bm => bm.setContext(ctx).draw());
+          applyTieDirections(allTies);
           allTies.forEach(t => t.setContext(ctx).draw());
           allTuplets.forEach(tp => tp.setContext(ctx).draw());
         }
         xPos += sWidth;
       }
+
+      // 所有小節都排版完了，這時才畫跨小節的連結線
+      applyTieDirections(crossTies);
+      crossTies.forEach(t => t.setContext(ctx).draw());
 
       if (interactive && rhyModule.hasPlayed) {
         let overlay = document.createElement('div');
@@ -780,10 +1022,10 @@ function showPage(pageId) {
   }
 
   // 靜態渲染包裝：解答頁與錯題本用該題自身的設定繪譜
-  function renderStaticStaff(containerId, seq, correctSeq, item) {
+  function renderStaticStaff(containerId, seq, correctSeq, item, tieAcross, correctTie) {
     renderMainStaff(containerId, seq, false, correctSeq, item.startPitch, {
       barsCount: item.barsCount, beatsPerBar: item.beatsPerBar, meter: item.meter, meterType: item.meterType, pitchMode: item.pitchMode
-    });
+    }, tieAcross || [], correctTie || []);
   }
 
   // ================= 播放引擎 =================
@@ -804,9 +1046,10 @@ function showPage(pageId) {
   };
 
   // 靜態播放：解答頁 / 錯題本用該題自身的拍號、速度與音高播放（不動作答狀態）
-  function playStatic(seq, item) {
+  function playStatic(seq, item, tieAcross) {
     window.rhyStopAll();
     if(!pianoInst) return;
+    const tieArr = tieAcross || [];   // 舊錯題本／舊考卷沒有這個欄位，視為沒有連結線
     const ctx = ensureAudio(); let time = ctx.currentTime + 0.1;
     const bpm = item.bpm, meter = item.meter, meterType = item.meterType, pitchMode = item.pitchMode, startPitch = item.startPitch;
     let secPerUnit = 60 / bpm;
@@ -832,27 +1075,10 @@ function showPage(pageId) {
       time += numerator * secPerUnit;
     }
     let beatUnits = meterType === 'simple' ? 4 : 6;
-    let currentPitch = startPitch;
-    seq.forEach(id => {
-      if(id === 'placeholder'){ time += beatUnits * secPer16th; return; }
-      const block = ALL_BLOCKS[id];
-      const lengths = block.lengths;
-      const tieNext = block.tieNext || [];
-      let i = 0;
-      while (i < lengths.length) {
-        let totalLen = lengths[i];
-        let isTied = tieNext[i];
-        let nextIdx = i + 1;
-        while (isTied && nextIdx < lengths.length) {
-          totalLen += lengths[nextIdx];
-          isTied = tieNext[nextIdx];
-          nextIdx++;
-        }
-        pianoInst.play(pitchMode==='dual'?currentPitch:69, time, { duration: totalLen * secPer16th * 0.9, gain: 3.5 });
-        if(pitchMode==='dual') currentPitch = (currentPitch===69) ? 64 : 69;
-        time += totalLen * secPer16th;
-        i = nextIdx;
-      }
+    const bpb = item.beatsPerBar || (meterType === 'compound' ? numerator / 3 : numerator);
+    buildPlayEvents(seq, tieArr, pitchMode, startPitch, beatUnits, bpb).forEach(function(e){
+      if(e.midi !== null) pianoInst.play(e.midi, time, { duration: e.len * secPer16th * 0.9, gain: 3.5 });
+      time += e.len * secPer16th;
     });
     rhyModule.isPlaying = true; rhyModule.updatePlayBtn();
     const timerId = setTimeout(() => { rhyModule.isPlaying = false; rhyModule.updatePlayBtn(); }, (time-ctx.currentTime)*1000 + 100);
@@ -862,6 +1088,7 @@ function showPage(pageId) {
   const rhyModule = {
     mode: 'practice', pitchMode: 'single', meter: '2/4', meterType: 'simple', barsCount: 2, beatsPerBar: 2, bpm: 80, totalBeats: 4,
     selectedPatterns: new Set(), questionSeq: [], userSeq: [], lockedStartPitch: 69, isPlaying: false, hasPlayed: false,
+    tieEnabled: false, questionTie: [], userTie: [], tieMin: 1, tieMax: 0,
     activeSlotIdx: 0, score: { c:0, t:0 },
     testSession: { isRunning: false, replaysLeft: 0, totalPlays: 0 },
     _ansItem: null,
@@ -889,6 +1116,34 @@ function showPage(pageId) {
       this.questionSeq = []; const pool = Array.from(this.selectedPatterns);
       for(let i=0; i<this.totalBeats; i++) this.questionSeq.push(pool[Math.floor(Math.random() * pool.length)]);
       this.lockedStartPitch = Math.random() < 0.5 ? 69 : 64;
+      this.questionTie = this.buildQuestionTie();
+    },
+
+    /* 跨拍連結線的出題：只在小節內、連鎖最多三個音、
+       數量在 tieMin～tieMax 之間（練習用 1～小節數，考試由 exam 設定覆寫）。 */
+    buildQuestionTie: function() {
+      const n = this.totalBeats;
+      const tie = new Array(n).fill(false);
+      if (!this.tieEnabled) return tie;
+
+      const slots = [];
+      for (let i = 0; i < n - 1; i++) if (isInnerBoundary(i, this.beatsPerBar, n)) slots.push(i);
+      if (!slots.length) return tie;   // 3/8 這種每小節只有一拍的拍號，小節內沒有拍界
+
+      const maxN = Math.min(this.tieMax || this.barsCount, slots.length);
+      const minN = Math.min(Math.max(this.tieMin || 1, 1), maxN);
+      const want = minN + Math.floor(Math.random() * (maxN - minN + 1));
+
+      // 洗牌後依序嘗試，不合規則（連鎖過長）就跳過
+      for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); const t = slots[i]; slots[i] = slots[j]; slots[j] = t; }
+      let placed = 0;
+      for (let k = 0; k < slots.length && placed < want; k++) {
+        const i = slots[k];
+        if (tie[i]) continue;
+        if (chainLenIfSet(tie, i) > 2) continue;
+        tie[i] = true; placed++;
+      }
+      return tie;
     },
 
     playSequence: function(seq, onEnd) {
@@ -924,30 +1179,11 @@ function showPage(pageId) {
         time += numerator * secPerUnit;
       }
 
-      let currentPitch = this.lockedStartPitch;
-      seq.forEach(id => {
-        const block = ALL_BLOCKS[id];
-        const lengths = block.lengths;
-        const tieNext = block.tieNext || [];
-
-        let i = 0;
-        while (i < lengths.length) {
-          let totalLen = lengths[i];
-          let isTied = tieNext[i];
-          let nextIdx = i + 1;
-
-          while (isTied && nextIdx < lengths.length) {
-            totalLen += lengths[nextIdx];
-            isTied = tieNext[nextIdx];
-            nextIdx++;
-          }
-
-          pianoInst.play(this.pitchMode==='dual'?currentPitch:69, time, { duration: totalLen * secPer16th * 0.9, gain: 3.5 });
-          if(this.pitchMode==='dual') currentPitch = (currentPitch===69) ? 64 : 69;
-
-          time += totalLen * secPer16th;
-          i = nextIdx;
-        }
+      const beatUnits = this.meterType === 'simple' ? 4 : 6;
+      const tieArr = (seq === this.questionSeq) ? this.questionTie : this.userTie;
+      buildPlayEvents(seq, tieArr || [], this.pitchMode, this.lockedStartPitch, beatUnits, this.beatsPerBar).forEach(function(e){
+        if(e.midi !== null) pianoInst.play(e.midi, time, { duration: e.len * secPer16th * 0.9, gain: 3.5 });
+        time += e.len * secPer16th;
       });
 
       const timerId = setTimeout(() => { this.isPlaying = false; this.updatePlayBtn(); if(onEnd) onEnd(); }, (time-ctx.currentTime)*1000 + 100);
@@ -1018,7 +1254,8 @@ function showPage(pageId) {
     },
 
     updateUI: function() {
-      renderMainStaff('rhy-staff-svg', this.userSeq, true, null, this.lockedStartPitch);
+      renderMainStaff('rhy-staff-svg', this.userSeq, true, null, this.lockedStartPitch, null, this.userTie, null);
+      this.refreshTieBtn();
       // 提交鈕在播放後即可按；未填的格子會在提交時跳出提醒並計為錯誤
       document.getElementById('rhy-submitBtn').disabled = !this.hasPlayed;
       document.querySelectorAll('.rhythm-btn').forEach(b => {
@@ -1051,6 +1288,42 @@ function showPage(pageId) {
       else { b.textContent = '▶ 播放題目'; b.disabled = !pianoInst; }
     },
 
+    /* 連結線可以跨小節線，所以任何拍號都能使用（3/8 每小節只有一拍，
+       它的連結線一定是跨小節的）。這裡只負責清掉提示文字。 */
+    syncTieSwitch: function() {
+      const note = document.getElementById('rhy-tieNote');
+      if (note) note.textContent = '';
+    },
+
+    /* ⌒ 按鈕：開關關閉時隱藏（按鈕列自然收合）；
+       選中最後一拍、小節最後一拍、空白拍、或連鎖會超過三個音時灰掉。 */
+    refreshTieBtn: function() {
+      const btn = document.getElementById('rhy-tieBtn'); if(!btn) return;
+      if (!this.tieEnabled) { btn.style.display = 'none'; return; }
+      btn.style.display = '';
+      const i = this.activeSlotIdx;
+      const ok = this.hasPlayed && i >= 0 && canToggleTie(this.userSeq, this.userTie, i, this.beatsPerBar);
+      btn.disabled = !ok;
+      btn.style.opacity = ok ? '1' : '0.35';
+      btn.textContent = (ok && this.userTie[i]) ? '⌒ 取消連結' : '⌒ 連結線';
+    },
+
+    toggleTie: function() {
+      const i = this.activeSlotIdx;
+      if (!this.tieEnabled || !this.hasPlayed || i < 0) return;
+      if (!canToggleTie(this.userSeq, this.userTie, i, this.beatsPerBar)) return;
+      this.userTie[i] = !this.userTie[i];
+      this.updateUI();
+    },
+
+    /* 刪掉第 i 拍時，該拍前後兩條連結線一律清除。
+       （換成別的節奏型則保留連結線，會自動接到新的最後一個音；
+         但刪成空白拍時必須清除，否則會留下畫面上看不見、又無法取消的狀態。） */
+    clearTieAround: function(i) {
+      if (i > 0) this.userTie[i-1] = false;
+      if (i < this.userTie.length) this.userTie[i] = false;
+    },
+
     refreshReviewCount: function() {
       const el = document.getElementById('rhy-reviewCount'); if(el) el.textContent = window.REVIEW_STORE.count('rhythm');
     },
@@ -1066,17 +1339,20 @@ function showPage(pageId) {
                      beatsPerBar: (function(){ var b = parseInt((cfg.meter||'4/4').split('/')[0],10); return cfg.meterType==='compound' ? b/3 : b; })(),
                      bpm: cfg.bpm || 80, startPitch: d.questions.startPitch };
       const qSeq = (d.questions.seq || []).slice();
-      const uSeq = Array.isArray(d.answers) ? d.answers.slice() : [];
+      const qTie = (d.questions.tie || []).slice();
+      // 舊考卷的 answers 是純陣列且沒有連結線；新版是 { seq, tie }
+      const uSeq = Array.isArray(d.answers) ? d.answers.slice() : ((d.answers && d.answers.seq) ? d.answers.seq.slice() : []);
+      const uTie = (d.answers && !Array.isArray(d.answers) && d.answers.tie) ? d.answers.tie.slice() : [];
       setPaperHead(p, KEY, 'rhy-ansBadge', 'rhy-ansScore', 'rhy-ansFeedback', 'rhy-ansNextBtn', 'rhy-paperBack', paperId, 'pageRhyAnswer');
       showPage('rhy-answer');
       setTimeout(function(){
-        renderStaticStaff('rhy-ansUser', uSeq, qSeq, item);
-        renderStaticStaff('rhy-ansCorrect', qSeq, null, item);
+        renderStaticStaff('rhy-ansUser', uSeq, qSeq, item, uTie, qTie);
+        renderStaticStaff('rhy-ansCorrect', qSeq, null, item, qTie, null);
         syncStaffScroll('rhy-ansUser', 'rhy-ansCorrect');
         resetReviewScroll(['rhy-ansUser','rhy-ansCorrect']);
       }, 60);
-      document.getElementById('rhy-ansPlayUser').onclick = function(){ playStatic(uSeq, item); };
-      document.getElementById('rhy-ansPlayCorrect').onclick = function(){ playStatic(qSeq, item); };
+      document.getElementById('rhy-ansPlayUser').onclick = function(){ playStatic(uSeq, item, uTie); };
+      document.getElementById('rhy-ansPlayCorrect').onclick = function(){ playStatic(qSeq, item, qTie); };
       return true;
     },
 
@@ -1098,15 +1374,30 @@ function showPage(pageId) {
       const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
       this.selectedPatterns = new Set(order);
 
+      // 連結線：由考卷設定決定（大學檔至少 1 次、至多 2 次；高中檔沒有這個欄位＝不出）
+      this.tieEnabled = !!cfg.tie;
+      this.tieMin = cfg.tieMin || 1; this.tieMax = cfg.tieMax || 2;
+
       // 題目只產生一次；起始音（A/E 交替用）也一併保存，確保每次播放一致
       const sd = EXm.sectionData(KEY, function(){
         self.generateQuestion();
-        return { questions: { seq: self.questionSeq.slice(), startPitch: self.lockedStartPitch } , labels: {} };
+        return { questions: { seq: self.questionSeq.slice(), tie: self.questionTie.slice(), startPitch: self.lockedStartPitch } , labels: {} };
       });
       if(!sd) return;
       this.questionSeq = sd.questions.seq.slice();
+      this.questionTie = (sd.questions.tie || []).slice();
       this.lockedStartPitch = sd.questions.startPitch;
-      this.userSeq = (sd.answers && sd.answers.length) ? sd.answers.slice() : Array(this.totalBeats).fill('placeholder');
+      // 作答存檔格式：新版是 { seq, tie }，舊版是純陣列
+      const savedAns = sd.answers;
+      if (savedAns && !Array.isArray(savedAns) && savedAns.seq) {
+        this.userSeq = savedAns.seq.slice();
+        this.userTie = (savedAns.tie || []).slice();
+      } else if (Array.isArray(savedAns) && savedAns.length) {
+        this.userSeq = savedAns.slice(); this.userTie = Array(this.totalBeats).fill(false);
+      } else {
+        this.userSeq = Array(this.totalBeats).fill('placeholder');
+        this.userTie = Array(this.totalBeats).fill(false);
+      }
       this.hasPlayed = !!sd.played; this.activeSlotIdx = 0;
 
       const badge = document.getElementById('rhy-statusBadge');
@@ -1129,17 +1420,30 @@ function showPage(pageId) {
 
       // 作答即時保存＋即時計分（每個錯拍 -2）
       function saveNow(){
-        EXm.saveAnswers(KEY, self.userSeq.slice());
+        EXm.saveAnswers(KEY, { seq: self.userSeq.slice(), tie: self.userTie.slice() });
+        /* 計分：先逐小節比時值，相同的小節不扣分（記譜寫法不同也算對）。
+           不同的小節才逐拍算：節奏錯 1 單位、連結線錯 1 單位（算在前面那拍），
+           同一個拍界最多合計 2 單位。 */
         let wrong = 0, blank = 0;
-        for(let i=0; i<self.questionSeq.length; i++){
-          const u = self.userSeq[i];
-          if(!u || u === 'placeholder') { blank++; wrong++; }
-          else if(u !== self.questionSeq[i]) wrong++;
+        for(let i=0; i<self.userSeq.length; i++){ const u = self.userSeq[i]; if(!u || u === 'placeholder') blank++; }
+        const barOK = compareBars(self.userSeq, self.questionSeq, self.userTie, self.questionTie,
+                                  self.beatsPerBar, self.barsCount);
+        const total = self.barsCount * self.beatsPerBar;
+        for(let b=0; b<self.barsCount; b++){
+          if(barOK[b]) continue;
+          const from = b*self.beatsPerBar, to = from + self.beatsPerBar;
+          for(let i=from; i<to; i++){
+            let unit = 0;
+            if(self.userSeq[i] !== self.questionSeq[i]) unit++;
+            if(isInnerBoundary(i, self.beatsPerBar, total) && i+1 < to
+               && !!self.userTie[i] !== !!self.questionTie[i]) unit++;
+            wrong += Math.min(unit, 2);
+          }
         }
         const max = EXm.maxFor(KEY);
         // lostUnits＝錯拍數；實際扣幾分由檔位決定（大學每拍 -2、高中每拍 -1 且三題共用 20 分池）
         EXm.saveResult(KEY, { lostUnits: wrong, max: max, unanswered: blank,
-          detail: [{ correct: wrong===0, your: '錯 '+wrong+' 拍', right: '共 '+self.questionSeq.length+' 拍' }] });
+          detail: [{ correct: wrong===0, your: '錯 '+wrong+' 處', right: '共 '+self.questionSeq.length+' 拍' }] });
       }
       saveNow();
       const _origUpdateUI = this.updateUI.bind(this);
@@ -1180,6 +1484,7 @@ function showPage(pageId) {
     showAnswerPage: function(isCorrect) {
       const item = {
         correctSeq: [...this.questionSeq], userSeq: [...this.userSeq], startPitch: this.lockedStartPitch,
+        correctTie: [...this.questionTie], userTie: [...this.userTie],
         meter: this.meter, meterType: this.meterType, barsCount: this.barsCount, beatsPerBar: this.beatsPerBar,
         bpm: this.bpm, pitchMode: this.pitchMode,
         label: `${this.meter}拍・${this.barsCount}小節`, correctText: '（節奏聽寫）', yourText: ''
@@ -1193,8 +1498,8 @@ function showPage(pageId) {
       if(!isCorrect){ window.REVIEW_STORE.add('rhythm', item); this.refreshReviewCount(); }
       showPage('rhy-answer');
       setTimeout(() => {
-        renderStaticStaff('rhy-ansUser', item.userSeq, item.correctSeq, item);
-        renderStaticStaff('rhy-ansCorrect', item.correctSeq, null, item);
+        renderStaticStaff('rhy-ansUser', item.userSeq, item.correctSeq, item, item.userTie, item.correctTie);
+        renderStaticStaff('rhy-ansCorrect', item.correctSeq, null, item, item.correctTie, null);
         syncStaffScroll('rhy-ansUser', 'rhy-ansCorrect');
         resetReviewScroll(['rhy-ansUser','rhy-ansCorrect']);
       }, 60);
@@ -1225,11 +1530,11 @@ function showPage(pageId) {
           <div class="review-staff"><div id="rhy-rev-correct-${uid}"></div></div>
         `;
         list.appendChild(box);
-        box.querySelector('.rhy-rev-user').onclick = () => playStatic(item.userSeq, item);
-        box.querySelector('.rhy-rev-correct').onclick = () => playStatic(item.correctSeq, item);
+        box.querySelector('.rhy-rev-user').onclick = () => playStatic(item.userSeq, item, item.userTie);
+        box.querySelector('.rhy-rev-correct').onclick = () => playStatic(item.correctSeq, item, item.correctTie);
         setTimeout(() => {
-          renderStaticStaff(`rhy-rev-user-${uid}`, item.userSeq, item.correctSeq, item);
-          renderStaticStaff(`rhy-rev-correct-${uid}`, item.correctSeq, null, item);
+          renderStaticStaff(`rhy-rev-user-${uid}`, item.userSeq, item.correctSeq, item, item.userTie, item.correctTie);
+          renderStaticStaff(`rhy-rev-correct-${uid}`, item.correctSeq, null, item, item.correctTie, null);
           syncStaffScroll(`rhy-rev-user-${uid}`, `rhy-rev-correct-${uid}`);
           resetReviewScroll([`rhy-rev-user-${uid}`, `rhy-rev-correct-${uid}`]);
         }, 50);
@@ -1248,7 +1553,14 @@ function showPage(pageId) {
         this.meter = b.dataset.meter; this.meterType = b.dataset.type;
         document.querySelectorAll('#rhy-meterSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
         document.getElementById('bpmSym').textContent = this.meterType === 'simple' ? '♩' : '♪';
+        this.syncTieSwitch();
         this.initSettings();
+      });
+
+      document.querySelectorAll('#rhy-tieSwitch .mode-btn').forEach(b => b.onclick = () => {
+        if (b.disabled) return;
+        this.tieEnabled = (b.dataset.tie === 'on');
+        document.querySelectorAll('#rhy-tieSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
       });
 
       document.getElementById('selectAllBtn').onclick = () => {
@@ -1274,6 +1586,8 @@ function showPage(pageId) {
         document.getElementById('rhy-statusBadge').textContent = `${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
 
         this.userSeq = Array(this.totalBeats).fill('placeholder');
+        this.userTie = Array(this.totalBeats).fill(false);
+        this.tieMin = 1; this.tieMax = this.barsCount;   // 練習：至少 1 次、上限＝小節數
         this.hasPlayed = false; this.activeSlotIdx = 0; this.generateQuestion();
 
         document.getElementById('rhy-playCaption').textContent = '';
@@ -1309,6 +1623,7 @@ function showPage(pageId) {
           }
         }
         if(t >= 0 && this.userSeq[t] !== 'placeholder') {
+          this.clearTieAround(t);
           let b = ALL_BLOCKS[this.userSeq[t]].beats;
           this.userSeq.splice(t, 1);
           for(let k=0; k<b; k++) this.userSeq.splice(t, 0, 'placeholder');
@@ -1316,11 +1631,7 @@ function showPage(pageId) {
         }
       };
 
-      document.getElementById('rhy-clearBtn').onclick = () => {
-        if(!this.hasPlayed) return;
-        this.userSeq = Array(this.totalBeats).fill('placeholder');
-        this.activeSlotIdx = 0; this.updateUI();
-      };
+      document.getElementById('rhy-tieBtn').onclick = () => { this.toggleTie(); };
 
       document.getElementById('rhy-submitBtn').onclick = () => {
         if(!this.hasPlayed) return;
@@ -1330,15 +1641,17 @@ function showPage(pageId) {
           if(!window.confirm(`還有 ${emptyCount} 拍未填寫。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
         }
         window.rhyStopAll();
-        const isCorrect = JSON.stringify(this.userSeq) === JSON.stringify(this.questionSeq);
+        // 逐小節攤平時值比對：記譜寫法不同但時值相同一律算對
+        const isCorrect = compareBars(this.userSeq, this.questionSeq, this.userTie, this.questionTie,
+                                      this.beatsPerBar, this.barsCount).every(Boolean);
         this.score.t++; if(isCorrect) this.score.c++;
         document.getElementById('rhy-scoreNum').textContent = `${this.score.c}/${this.score.t}`;
         this.showAnswerPage(isCorrect);
       };
 
       // 解答頁播放與下一題
-      document.getElementById('rhy-ansPlayUser').onclick = () => { if(this._ansItem) playStatic(this._ansItem.userSeq, this._ansItem); };
-      document.getElementById('rhy-ansPlayCorrect').onclick = () => { if(this._ansItem) playStatic(this._ansItem.correctSeq, this._ansItem); };
+      document.getElementById('rhy-ansPlayUser').onclick = () => { if(this._ansItem) playStatic(this._ansItem.userSeq, this._ansItem, this._ansItem.userTie); };
+      document.getElementById('rhy-ansPlayCorrect').onclick = () => { if(this._ansItem) playStatic(this._ansItem.correctSeq, this._ansItem, this._ansItem.correctTie); };
       document.getElementById('rhy-ansNextBtn').onclick = () => {
         ensureAudio(); window.rhyStopAll();
         this.userSeq = Array(this.totalBeats).fill('placeholder');
@@ -1359,7 +1672,7 @@ function showPage(pageId) {
   };
 
   window.rhyModule = rhyModule;
-  rhyModule.initSettings(); rhyModule.setupEvents(); rhyModule.refreshReviewCount(); loadPiano();
+  rhyModule.initSettings(); rhyModule.setupEvents(); rhyModule.syncTieSwitch(); rhyModule.refreshReviewCount(); loadPiano();
   if(bootPaperReview(rhyModule)){ /* 考卷回顧 */ }
   else if(window.EXAM && window.EXAM.isExamMode()){ rhyModule.examBootstrap(); }
   // 由 index 錯題本總覽「跳回複習」進入時，直接開啟錯題本頁
@@ -1379,7 +1692,7 @@ function showPage(pageId) {
     <h3>設定</h3>
     <p>音高演奏可選「<b>單音</b>（都用 A4）」或「<b>雙音</b>（兩音嚴格交替，幫助分辨顆粒）」；拍號含單拍子 2/4、3/4、4/4 與複拍子 3/8、6/8、12/8；可調小節數、速度；下方勾選這次要出現的節奏型（以一拍為單位，可全選）。測驗模式會自動重播數次（含倒數）。</p>
     <h3>作答</h3>
-    <p>按「播放題目」（先有預備拍節拍器）→ 點五線譜上要填的拍位 → 點下方節奏鍵盤填入（自動往後），用「⌫刪除／清空」修改 → 提交 → 解答頁會把你的作答用<b>紅色標出錯處</b>並與正解對照，可分別聆聽「你的作答」與「正解」。</p>
+    <p>按「播放題目」（先有預備拍節拍器）→ 點五線譜上要填的拍位 → 點下方節奏鍵盤填入（自動往後），用「⌫刪除」修改（設定頁開啟「連結線」後，選中某一拍再按「⌒」即可把它連到下一拍，再按一次取消）→ 提交 → 解答頁會把你的作答用<b>紅色標出錯處</b>並與正解對照，可分別聆聽「你的作答」與「正解」。</p>
     <div class="help-common">
       <h3>共通規則（六個練習都適用）</h3>
       <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>

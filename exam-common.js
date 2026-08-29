@@ -18,7 +18,7 @@
 
   /* 考卷結構版本。段落或配分一改就換這個字串，
      未完成的考試會自動清掉（結構對不上會算錯分），歷史成績不受影響。 */
-  var SCHEMA = 'v82-pitcherr';
+  var SCHEMA = 'v89-tie';   // 作答格式新增連結線欄位；換版會清掉「進行中」的考試，歷史成績與已存考卷不受影響
   try {
     if (localStorage.getItem(LS_SCHEMA) !== SCHEMA) {
       localStorage.removeItem(LS_SESSION);
@@ -102,11 +102,11 @@
                        bpm: 72, plays: 5, errCount: 5, tuningA: true },
           interval: { count: 10, allowRepeat: false, compound: true, pool: 'ALL13' },
           chord:    { count: 10, allowRepeat: false, inversion: false, pool: 'LV5' },
-          rhythm1: { meter: r1.meter, meterType: 'simple', bars: r1.bars, bpm: 80, plays: 5, pitchMode: 'single' },
-          rhythm2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 80, plays: 5, pitchMode: 'dual' },
-          melody1: { meter: m1.meter, meterType: 'simple', bars: m1.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true },
-          melody2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true },
-          twopart:  { meter: '4/4', meterType: 'simple', bars: 2, bpm: 70, plays: 8, tuningA: true },
+          rhythm1: { meter: r1.meter, meterType: 'simple', bars: r1.bars, bpm: 80, plays: 5, pitchMode: 'single', tie: true, tieMin: 1, tieMax: 2 },
+          rhythm2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 80, plays: 5, pitchMode: 'dual', tie: true, tieMin: 1, tieMax: 2 },
+          melody1: { meter: m1.meter, meterType: 'simple', bars: m1.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true, tie: true, tieMin: 1, tieMax: 2 },
+          melody2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true, tie: true, tieMin: 1, tieMax: 2 },
+          twopart:  { meter: '4/4', meterType: 'simple', bars: 2, bpm: 70, plays: 8, tuningA: true, tie: true, tieMin: 1, tieMax: 2 },
           fourpart: { bars: 10, bpm: 100, plays: 6, levelId: 4, tuningA: true }
         };
       }

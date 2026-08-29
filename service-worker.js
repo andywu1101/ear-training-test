@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v88'; // v.88：四部和聲半減七記號修正
+const CACHE_NAME = 'ear-training-shell-v89'; // v.89：連結線（跨拍・跨小節）
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
