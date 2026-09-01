@@ -10,6 +10,20 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="聽力訓練">
 <meta name="theme-color" content="#33415c">
+<script>
+/* Android／桌機 Chromium 的安裝事件可能在 DOMContentLoaded 之前就觸發，
+   所以監聽必須放在最前面，晚了就接不到。事件物件只能用一次。 */
+window.__a2hsPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  window.__a2hsPrompt = e;
+  if (typeof window.__a2hsRefresh === 'function') window.__a2hsRefresh();
+});
+window.addEventListener('appinstalled', function(){
+  window.__a2hsPrompt = null;
+  if (typeof window.__a2hsRefresh === 'function') window.__a2hsRefresh();
+});
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -165,6 +179,14 @@
   .donate-card .menu-card-title{ color: var(--wrong); margin:0 0 4px; font-size:18px; }
   .donate-card .menu-card-desc{ color: var(--ink-soft); }
   /* 贊助佔位彈窗 */
+  /* 加入主畫面的說明浮層 */
+  .a2hs-ico{ display:inline-block; vertical-align:-0.18em; }
+  .a2hs-steps{ margin:0; padding:0; list-style:none; text-align:left; }
+  .a2hs-steps li{ display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--hairline); font-size:14.5px; color:var(--ink); line-height:1.65; }
+  .a2hs-steps li:last-child{ border-bottom:none; }
+  .a2hs-num{ flex:0 0 20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-family:var(--font-mono); font-size:11px; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+  .a2hs-done{ font-size:15px; margin:14px 0 4px; }
+  .a2hs-hint{ font-size:13px; color:var(--ink-soft); background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:10px 12px; margin:0 0 16px; text-align:left; line-height:1.7; }
   .donate-modal{ display:none; position:fixed; inset:0; z-index:1200; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; }
   /* 用 margin:auto 置中：內容高過螢幕時卡片上緣才不會溢出捲動範圍被裁掉（圓角消失） */
   .donate-modal.open{ display:flex; align-items:flex-start; justify-content:center; }
@@ -297,7 +319,7 @@
     </div>
 
     <h1>音樂聽力練習</h1>
-    <p class="subtitle">歡迎使用聽力訓練系統，請從下方目錄選擇今天要練習的項目：</p>
+    <p class="subtitle" id="menuSubtitle" style="visibility:hidden;">歡迎使用聽力訓練系統，請從下方目錄選擇今天要練習的項目：</p>
     <p class="intro-line">首次使用？<a href="https://youtu.be/fwHc6VuFatg" target="_blank" rel="noopener">▸ 請觀看完整使用教學</a></p>
 
     <div class="menu-grid">
@@ -411,11 +433,11 @@
           <p class="menu-card-desc">整合所有練習答錯的題目，一次檢視各項目的錯題數量與最近紀錄，並可跳回該練習複習。</p>
         </div>
       </div>
-    </div>    <p class="footer-note">還沒加入主畫面？<a class="footer-link" href="https://youtu.be/fF4-J2NGAnw?t=27" target="_blank" rel="noopener">▸ 看看怎麼加入</a>，開啟體驗會更接近原生 App。</p>
+    </div>
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.89　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.90　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -515,6 +537,28 @@
 </div>
 
 <!-- 作者主頁彈窗（Portaly 主頁 / YouTube 頻道，可擴充） -->
+<div class="donate-modal" id="a2hsModal" onclick="if(event.target===this) closeA2HS()">
+  <div class="donate-box">
+    <div class="dico" style="line-height:1;"><svg class="a2hs-ico" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg></div>
+    <h3>加入主畫面</h3>
+    <p style="margin-bottom:14px;">加入之後就像一般 App 一樣，從主畫面直接開啟，畫面更完整、載入也更快。</p>
+
+    <div id="a2hsSafariHint" class="a2hs-hint" style="display:none;">
+      你現在是用其他 App 內建的瀏覽器開啟，這種瀏覽器<b>沒有</b>「加入主畫面」的功能。<br>
+      請先按右上角的「⋯」或「⋮」，選擇<b>「用 Safari 開啟」</b>，再照下面的步驟操作。
+    </div>
+
+    <ol class="a2hs-steps">
+      <li><span class="a2hs-num">1</span><span>從網址列找到分享圖示 <svg class="a2hs-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg> 並點擊（可能在畫面下方，或右下角的「⋯」裡）</span></li>
+      <li><span class="a2hs-num">2</span><span>點擊「加入主畫面」</span></li>
+      <li><span class="a2hs-num">3</span><span>點擊「加入」按鈕</span></li>
+    </ol>
+    <p class="a2hs-done">大功告成 🎉</p>
+    <p style="margin:0 0 18px;"><a class="footer-link" href="https://youtu.be/fF4-J2NGAnw?t=27" target="_blank" rel="noopener">▸ 看影片教學</a></p>
+    <button class="donate-dismiss" onclick="closeA2HS()">關閉</button>
+  </div>
+</div>
+
 <div class="donate-modal" id="goldInfoModal" onclick="if(event.target===this) closeGoldInfo()">
   <div class="donate-box">
     <div class="dico">✨</div>
@@ -685,7 +729,8 @@ window.CHANGELOG = [
   { v: 'v.86', items: ['主目錄介面優化：現在八個練習項目一目了然', '透過手機操作時，各練習項目的說明改由卡片右下角的 ▸ 開啟，版面更清爽', '修正音堆練習中，中央 C 等加線與音符沒有對齊的問題'] },
   { v: 'v.87', items: ['修正四部和聲在手機瀏覽器中，譜例下方的級數作答格可能被遮住、看不到自己填了什麼的問題', '四部和聲的三顆播放按鈕改為同一列，作答區空間更充裕', '贊助者名單新增「金色樂友」標示，累積贊助滿 5,000 元的朋友會以金色顯示'] },
   { v: 'v.88', items: ['修正四部和聲的半減七和絃記號標示異常，導致與正確答案不符的問題。例：小調 ii 與大調 vii 的半減七和絃（含轉位）可能會被誤標為減七（°），正確應為半減七（ø）', '優化四部和聲級數鍵盤的性質記號輸入（°、ø、+），先按轉位或先按性質都能正確填寫該級數'] },
-  { v: 'v.89', items: ['節奏練習、單旋律曲調、兩聲部曲調三個項目新增「連結線」功能：在設定頁開啟後，題目必定會出現至少一次連結線，作答時選中一拍後，再按「⌒」就能連到下一拍，再按一次取消', '優化作答鍵盤，將「🗑️ 清空」改為「⌒ 連結線」', '同步更新模擬測驗「大學檔」的節奏、單旋律、兩聲部各段落一定會出現連結線（每段 1～2 條），考卷因結構調整，未完成的考試會自動重置，已完成的歷史成績與已保存的考卷不受影響', '優化節奏型按鈕的音符間距，四分音符加兩個十六分音符的節奏型（例如 ♩⌒♬）現在看得更清楚', '修正各練習的解答頁左上角改為「返回設定頁」，提交後不會再回到作答頁'] }
+  { v: 'v.89', items: ['節奏練習、單旋律曲調、兩聲部曲調三個項目新增「連結線」功能：在設定頁開啟後，題目必定會出現至少一次連結線，作答時選中一拍後，再按「⌒」就能連到下一拍，再按一次取消', '優化作答鍵盤，將「🗑️ 清空」改為「⌒ 連結線」', '同步更新模擬測驗「大學檔」的節奏、單旋律、兩聲部各段落一定會出現連結線（每段 1～2 條），考卷因結構調整，未完成的考試會自動重置，已完成的歷史成績與已保存的考卷不受影響', '優化節奏型按鈕的音符間距，四分音符加兩個十六分音符的節奏型（例如 ♩⌒♬）現在看得更清楚', '修正各練習的解答頁左上角改為「返回設定頁」，提交後不會再回到作答頁'] },
+  { v: 'v.90', items: ['優化版面，並更新各設備加入主畫面的文案與功能'] }
 ];
 
 function showChangelog(){
@@ -709,6 +754,91 @@ function showChangelog(){
 function closeChangelog(){ var m=document.getElementById('logModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
 
 /* 彈窗開啟時鎖住背景捲動，避免手指滑到下層頁面 */
+
+/* ===== 加入主畫面的提示（第一行 subtitle） =====
+   iOS 沒有任何 API 可以用程式安裝，只能開浮層教使用者自己按；
+   Android／桌機 Chromium 才有 beforeinstallprompt 可以真的一鍵安裝。
+   判斷一律偏保守：認不出來就顯示原本的歡迎詞，寧可少提示也不要教錯。 */
+var A2HS_DEFAULT = '歡迎使用聽力訓練系統，請從下方目錄選擇今天要練習的項目：';
+
+function a2hsEnv(){
+  var ua = navigator.userAgent || '';
+  var maxTouch = navigator.maxTouchPoints || 0;
+  /* iPadOS 的 Safari 會偽裝成 Mac，必須靠 maxTouchPoints 才分得出來 */
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && maxTouch > 1);
+  /* 已經加入主畫面：iOS 看 navigator.standalone，其餘看 display-mode */
+  var standalone = (window.navigator.standalone === true) ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  /* 其他 App 的內建瀏覽器（LINE、IG、FB…）沒有「加入主畫面」，要先請他用 Safari 開 */
+  var inApp = /\bLine\/|Instagram|FBAN|FBAV|FB_IAB|MicroMessenger|Twitter/i.test(ua);
+  /* iOS 上的 Chrome / Firefox / Edge：一律導向 Safari，避免教錯 */
+  var iosOtherBrowser = isIOS && /CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+  var isAndroid = /Android/.test(ua);
+  return { isIOS: isIOS, isAndroid: isAndroid, standalone: standalone,
+           needSafari: inApp || iosOtherBrowser };
+}
+
+function a2hsRefresh(){
+  var el = document.getElementById('menuSubtitle');
+  if(!el) return;
+  var env = a2hsEnv();
+  var html = A2HS_DEFAULT;
+
+  if(!env.standalone){
+    if(env.isIOS){
+      html = '歡迎使用聽力訓練系統，<a href="#" onclick="showA2HS();return false;">▸ 三秒完成加入</a>主畫面，以獲得原生 App 的體驗。';
+    } else if(env.isAndroid && window.__a2hsPrompt){
+      html = '歡迎使用聽力訓練系統，<a href="#" onclick="doInstall();return false;">▸ 一鍵安裝</a>主畫面，以獲得原生 App 的體驗。';
+    }
+  }
+  el.innerHTML = html;
+  el.style.visibility = 'visible';   // 決定好才顯示，避免文字閃一下
+}
+window.__a2hsRefresh = a2hsRefresh;
+
+function showA2HS(){
+  var hint = document.getElementById('a2hsSafariHint');
+  if(hint) hint.style.display = a2hsEnv().needSafari ? 'block' : 'none';
+  var m = document.getElementById('a2hsModal');
+  if(m) m.classList.add('open');
+  syncBodyLock();
+}
+function closeA2HS(){
+  var m = document.getElementById('a2hsModal');
+  if(m) m.classList.remove('open');
+  syncBodyLock();
+}
+
+/* Android：呼叫系統安裝對話框。事件物件只能用一次，用過就把那一行收掉。 */
+function doInstall(){
+  var e = window.__a2hsPrompt;
+  if(!e){ a2hsRefresh(); return; }
+  window.__a2hsPrompt = null;
+  try{
+    e.prompt();
+    if(e.userChoice && e.userChoice.then) e.userChoice.then(function(){ a2hsRefresh(); });
+    else a2hsRefresh();
+  }catch(err){ a2hsRefresh(); }
+}
+
+/* 除錯用：網址加上 ?debug=ua 會把判斷結果印在提示列，方便回報問題 */
+(function(){
+  try{
+    if(location.search.indexOf('debug=ua') < 0) return;
+    var env = a2hsEnv();
+    var box = document.createElement('pre');
+    box.style.cssText = 'font-size:11px;white-space:pre-wrap;word-break:break-all;background:var(--panel);border:1px solid var(--panel-border);border-radius:10px;padding:10px;margin:0 0 14px;color:var(--ink-soft);';
+    box.textContent = 'iOS=' + env.isIOS + '  Android=' + env.isAndroid +
+      '\nstandalone=' + env.standalone + '  needSafari=' + env.needSafari +
+      '\ninstallPrompt=' + (!!window.__a2hsPrompt) + '  maxTouchPoints=' + (navigator.maxTouchPoints||0) +
+      '\n' + navigator.userAgent;
+    var sub = document.getElementById('menuSubtitle');
+    if(sub && sub.parentNode) sub.parentNode.insertBefore(box, sub.nextSibling);
+  }catch(e){}
+})();
+
+a2hsRefresh();
+
 function syncBodyLock(){
   var open = document.querySelectorAll('.donate-modal.open').length > 0;
   document.body.style.overflow = open ? 'hidden' : '';
