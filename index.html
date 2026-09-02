@@ -52,6 +52,9 @@ window.addEventListener('appinstalled', function(){
 
   h1{ font-family: var(--font-display); font-weight: 600; font-size: 30px; margin: 0 0 8px; letter-spacing: -0.01em; }
   .subtitle{ color: var(--ink-soft); font-size: 14px; margin: 0 0 22px; line-height: 1.6; }
+  /* 加入主畫面那個連結，樣式與下一行的「請觀看完整使用教學」一致 */
+  .subtitle a{ color:var(--accent); font-weight:700; text-decoration:none; border-bottom:1px solid var(--accent-line); padding-bottom:1px; }
+  .subtitle a:hover, .subtitle a:active{ border-color:var(--accent); }
 
   .menu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 10px; }
   .menu-card {
