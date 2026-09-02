@@ -189,6 +189,10 @@ window.addEventListener('appinstalled', function(){
   .a2hs-steps li:last-child{ border-bottom:none; }
   .a2hs-num{ flex:0 0 20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-family:var(--font-mono); font-size:11px; display:flex; align-items:center; justify-content:center; margin-top:2px; }
   .a2hs-done{ font-size:15px; margin:14px 0 4px; }
+  .a2hs-copy{ display:block; width:100%; margin-top:10px; padding:9px 12px; font:inherit; font-size:13.5px;
+              background:var(--accent); color:#fff; border:none; border-radius:9px; cursor:pointer;
+              word-break:break-all; line-height:1.5; }
+  .a2hs-copy:active{ opacity:0.85; }
   .a2hs-hint{ font-size:13px; color:var(--ink-soft); background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:10px 12px; margin:0 0 16px; text-align:left; line-height:1.7; }
   .donate-modal{ display:none; position:fixed; inset:0; z-index:1200; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; }
   /* 用 margin:auto 置中：內容高過螢幕時卡片上緣才不會溢出捲動範圍被裁掉（圓角消失） */
@@ -547,8 +551,10 @@ window.addEventListener('appinstalled', function(){
     <p style="margin-bottom:14px;">加入之後就像一般 App 一樣，從主畫面直接開啟，畫面更完整、載入也更快。</p>
 
     <div id="a2hsSafariHint" class="a2hs-hint" style="display:none;">
-      你現在是用其他 App 內建的瀏覽器開啟，這種瀏覽器<b>沒有</b>「加入主畫面」的功能。<br>
-      請先按右上角的「⋯」或「⋮」，選擇<b>「用 Safari 開啟」</b>，再照下面的步驟操作。
+      你現在是用 LINE 或其他 App 的內建瀏覽器開啟，這種瀏覽器<b>沒有</b>「加入主畫面」的功能。<br>
+      請先找到「⋯」或「⋮」選單（可能在右上角或右下角），點選<b>「在瀏覽器中開啟」</b>。<br>
+      若打開後不是 Safari，請按下面的按鈕複製網址，再自己貼到 Safari 的網址列。
+      <button type="button" id="a2hsCopyBtn" class="a2hs-copy" onclick="copySiteUrl()">📋 複製網址</button>
     </div>
 
     <ol class="a2hs-steps">
@@ -798,6 +804,21 @@ function a2hsRefresh(){
   el.style.visibility = 'visible';   // 決定好才顯示，避免文字閃一下
 }
 window.__a2hsRefresh = a2hsRefresh;
+
+/* 內建瀏覽器把網址搬到 Safari 很麻煩，提供一鍵複製。
+   用乾淨的首頁網址（去掉 ?query 與 #hash），避免把 debug 參數也帶過去。 */
+function copySiteUrl(){
+  var btn = document.getElementById('a2hsCopyBtn');
+  var url = location.origin + location.pathname;
+  var done = function(){ if(btn){ btn.textContent = '✓ 已複製，請貼到 Safari 的網址列';
+                                  setTimeout(function(){ btn.textContent = '📋 複製網址'; }, 2600); } };
+  var failed = function(){ if(btn) btn.textContent = url; };   // 複製不了就把網址秀出來讓他長按
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(done, failed);
+    } else { failed(); }
+  }catch(e){ failed(); }
+}
 
 function showA2HS(){
   var hint = document.getElementById('a2hsSafariHint');
