@@ -553,14 +553,19 @@ window.addEventListener('appinstalled', function(){
     <div id="a2hsSafariHint" class="a2hs-hint" style="display:none;">
       你現在是用 LINE 或其他 App 的內建瀏覽器開啟，這種瀏覽器<b>沒有</b>「加入主畫面」的功能。<br>
       請先找到「⋯」或「⋮」選單（可能在右上角或右下角），點選<b>「在瀏覽器中開啟」</b>。<br>
-      若打開後不是 Safari，請按下面的按鈕複製網址，再自己貼到 Safari 的網址列。
+      若打開後不是 <span id="a2hsBrowserName">Safari</span>，請按下面的按鈕複製網址，再自己貼到 <span id="a2hsBrowserName2">Safari</span> 的網址列。
       <button type="button" id="a2hsCopyBtn" class="a2hs-copy" onclick="copySiteUrl()">📋 複製網址</button>
     </div>
 
-    <ol class="a2hs-steps">
+    <ol class="a2hs-steps" id="a2hsStepsIOS">
       <li><span class="a2hs-num">1</span><span>從網址列找到分享圖示 <svg class="a2hs-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg> 並點擊（可能在畫面下方，或右下角的「⋯」裡）</span></li>
       <li><span class="a2hs-num">2</span><span>點擊「加入主畫面」</span></li>
       <li><span class="a2hs-num">3</span><span>點擊「加入」按鈕</span></li>
+    </ol>
+    <ol class="a2hs-steps" id="a2hsStepsAndroid" style="display:none;">
+      <li><span class="a2hs-num">1</span><span>從網址列找到選單「⋮」</span></li>
+      <li><span class="a2hs-num">2</span><span>找到「安裝應用程式」或「加到主畫面」（不同版本用詞不同）</span></li>
+      <li><span class="a2hs-num">3</span><span>點「安裝」或「新增」</span></li>
     </ol>
     <p class="a2hs-done">大功告成 🎉</p>
     <p style="margin:0 0 18px;"><a class="footer-link" href="https://youtu.be/fF4-J2NGAnw?t=27" target="_blank" rel="noopener">▸ 看影片教學</a></p>
@@ -793,12 +798,11 @@ function a2hsRefresh(){
   var env = a2hsEnv();
   var html = A2HS_DEFAULT;
 
-  if(!env.standalone){
-    if(env.isIOS){
-      html = '歡迎使用聽力訓練系統，<a href="#" onclick="showA2HS();return false;">▸ 三秒完成加入</a>主畫面，以獲得原生 App 的體驗。';
-    } else if(env.isAndroid && window.__a2hsPrompt){
-      html = '歡迎使用聽力訓練系統，<a href="#" onclick="doInstall();return false;">▸ 一鍵安裝</a>主畫面，以獲得原生 App 的體驗。';
-    }
+  /* iOS 與 Android 都無條件顯示（只要不是從主畫面開啟）。
+     文字統一，差別在點下去之後：Android 有安裝事件就直接跳系統對話框，
+     沒有事件（已安裝、三個月冷卻、廠商瀏覽器不支援）就退回浮層說明。 */
+  if(!env.standalone && (env.isIOS || env.isAndroid)){
+    html = '歡迎使用聽力訓練系統，<a href="#" onclick="tryInstall();return false;">▸ 三秒完成加入</a>主畫面，以獲得原生 App 的體驗。';
   }
   el.innerHTML = html;
   el.style.visibility = 'visible';   // 決定好才顯示，避免文字閃一下
@@ -821,8 +825,16 @@ function copySiteUrl(){
 }
 
 function showA2HS(){
+  var env = a2hsEnv();
+  var ios = document.getElementById('a2hsStepsIOS');
+  var and = document.getElementById('a2hsStepsAndroid');
+  if(ios) ios.style.display = env.isAndroid ? 'none' : '';
+  if(and) and.style.display = env.isAndroid ? '' : 'none';
+  var bn = env.isAndroid ? 'Chrome' : 'Safari';
+  var n1 = document.getElementById('a2hsBrowserName'); if(n1) n1.textContent = bn;
+  var n2 = document.getElementById('a2hsBrowserName2'); if(n2) n2.textContent = bn;
   var hint = document.getElementById('a2hsSafariHint');
-  if(hint) hint.style.display = a2hsEnv().needSafari ? 'block' : 'none';
+  if(hint) hint.style.display = env.needSafari ? 'block' : 'none';
   var m = document.getElementById('a2hsModal');
   if(m) m.classList.add('open');
   syncBodyLock();
@@ -833,16 +845,18 @@ function closeA2HS(){
   syncBodyLock();
 }
 
-/* Android：呼叫系統安裝對話框。事件物件只能用一次，用過就把那一行收掉。 */
-function doInstall(){
+/* 點擊「三秒完成加入」的統一入口。
+   ⚠ Chrome 規定 prompt() 只能在使用者手勢中呼叫，所以無法在載入時自動跳出；
+   而 mini-infobar 是瀏覽器自己的 UI，我們既不能觸發也擋不掉（被關掉後約三個月不再出現）。 */
+function tryInstall(){
   var e = window.__a2hsPrompt;
-  if(!e){ a2hsRefresh(); return; }
-  window.__a2hsPrompt = null;
+  if(!e){ showA2HS(); return; }          // 沒有安裝事件就退回說明浮層
+  window.__a2hsPrompt = null;            // 事件物件只能用一次
   try{
     e.prompt();
     if(e.userChoice && e.userChoice.then) e.userChoice.then(function(){ a2hsRefresh(); });
     else a2hsRefresh();
-  }catch(err){ a2hsRefresh(); }
+  }catch(err){ showA2HS(); }
 }
 
 /* 除錯用：網址加上 ?debug=ua 會把判斷結果印在提示列，方便回報問題 */
