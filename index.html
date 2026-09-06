@@ -548,7 +548,7 @@ window.addEventListener('appinstalled', function(){
   <div class="donate-box">
     <div class="dico" style="line-height:1;"><svg class="a2hs-ico" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg></div>
     <h3>加入主畫面</h3>
-    <p style="margin-bottom:14px;">加入之後就像一般 App 一樣，從主畫面直接開啟，畫面更完整、載入也更快。</p>
+    <p style="margin-bottom:14px;">加入之後可從主畫面快速開啟，且不會受到網址列的干擾，畫面更完整，載入也更快速。</p>
 
     <div id="a2hsSafariHint" class="a2hs-hint" style="display:none;">
       你現在是用 LINE 或其他 App 的內建瀏覽器開啟，這種瀏覽器<b>沒有</b>「加入主畫面」的功能。<br>
@@ -558,8 +558,8 @@ window.addEventListener('appinstalled', function(){
     </div>
 
     <ol class="a2hs-steps" id="a2hsStepsIOS">
-      <li><span class="a2hs-num">1</span><span>從網址列找到分享圖示 <svg class="a2hs-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg> 並點擊（可能在畫面下方，或右下角的「⋯」裡）</span></li>
-      <li><span class="a2hs-num">2</span><span>點擊「加入主畫面」</span></li>
+      <li><span class="a2hs-num">1</span><span>從網址列找到分享圖示 <svg class="a2hs-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg> 並點擊（可能在網址列上，或更多「⋯」裡）</span></li>
+      <li><span class="a2hs-num">2</span><span>找到並點擊「加入主畫面」</span></li>
       <li><span class="a2hs-num">3</span><span>點擊「加入」按鈕</span></li>
     </ol>
     <ol class="a2hs-steps" id="a2hsStepsAndroid" style="display:none;">
@@ -795,17 +795,23 @@ function a2hsEnv(){
 function a2hsRefresh(){
   var el = document.getElementById('menuSubtitle');
   if(!el) return;
-  var env = a2hsEnv();
-  var html = A2HS_DEFAULT;
+  /* 這一行預設是隱藏的（避免文字閃動），所以不管判斷有沒有出錯，
+     最後都一定要把它顯示出來，否則整行會消失。 */
+  try{
+    var env = a2hsEnv();
+    var html = A2HS_DEFAULT;
 
-  /* iOS 與 Android 都無條件顯示（只要不是從主畫面開啟）。
-     文字統一，差別在點下去之後：Android 有安裝事件就直接跳系統對話框，
-     沒有事件（已安裝、三個月冷卻、廠商瀏覽器不支援）就退回浮層說明。 */
-  if(!env.standalone && (env.isIOS || env.isAndroid)){
-    html = '歡迎使用聽力訓練系統，<a href="#" onclick="tryInstall();return false;">▸ 三秒完成加入</a>主畫面，以獲得原生 App 的體驗。';
+    /* iOS 與 Android 都無條件顯示（只要不是從主畫面開啟）。
+       文字統一，差別在點下去之後：Android 有安裝事件就直接跳系統對話框，
+       沒有事件（已安裝、三個月冷卻、廠商瀏覽器不支援）就退回浮層說明。 */
+    if(!env.standalone && (env.isIOS || env.isAndroid)){
+      html = '歡迎使用聽力訓練系統，<a href="#" onclick="tryInstall();return false;">▸ 三秒完成加入</a>主畫面，以獲得原生 App 的體驗。';
+    }
+    el.innerHTML = html;
+  }catch(e){
+    el.innerHTML = A2HS_DEFAULT;     // 判斷失敗就退回原本的歡迎詞
   }
-  el.innerHTML = html;
-  el.style.visibility = 'visible';   // 決定好才顯示，避免文字閃一下
+  el.style.visibility = 'visible';
 }
 window.__a2hsRefresh = a2hsRefresh;
 
