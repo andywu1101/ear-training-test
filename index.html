@@ -267,6 +267,9 @@ window.addEventListener('appinstalled', function(){
   @media (prefers-reduced-motion: reduce){
     .sponsor-list span.sponsor-gold{ animation: none; background-position: 50% 0; }
   }
+  /* 一般贊助者與金色樂友之間的換行元素：在 flex 容器裡佔滿整列，後面的名牌就會換到下一行。
+     不畫線，只留一點間距做區隔。 */
+  .sponsor-sep{ flex:0 0 100%; height:0; margin:5px 0 0; }
   /* 名單框右下角的說明按鈕（金色小圓框） */
   .sponsor-info-btn{
     position: absolute; right: 6px; bottom: 6px;
@@ -903,11 +906,19 @@ function showPanel(which){
 }
 function renderSponsors(){
   var box = document.getElementById('sponsorList'); if(!box) return;
-  box.innerHTML = SPONSORS.map(function(s){
+  var tag = function(s){
     return '<span'+(s.gold ? ' class="sponsor-gold"' : '')+'>'+escapeHtml(s.name)+'</span>';
-  }).join('')
+  };
+  /* 一般贊助者排在上面、金色樂友排在下面，中間用一條虛線隔開。
+     兩組任一為空時就不畫分隔線，避免出現孤立的線。 */
+  var normal = [], gold = [];
+  SPONSORS.forEach(function(s){ (s.gold ? gold : normal).push(s); });
+  var html = normal.map(tag).join('');
+  if(normal.length && gold.length) html += '<div class="sponsor-sep"></div>';
+  html += gold.map(tag).join('');
   /* (i) 說明按鈕跟著一起重畫，否則會被 innerHTML 蓋掉 */
-  + '<button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>';
+  box.innerHTML = html
+    + '<button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>';
 }
 function showDonate(){ showPanel(''); var m=document.getElementById('donateModal'); if(m) m.classList.add('open'); syncBodyLock(); }
 function closeDonate(){ var m=document.getElementById('donateModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
