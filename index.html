@@ -31,7 +31,7 @@ window.addEventListener('appinstalled', function(){
     --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body{ margin:0; background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height:100vh; padding: 20px 16px 64px; }
@@ -183,9 +183,6 @@ window.addEventListener('appinstalled', function(){
   .donate-card .menu-card-desc{ color: var(--ink-soft); }
   /* 贊助佔位彈窗 */
   /* 導入及導出紀錄 */
-  .backup-btn{ display:inline-block; font:inherit; font-size:13px; color:var(--accent); background:transparent;
-               border:1px solid var(--accent-line); border-radius:9px; padding:4px 14px; cursor:pointer; white-space:nowrap; }
-  .backup-btn:active{ background:rgba(51,65,92,0.06); }
   .bk-stat{ background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
             padding:11px 12px; margin:0 0 18px; font-size:13.5px; text-align:left; }
   .bk-stat .row{ display:flex; justify-content:space-between; padding:3px 2px; }
@@ -468,9 +465,9 @@ window.addEventListener('appinstalled', function(){
       </div>
     </div>
 
-    <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
+    <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
+    <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <div class="report-wrap" style="margin-top:10px;"><button type="button" class="backup-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
     <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.91　·　更新日誌 ▸</button></p>
   </div>
 
@@ -506,7 +503,7 @@ window.addEventListener('appinstalled', function(){
     <p class="subtitle">這裡整合各項練習累積的錯題（儲存在本機瀏覽器）。點「跳回複習」會直接開啟該練習的錯題本。</p>
     <div class="hub-total" id="hubTotal"></div>
     <div id="hubGroups"></div>
-    <div class="report-wrap" style="margin-top:22px;"><button type="button" class="backup-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
+    <div class="report-wrap" style="margin-top:22px;"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
   </div>
 </div>
 
@@ -515,8 +512,7 @@ window.addEventListener('appinstalled', function(){
   <div class="donate-box">
     <div class="dico">💾</div>
     <h3>導入及導出紀錄</h3>
-    <p style="margin-bottom:14px;">練習紀錄只存在這台裝置上，無法跨設備共用存檔。<br>
-       將紀錄導出後，日後可在任何裝置導入以還原練習紀錄。</p>
+    <p style="margin-bottom:14px;">練習紀錄只存在這台裝置上，無法跨設備共用存檔。將紀錄導出後，日後可在任何裝置導入以還原練習紀錄。</p>
     <div class="bk-stat" id="bkStat"></div>
     <div class="bk-row">
       <button type="button" class="bk-btn" id="bkExportBtn" onclick="doExport()">📤 導出紀錄</button>
@@ -842,20 +838,42 @@ function doExport(){
     return;
   }
 
-  var isIOS = (function(){
-    try{ var ua = navigator.userAgent || '';
-         return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints||0) > 1); }
-    catch(e){ return false; }
-  })();
+  var ua = '';
+  try{ ua = navigator.userAgent || ''; }catch(e){}
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && (function(){ try{ return (navigator.maxTouchPoints||0) > 1; }catch(e){ return false; } })());
+  var isAndroid = /Android/.test(ua);
+  var isMobile = isIOS || isAndroid;
 
-  /* 優先走系統分享面板：iOS 在主畫面模式下這是唯一可行的方式 */
-  if(navigator.canShare && navigator.canShare({ files: [file] })){
+  /* 一般下載：桌機最可靠的方式 */
+  function bkDownload(){
+    try{
+      var blob = new Blob([text], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = bkFileName();
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      closeBackup();
+      return true;
+    }catch(e){ return false; }
+  }
+
+  /* 手機才走系統分享面板：iOS 在主畫面模式下這是唯一可行的方式。
+     ⚠ 桌機不要走分享——桌機瀏覽器常常直接拒絕（丟 AbortError／NotAllowedError），
+     看起來就像「按了沒反應」，而桌機的一般下載本來就正常。 */
+  if(isMobile && navigator.canShare && navigator.canShare({ files: [file] })){
     navigator.share({ files: [file], title: '聽力練習備份' })
       .then(function(){ closeBackup(); })
       .catch(function(err){
-        /* 使用者自己取消不算失敗，不要跳錯誤嚇他 */
-        if(err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
-        bkShowErr('導出失敗', '無法開啟分享面板，請稍後再試。', '⚠️');
+        var name = err && err.name;
+        if(name === 'AbortError') return;          // 使用者自己取消，不要跳錯誤嚇他
+        if(!isIOS && bkDownload()) return;         // Android 還可以退回下載
+        if(isIOS){
+          bkShowErr('導出失敗', '無法開啟分享面板，請稍後再試。', '⚠️');
+        } else {
+          bkShowErr('導出失敗', '無法產生檔案，請改用其他瀏覽器再試。', '⚠️');
+        }
       });
     return;
   }
@@ -867,17 +885,8 @@ function doExport(){
     return;
   }
 
-  /* 桌機與 Android 退回一般下載 */
-  try{
-    var blob = new Blob([text], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = bkFileName();
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-    closeBackup();
-  }catch(e){
+  /* 桌機與沒有分享能力的 Android：一般下載 */
+  if(!bkDownload()){
     bkShowErr('導出失敗', '無法產生檔案，請改用其他瀏覽器再試。', '⚠️');
   }
 }
@@ -1119,7 +1128,7 @@ window.CHANGELOG = [
   { v: 'v.88', items: ['修正四部和聲的半減七和絃記號標示異常，導致與正確答案不符的問題。例：小調 ii 與大調 vii 的半減七和絃（含轉位）可能會被誤標為減七（°），正確應為半減七（ø）', '優化四部和聲級數鍵盤的性質記號輸入（°、ø、+），先按轉位或先按性質都能正確填寫該級數'] },
   { v: 'v.89', items: ['節奏練習、單旋律曲調、兩聲部曲調三個項目新增「連結線」功能：在設定頁開啟後，題目必定會出現至少一次連結線，作答時選中一拍後，再按「⌒」就能連到下一拍，再按一次取消', '優化作答鍵盤，將「🗑️ 清空」改為「⌒ 連結線」', '同步更新模擬測驗「大學檔」的節奏、單旋律、兩聲部各段落一定會出現連結線（每段 1～2 條），考卷因結構調整，未完成的考試會自動重置，已完成的歷史成績與已保存的考卷不受影響', '優化節奏型按鈕的音符間距，四分音符加兩個十六分音符的節奏型（例如 ♩⌒♬）現在看得更清楚', '修正各練習的解答頁左上角改為「返回設定頁」，提交後不會再回到作答頁'] },
   { v: 'v.90', items: ['優化版面，並更新各設備加入主畫面的文案與功能'] },
-  { v: 'v.91', items: ['新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] }
+  { v: 'v.91', items: ['優化各裝置的中文字體顯示，Android 與 Windows 上的閱讀體驗更美觀', '新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] }
 ];
 
 function showChangelog(){
