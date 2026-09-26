@@ -182,6 +182,32 @@ window.addEventListener('appinstalled', function(){
   .donate-card .menu-card-title{ color: var(--wrong); margin:0 0 4px; font-size:18px; }
   .donate-card .menu-card-desc{ color: var(--ink-soft); }
   /* 贊助佔位彈窗 */
+  /* 導入及導出紀錄 */
+  .backup-btn{ display:inline-block; font:inherit; font-size:13px; color:var(--accent); background:transparent;
+               border:1px solid var(--accent-line); border-radius:9px; padding:4px 14px; cursor:pointer; white-space:nowrap; }
+  .backup-btn:active{ background:rgba(51,65,92,0.06); }
+  .bk-stat{ background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
+            padding:11px 12px; margin:0 0 18px; font-size:13.5px; text-align:left; }
+  .bk-stat .row{ display:flex; justify-content:space-between; padding:3px 2px; }
+  .bk-stat .row span:first-child{ color:var(--ink-soft); }
+  .bk-stat .row span:last-child{ font-family:var(--font-mono); font-weight:600; }
+  .bk-stat .empty{ color:var(--ink-soft); }
+  .bk-row{ display:flex; gap:10px; justify-content:center; margin:0 0 16px; }
+  .bk-row .bk-btn{ flex:1 1 0; max-width:160px; padding:11px 8px; font:inherit; font-size:14px;
+                   border-radius:11px; border:1px solid var(--accent); background:var(--accent); color:#fff;
+                   cursor:pointer; white-space:nowrap; }
+  .bk-row .bk-btn.ghost{ background:transparent; color:var(--accent); }
+  .bk-row .bk-btn[disabled]{ opacity:0.38; cursor:not-allowed; }
+  .bk-warn{ background:#fdf3f1; border:1px solid #e8cdc6; color:var(--wrong); border-radius:10px;
+            padding:10px 12px; font-size:13px; margin:0 0 14px; text-align:left; line-height:1.65; }
+  .bk-cmp{ width:100%; border-collapse:collapse; font-size:13.5px; margin:0 0 6px; }
+  .bk-cmp th{ font-size:12px; color:var(--ink-soft); font-weight:500; padding:4px 6px; text-align:right; }
+  .bk-cmp th:first-child{ text-align:left; }
+  .bk-cmp td{ padding:5px 6px; text-align:right; font-family:var(--font-mono); }
+  .bk-cmp td:first-child{ text-align:left; font-family:inherit; color:var(--ink-soft); }
+  .bk-cmp .to{ color:var(--accent); font-weight:700; }
+  .bk-note{ font-size:12.5px; color:var(--ink-soft); text-align:left; background:var(--panel);
+            border:1px solid var(--panel-border); border-radius:9px; padding:9px 11px; margin:0 0 14px; line-height:1.7; }
   /* 加入主畫面的說明浮層 */
   .a2hs-ico{ display:inline-block; vertical-align:-0.18em; }
   .a2hs-steps{ margin:0; padding:0; list-style:none; text-align:left; }
@@ -355,7 +381,6 @@ window.addEventListener('appinstalled', function(){
 
       <a href="rhythm-trainer.html" class="menu-card active-feature practice-card">
         <span class="menu-badge badge-ready">開始練習</span>
-        <span class="menu-new">New!</span>
         <div>
           <div class="menu-card-num">03</div>
           <h3 class="menu-card-title">節奏練習</h3>
@@ -366,7 +391,6 @@ window.addEventListener('appinstalled', function(){
 
       <a href="melody-trainer.html" class="menu-card active-feature practice-card">
         <span class="menu-badge badge-ready">開始練習</span>
-        <span class="menu-new">New!</span>
         <div>
           <div class="menu-card-num">04</div>
           <h3 class="menu-card-title">單旋律曲調</h3>
@@ -377,7 +401,6 @@ window.addEventListener('appinstalled', function(){
 
       <a href="two-part-trainer.html" class="menu-card active-feature practice-card">
         <span class="menu-badge badge-ready">開始練習</span>
-        <span class="menu-new">New!</span>
         <div>
           <div class="menu-card-num">05</div>
           <h3 class="menu-card-title">兩聲部曲調</h3>
@@ -447,7 +470,8 @@ window.addEventListener('appinstalled', function(){
 
     <div class="report-wrap"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.90　·　更新日誌 ▸</button></p>
+    <div class="report-wrap" style="margin-top:10px;"><button type="button" class="backup-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.91　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -482,6 +506,64 @@ window.addEventListener('appinstalled', function(){
     <p class="subtitle">這裡整合各項練習累積的錯題（儲存在本機瀏覽器）。點「跳回複習」會直接開啟該練習的錯題本。</p>
     <div class="hub-total" id="hubTotal"></div>
     <div id="hubGroups"></div>
+    <div class="report-wrap" style="margin-top:22px;"><button type="button" class="backup-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
+  </div>
+</div>
+
+<!-- 導入及導出紀錄 -->
+<div class="donate-modal" id="backupModal" onclick="if(event.target===this) closeBackup()">
+  <div class="donate-box">
+    <div class="dico">💾</div>
+    <h3>導入及導出紀錄</h3>
+    <p style="margin-bottom:14px;">練習紀錄只存在這台裝置上，無法跨設備共用存檔。<br>
+       將紀錄導出後，日後可在任何裝置導入以還原練習紀錄。</p>
+    <div class="bk-stat" id="bkStat"></div>
+    <div class="bk-row">
+      <button type="button" class="bk-btn" id="bkExportBtn" onclick="doExport()">📤 導出紀錄</button>
+      <button type="button" class="bk-btn ghost" onclick="pickImportFile()">📥 導入紀錄</button>
+    </div>
+    <input type="file" id="bkFileInput" style="display:none;" onchange="onImportFile(event)">
+    <button class="donate-dismiss" onclick="closeBackup()">關閉</button>
+  </div>
+</div>
+
+<!-- 導入前的覆蓋確認 -->
+<div class="donate-modal" id="bkConfirmModal" onclick="if(event.target===this) closeBkConfirm()">
+  <div class="donate-box">
+    <div class="dico">⚠️</div>
+    <h3>導入將覆蓋現有紀錄</h3>
+    <div class="bk-warn">這台裝置上的所有紀錄會被取代，<b>無法復原</b>。</div>
+    <table class="bk-cmp" id="bkCmp"></table>
+    <div class="bk-note" id="bkMeta"></div>
+    <div class="bk-row">
+      <button type="button" class="bk-btn ghost" onclick="closeBkConfirm()">取消</button>
+      <button type="button" class="bk-btn" onclick="doImportConfirmed()">確定覆蓋</button>
+    </div>
+  </div>
+</div>
+
+<!-- 導入完成 -->
+<div class="donate-modal" id="bkDoneModal" onclick="if(event.target===this) closeBkDone()">
+  <div class="donate-box">
+    <div class="dico">✅</div>
+    <h3>導入完成</h3>
+    <p id="bkDoneText" style="margin-bottom:16px;"></p>
+    <div class="bk-row">
+      <button type="button" class="bk-btn ghost" onclick="closeBkDone(); showMenu();">回選單</button>
+      <button type="button" class="bk-btn" onclick="closeBkDone(); showHub();">錯題本總覽</button>
+    </div>
+  </div>
+</div>
+
+<!-- 導入或導出失敗 -->
+<div class="donate-modal" id="bkErrModal" onclick="if(event.target===this) closeBkErr()">
+  <div class="donate-box">
+    <div class="dico" id="bkErrIcon">📄</div>
+    <h3 id="bkErrTitle">無法讀取這個檔案</h3>
+    <p id="bkErrText" style="margin-bottom:16px;"></p>
+    <div class="bk-row">
+      <button type="button" class="bk-btn" onclick="closeBkErr()">知道了</button>
+    </div>
   </div>
 </div>
 
@@ -641,6 +723,293 @@ window.REVIEW_STORE = {
   total(){ return this.TYPES.reduce((a,t)=>a+this.count(t), 0); }
 };
 
+/* ===== 導入及導出紀錄（v.91） =====
+   練習紀錄全部存在 localStorage，一台裝置一份。這裡把它們打包成一個檔案，
+   讓使用者可以保管、在別台裝置還原。
+
+   ⚠ iOS 的關鍵限制：在「加到主畫面」的 standalone 模式下，
+   傳統的 <a download> 下載會被「靜默忽略」——不報錯、沒反應、檔案不存在，
+   使用者會以為備份好了。所以一律優先走 navigator.share()（系統分享面板），
+   iOS 上沒有分享能力時寧可明白擋下，也不要假裝成功。 */
+
+var BK_FORMAT = 'ear-training-backup';
+var BK_APP_VER = 'v.91';
+var BK_EXAM_KEYS = {
+  history: 'earTrainer.exam.history',
+  papers:  'earTrainer.exam.papers',
+  schema:  'earTrainer.exam.schema'
+};
+/* 進行中的考試（session）與已看過的更新日誌刻意不備份：
+   前者搬到別台會出現奇怪的狀態，後者搬過去會讓新裝置不顯示更新說明。 */
+
+function bkReadJSON(key, dflt){
+  try{ var v = localStorage.getItem(key); return v == null ? dflt : JSON.parse(v); }
+  catch(e){ return dflt; }
+}
+
+/* 統計這台裝置目前有多少紀錄 */
+function bkStats(data){
+  var S = window.REVIEW_STORE;
+  var review = 0, papers = 0, history = 0;
+  try{
+    if(data){
+      S.TYPES.forEach(function(t){ review += ((data.review || {})[t] || []).length; });
+      papers = (data.papers || []).length;
+      history = (data.history || []).length;
+    } else {
+      review = S.total();
+      papers = bkReadJSON(BK_EXAM_KEYS.papers, []).length;
+      history = bkReadJSON(BK_EXAM_KEYS.history, []).length;
+    }
+  }catch(e){}
+  return { review: review, papers: papers, history: history,
+           empty: (review + papers + history) === 0 };
+}
+
+function bkRenderStat(){
+  var el = document.getElementById('bkStat'); if(!el) return;
+  var st = bkStats(null);
+  if(st.empty){
+    el.innerHTML = '<div class="row"><span class="empty">這台裝置目前沒有任何紀錄</span></div>';
+  } else {
+    el.innerHTML =
+      '<div class="row"><span>錯題本</span><span>' + st.review + ' 筆</span></div>' +
+      '<div class="row"><span>歷史成績</span><span>' + st.history + ' 次</span></div>' +
+      '<div class="row"><span>完整考卷</span><span>' + st.papers + ' 份</span></div>';
+  }
+  var btn = document.getElementById('bkExportBtn');
+  if(btn){ btn.disabled = st.empty; }
+}
+
+function showBackup(){
+  bkRenderStat();
+  var m = document.getElementById('backupModal');
+  if(m) m.classList.add('open');
+  syncBodyLock();
+}
+function closeBackup(){
+  var m = document.getElementById('backupModal');
+  if(m) m.classList.remove('open');
+  syncBodyLock();
+}
+
+function bkShowErr(title, text, icon){
+  document.getElementById('bkErrTitle').textContent = title;
+  document.getElementById('bkErrText').innerHTML = text;
+  document.getElementById('bkErrIcon').textContent = icon || '📄';
+  document.getElementById('bkErrModal').classList.add('open');
+  syncBodyLock();
+}
+function closeBkErr(){
+  document.getElementById('bkErrModal').classList.remove('open');
+  syncBodyLock();
+}
+
+/* ---------- 導出 ---------- */
+
+function bkCollect(){
+  var S = window.REVIEW_STORE;
+  var review = {};
+  S.TYPES.forEach(function(t){ review[t] = S.load(t); });
+  return {
+    format: BK_FORMAT,
+    appVer: BK_APP_VER,
+    schema: bkReadJSON(BK_EXAM_KEYS.schema, null),
+    exportedAt: Date.now(),
+    data: {
+      review: review,
+      history: bkReadJSON(BK_EXAM_KEYS.history, []),
+      papers:  bkReadJSON(BK_EXAM_KEYS.papers, [])
+    }
+  };
+}
+
+function bkFileName(){
+  var d = new Date();
+  var p = function(n){ return String(n).padStart(2, '0'); };
+  return '聽力練習備份_' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '.json';
+}
+
+function doExport(){
+  var btn = document.getElementById('bkExportBtn');
+  if(btn && btn.disabled) return;
+  var text, file;
+  try{
+    text = JSON.stringify(bkCollect());
+    file = new File([text], bkFileName(), { type: 'application/json' });
+  }catch(e){
+    bkShowErr('導出失敗', '準備檔案時發生問題，請稍後再試。', '⚠️');
+    return;
+  }
+
+  var isIOS = (function(){
+    try{ var ua = navigator.userAgent || '';
+         return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints||0) > 1); }
+    catch(e){ return false; }
+  })();
+
+  /* 優先走系統分享面板：iOS 在主畫面模式下這是唯一可行的方式 */
+  if(navigator.canShare && navigator.canShare({ files: [file] })){
+    navigator.share({ files: [file], title: '聽力練習備份' })
+      .then(function(){ closeBackup(); })
+      .catch(function(err){
+        /* 使用者自己取消不算失敗，不要跳錯誤嚇他 */
+        if(err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
+        bkShowErr('導出失敗', '無法開啟分享面板，請稍後再試。', '⚠️');
+      });
+    return;
+  }
+
+  /* iOS 沒有分享能力時寧可明白擋下，不要退回會靜默失敗的下載 */
+  if(isIOS){
+    bkShowErr('這個版本無法直接儲存',
+      '你的 iOS 版本無法從網頁直接儲存檔案。<br>請更新 iOS，或改用 Safari 開啟本網站後再導出。', '⚠️');
+    return;
+  }
+
+  /* 桌機與 Android 退回一般下載 */
+  try{
+    var blob = new Blob([text], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = bkFileName();
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    closeBackup();
+  }catch(e){
+    bkShowErr('導出失敗', '無法產生檔案，請改用其他瀏覽器再試。', '⚠️');
+  }
+}
+
+/* ---------- 導入 ---------- */
+
+var bkPending = null;   // 通過檢查、等待使用者確認覆蓋的資料
+
+function pickImportFile(){
+  var input = document.getElementById('bkFileInput');
+  if(!input) return;
+  input.value = '';        // 讓同一個檔案可以重複選
+  input.click();
+}
+
+function onImportFile(ev){
+  var f = ev && ev.target && ev.target.files && ev.target.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onerror = function(){ bkShowErr('無法讀取這個檔案', '檔案讀取失敗，可能已經損毀。'); };
+  reader.onload = function(){
+    var obj = null;
+    try{ obj = JSON.parse(String(reader.result)); }
+    catch(e){
+      bkShowErr('無法讀取這個檔案', '這不是聽力練習的備份檔，<br>請確認選擇的檔案是否正確。');
+      return;
+    }
+    bkPrepareImport(obj);
+  };
+  reader.readAsText(f);
+}
+
+/* 版本字串 'v.91' → 91，用來比較新舊 */
+function bkVerNum(v){
+  try{ var m = String(v || '').match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
+  catch(e){ return 0; }
+}
+
+function bkPrepareImport(obj){
+  if(!obj || obj.format !== BK_FORMAT || !obj.data){
+    bkShowErr('無法讀取這個檔案', '這不是聽力練習的備份檔，<br>請確認選擇的檔案是否正確。');
+    return;
+  }
+  /* 比目前的 App 新就擋下來，舊的照常導入（缺的欄位比照現有相容機制以預設值呈現） */
+  if(bkVerNum(obj.appVer) > bkVerNum(BK_APP_VER)){
+    bkShowErr('備份檔版本較新',
+      '這份備份是較新版本建立的。<br>請連上網路重新整理頁面更新後再試。', '⬆️');
+    return;
+  }
+
+  bkPending = obj;
+  var now = bkStats(null), next = bkStats(obj.data);
+
+  document.getElementById('bkCmp').innerHTML =
+    '<tr><th>　</th><th>目前這台</th><th>即將導入</th></tr>' +
+    '<tr><td>錯題本</td><td>' + now.review + ' 筆</td><td class="to">' + next.review + ' 筆</td></tr>' +
+    '<tr><td>歷史成績</td><td>' + now.history + ' 次</td><td class="to">' + next.history + ' 次</td></tr>' +
+    '<tr><td>完整考卷</td><td>' + now.papers + ' 份</td><td class="to">' + next.papers + ' 份</td></tr>';
+
+  var meta = '備份時間：' + bkFmtDate(obj.exportedAt);
+  if(bkVerNum(obj.appVer) < bkVerNum(BK_APP_VER)){
+    meta += '<br>這份備份建立於 ' + escapeHtml(obj.appVer || '較舊版本') +
+            '，較新功能的資料會以預設值呈現。';
+  }
+  document.getElementById('bkMeta').innerHTML = meta;
+
+  closeBackup();
+  document.getElementById('bkConfirmModal').classList.add('open');
+  syncBodyLock();
+}
+
+function bkFmtDate(ts){
+  try{
+    var d = new Date(ts); var p = function(n){ return String(n).padStart(2,'0'); };
+    return d.getFullYear() + '/' + p(d.getMonth()+1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }catch(e){ return '（未知）'; }
+}
+
+function closeBkConfirm(){
+  bkPending = null;
+  document.getElementById('bkConfirmModal').classList.remove('open');
+  syncBodyLock();
+}
+
+/* 覆蓋寫入。先在記憶體裡把要寫的東西全部備妥、驗證過，再一次寫入，
+   任何一步失敗就把原本的資料寫回去，避免留下一半新一半舊的狀態。 */
+function doImportConfirmed(){
+  var obj = bkPending; if(!obj) return;
+  var S = window.REVIEW_STORE;
+  var writes = [];
+  try{
+    S.TYPES.forEach(function(t){
+      var arr = (obj.data.review || {})[t];
+      writes.push([S.PREFIX + t, JSON.stringify(Array.isArray(arr) ? arr : [])]);
+    });
+    writes.push([BK_EXAM_KEYS.history, JSON.stringify(obj.data.history || [])]);
+    writes.push([BK_EXAM_KEYS.papers,  JSON.stringify(obj.data.papers  || [])]);
+    if(obj.schema != null) writes.push([BK_EXAM_KEYS.schema, JSON.stringify(obj.schema)]);
+  }catch(e){
+    closeBkConfirm();
+    bkShowErr('導入失敗', '備份檔的內容不完整，無法導入。', '⚠️');
+    return;
+  }
+
+  var backup = writes.map(function(w){ return [w[0], localStorage.getItem(w[0])]; });
+  try{
+    writes.forEach(function(w){ localStorage.setItem(w[0], w[1]); });
+  }catch(e){
+    /* 寫到一半失敗（多半是空間不足）就整批還原 */
+    backup.forEach(function(b){
+      try{ if(b[1] == null) localStorage.removeItem(b[0]); else localStorage.setItem(b[0], b[1]); }catch(e2){}
+    });
+    closeBkConfirm();
+    bkShowErr('導入失敗', '這台裝置的儲存空間不足，<br>紀錄已經還原成原本的狀態。', '⚠️');
+    return;
+  }
+
+  var st = bkStats(obj.data);
+  bkPending = null;
+  document.getElementById('bkConfirmModal').classList.remove('open');
+  document.getElementById('bkDoneText').textContent =
+    '已還原 ' + st.review + ' 筆錯題本、' + st.history + ' 次成績、' + st.papers + ' 份考卷。';
+  document.getElementById('bkDoneModal').classList.add('open');
+  syncBodyLock();
+  try{ updateHubBadge(); }catch(e){}
+}
+
+function closeBkDone(){
+  document.getElementById('bkDoneModal').classList.remove('open');
+  syncBodyLock();
+}
+
 function fmtTime(ts){
   if(!ts) return '';
   try{
@@ -749,7 +1118,8 @@ window.CHANGELOG = [
   { v: 'v.87', items: ['修正四部和聲在手機瀏覽器中，譜例下方的級數作答格可能被遮住、看不到自己填了什麼的問題', '四部和聲的三顆播放按鈕改為同一列，作答區空間更充裕', '贊助者名單新增「金色樂友」標示，累積贊助滿 5,000 元的朋友會以金色顯示'] },
   { v: 'v.88', items: ['修正四部和聲的半減七和絃記號標示異常，導致與正確答案不符的問題。例：小調 ii 與大調 vii 的半減七和絃（含轉位）可能會被誤標為減七（°），正確應為半減七（ø）', '優化四部和聲級數鍵盤的性質記號輸入（°、ø、+），先按轉位或先按性質都能正確填寫該級數'] },
   { v: 'v.89', items: ['節奏練習、單旋律曲調、兩聲部曲調三個項目新增「連結線」功能：在設定頁開啟後，題目必定會出現至少一次連結線，作答時選中一拍後，再按「⌒」就能連到下一拍，再按一次取消', '優化作答鍵盤，將「🗑️ 清空」改為「⌒ 連結線」', '同步更新模擬測驗「大學檔」的節奏、單旋律、兩聲部各段落一定會出現連結線（每段 1～2 條），考卷因結構調整，未完成的考試會自動重置，已完成的歷史成績與已保存的考卷不受影響', '優化節奏型按鈕的音符間距，四分音符加兩個十六分音符的節奏型（例如 ♩⌒♬）現在看得更清楚', '修正各練習的解答頁左上角改為「返回設定頁」，提交後不會再回到作答頁'] },
-  { v: 'v.90', items: ['優化版面，並更新各設備加入主畫面的文案與功能'] }
+  { v: 'v.90', items: ['優化版面，並更新各設備加入主畫面的文案與功能'] },
+  { v: 'v.91', items: ['新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] }
 ];
 
 function showChangelog(){

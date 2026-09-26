@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v90'; // v.90：加入主畫面提示改版
+const CACHE_NAME = 'ear-training-shell-v91'; // v.91：導入及導出紀錄
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
