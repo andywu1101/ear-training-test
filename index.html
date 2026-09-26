@@ -820,10 +820,12 @@ function bkCollect(){
   };
 }
 
+/* 檔名帶日期與時間，同一天導出多次才不會變成同一個檔名 */
 function bkFileName(){
   var d = new Date();
   var p = function(n){ return String(n).padStart(2, '0'); };
-  return '聽力練習備份_' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '.json';
+  return '聽力練習備份_' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate())
+       + '-' + p(d.getHours()) + p(d.getMinutes()) + '.json';
 }
 
 function doExport(){
