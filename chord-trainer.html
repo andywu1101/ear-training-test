@@ -525,6 +525,104 @@ function updateStaffHeader(pageId){
       bassNotes.forEach((n, idx) => { if(n.accCode) note.addAccidental(idx, new VF.Accidental(n.accCode)); });
       VF.Formatter.FormatAndDraw(context, bassStave, [note]);
     }
+    /* 畫完才做：兩行符頭對齊，再把整體置中（臨時記號不影響符頭的對齊） */
+    alignAndCentreGrand(container, staveX, staveX + staveWidth);
+  }
+
+  /* 大譜表的兩行必須把「符頭」對齊在同一條垂直線上，再把整體置中。
+     VexFlow 會把臨時記號插在符頭左邊、並把整個音符往右推，兩行的記號數量不同時
+     被推的距離就不同；若只給兩行同一個位移量，等於把原本就沒對齊的兩行整體平移，
+     還是不會對齊。所以先各自補正到同一個符頭 x，再一起置中。
+     （作法比照 08 音堆練習，見開發者手冊第八部） */
+  function alignAndCentreGrand(container, staveX, staveRight){
+    try{
+      const svg = container.querySelector('svg'); if(!svg) return;
+      const groups = [].slice.call(svg.querySelectorAll('.vf-stavenote'));
+      if(!groups.length) return;
+
+      const headXsOf = function(g){
+        return [].slice.call(g.querySelectorAll('.vf-notehead path')).map(function(pth){
+          const m = (pth.getAttribute('d') || '').match(/M(-?[0-9.]+)/);
+          return m ? parseFloat(m[1]) : null;
+        }).filter(function(x){ return x !== null; });
+      };
+
+      /* ⚠ 不用 getBBox()：它依賴瀏覽器的排版引擎，在測試環境（jsdom）回傳全 0，
+         等於整段邏輯無法驗證。改成直接從 path 的起點座標推算左右界，
+         兩種環境算出來的結果一致。 */
+      const HEAD_W = 17;                       // 全音符符頭的視覺寬度（實測）
+      const pathXsOf = function(g){
+        return [].slice.call(g.querySelectorAll('path')).map(function(pth){
+          const m = (pth.getAttribute('d') || '').match(/M\s*(-?[0-9.]+)/);
+          return m ? parseFloat(m[1]) : null;
+        }).filter(function(x){ return x !== null; });
+      };
+
+      const info = groups.map(function(g){
+        const hx = headXsOf(g);
+        const ax = pathXsOf(g);                // 含臨時記號在內的所有筆畫
+        if(!hx.length || !ax.length) return null;
+        const headX = Math.min.apply(null, hx);
+        return { g: g, headX: headX,
+                 left: Math.min.apply(null, ax),
+                 right: Math.max.apply(null, hx) + HEAD_W };
+      }).filter(function(o){ return o; });
+      if(!info.length) return;
+
+      /* ① 兩行的符頭對齊到最右邊那一行（只有一行時補正量為 0，等於只做置中） */
+      const headTarget = Math.max.apply(null, info.map(function(o){ return o.headX; }));
+      info.forEach(function(o){ o.align = headTarget - o.headX; });
+
+      /* ② 以含臨時記號的整體外框置中 */
+      let minX = Infinity, maxX = -Infinity;
+      info.forEach(function(o){
+        minX = Math.min(minX, o.left + o.align);
+        maxX = Math.max(maxX, o.right + o.align);
+      });
+      let dx = (staveX + staveRight) / 2 - (minX + maxX) / 2;
+
+      /* ③ 防撞：不可疊到譜號上，也不可超出右側 */
+      if(minX + dx < staveX + 26) dx = staveX + 26 - minX;
+      if(maxX + dx > staveRight - 6) dx = staveRight - 6 - maxX;
+
+      const shiftOf = {};
+      info.forEach(function(o, i){
+        const total = o.align + dx;
+        o.total = total;
+        if(Math.abs(total) > 0.05) o.g.setAttribute('transform', 'translate(' + total.toFixed(2) + ',0)');
+      });
+
+      /* ④ 加線（中央 C 那種上下加線）是 VexFlow 直接畫在譜表上、不在音符群組裡的，
+            不一起平移就會跟符頭左右錯開。用垂直位置判斷它屬於哪一行。 */
+      const rowY = info.map(function(o){
+        const ys = [].slice.call(o.g.querySelectorAll('.vf-notehead path')).map(function(pth){
+          const m = (pth.getAttribute('d') || '').match(/M[0-9.]+ (-?[0-9.]+)/);
+          return m ? parseFloat(m[1]) : null;
+        }).filter(function(y){ return y !== null; });
+        return ys.length ? (ys.reduce(function(a,b){ return a+b; }, 0) / ys.length) : null;
+      });
+
+      [].slice.call(svg.querySelectorAll('path')).forEach(function(pth){
+        if(pth.closest && pth.closest('.vf-stavenote')) return;      // 音符群組內的不處理
+        const d = pth.getAttribute('d') || '';
+        const m = d.match(/^M\s*(-?[0-9.]+)\s+(-?[0-9.]+)\s*L\s*(-?[0-9.]+)\s+(-?[0-9.]+)\s*$/);
+        if(!m) return;                                               // 只挑單純的水平線段
+        const y1 = parseFloat(m[2]), y2 = parseFloat(m[4]);
+        if(Math.abs(y1 - y2) > 0.5) return;
+        const x1 = parseFloat(m[1]), x2 = parseFloat(m[3]);
+        if(x2 - x1 > 40 || x2 - x1 < 4) return;                      // 譜線很長、加線很短
+        if(x1 < staveX + 20) return;                                 // 譜號附近的不是加線
+        let best = -1, bestD = Infinity;
+        rowY.forEach(function(y, i){
+          if(y === null) return;
+          const dd = Math.abs(y - y1);
+          if(dd < bestD){ bestD = dd; best = i; }
+        });
+        if(best >= 0 && Math.abs(info[best].total) > 0.05){
+          pth.setAttribute('transform', 'translate(' + info[best].total.toFixed(2) + ',0)');
+        }
+      });
+    }catch(e){}
   }
 
   function shuffleCopy(arr){

@@ -468,7 +468,7 @@ window.addEventListener('appinstalled', function(){
     <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
     <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.91　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.92　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -1130,7 +1130,8 @@ window.CHANGELOG = [
   { v: 'v.88', items: ['修正四部和聲的半減七和絃記號標示異常，導致與正確答案不符的問題。例：小調 ii 與大調 vii 的半減七和絃（含轉位）可能會被誤標為減七（°），正確應為半減七（ø）', '優化四部和聲級數鍵盤的性質記號輸入（°、ø、+），先按轉位或先按性質都能正確填寫該級數'] },
   { v: 'v.89', items: ['節奏練習、單旋律曲調、兩聲部曲調三個項目新增「連結線」功能：在設定頁開啟後，題目必定會出現至少一次連結線，作答時選中一拍後，再按「⌒」就能連到下一拍，再按一次取消', '優化作答鍵盤，將「🗑️ 清空」改為「⌒ 連結線」', '同步更新模擬測驗「大學檔」的節奏、單旋律、兩聲部各段落一定會出現連結線（每段 1～2 條），考卷因結構調整，未完成的考試會自動重置，已完成的歷史成績與已保存的考卷不受影響', '優化節奏型按鈕的音符間距，四分音符加兩個十六分音符的節奏型（例如 ♩⌒♬）現在看得更清楚', '修正各練習的解答頁左上角改為「返回設定頁」，提交後不會再回到作答頁'] },
   { v: 'v.90', items: ['優化版面，並更新各設備加入主畫面的文案與功能'] },
-  { v: 'v.91', items: ['優化各裝置的中文字體顯示，Android 與 Windows 上的閱讀體驗更美觀', '新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] }
+  { v: 'v.91', items: ['優化各裝置的中文字體顯示，Android 與 Windows 上的閱讀體驗更美觀', '新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] },
+  { v: 'v.92', items: ['優化音程練習與和絃辨認的譜例顯示：解決出現臨時升降記號時，上下兩行音符未對齊的問題，並將音符改為置中，閱讀更清楚'] }
 ];
 
 function showChangelog(){

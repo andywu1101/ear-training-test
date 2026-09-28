@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v91'; // v.91：導入及導出紀錄
+const CACHE_NAME = 'ear-training-shell-v92'; // v.92：音程與和絃的大譜表對齊與置中
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
