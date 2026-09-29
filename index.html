@@ -203,6 +203,8 @@ window.addEventListener('appinstalled', function(){
   .opt-item.on .opt-name{ font-weight:600; color:var(--accent); }
   .opt-sub{ display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.6; }
   .set-toast{ font-size:12.5px; color:var(--correct); margin:12px 0 0; min-height:19px; }
+  .set-credit{ font-size:11.5px; color:var(--ink-soft); line-height:1.7; margin:10px 0 0;
+        padding-top:10px; border-top:1px solid var(--hairline); }
   /* 導入及導出紀錄 */
   .bk-stat{ background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
             padding:11px 12px; margin:0 0 18px; font-size:13.5px; text-align:left; }
@@ -489,7 +491,7 @@ window.addEventListener('appinstalled', function(){
       <div class="menu-card active-feature settings-card" onclick="showSettings()">
         <div>
           <h3 class="menu-card-title">⚙️ 設定</h3>
-          <p class="menu-card-desc">應用調整</p>
+          <p class="menu-card-desc">功能調整</p>
         </div>
       </div>
     </div>
@@ -537,7 +539,7 @@ window.addEventListener('appinstalled', function(){
         <button type="button" class="opt-item" data-kit="salamander" onclick="setPianoKit('salamander')">
           <span class="opt-radio"></span>
           <span class="opt-body">
-            <span class="opt-name">Salamander（高音質）</span>
+            <span class="opt-name">Yamaha C5（高音質）</span>
             <span class="opt-sub">真實鋼琴錄音，檔案較大</span>
           </span>
         </button>
@@ -550,6 +552,8 @@ window.addEventListener('appinstalled', function(){
         </button>
       </div>
       <p class="set-toast" id="pianoKitToast"></p>
+      <p class="set-credit">高音質音色取樣自 Yamaha C5，來源為 Alexander Holm 錄製的
+        Salamander Grand Piano（已釋出為公有領域）。</p>
     </div>
   </div>
 
@@ -860,8 +864,8 @@ function setPianoKit(kit){
   var t = document.getElementById('pianoKitToast');
   if(t){
     t.textContent = (before === kit)
-      ? '目前使用：' + (kit === 'salamander' ? 'Salamander' : '標準音色')
-      : '✓ 已切換為' + (kit === 'salamander' ? ' Salamander' : '標準音色') + '，下次進入練習時生效';
+      ? '目前使用：' + (kit === 'salamander' ? 'Yamaha C5' : '標準音色')
+      : '✓ 已切換為' + (kit === 'salamander' ? ' Yamaha C5' : '標準音色') + '，下次進入練習時生效';
     clearTimeout(pianoToastTimer);
     pianoToastTimer = setTimeout(function(){ if(t) t.textContent = ''; }, 4000);
   }
@@ -1225,7 +1229,7 @@ window.CHANGELOG = [
   { v: 'v.90', items: ['優化版面，並更新各設備加入主畫面的文案與功能'] },
   { v: 'v.91', items: ['優化各裝置的中文字體顯示，Android 與 Windows 上的閱讀體驗更美觀', '新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] },
   { v: 'v.92', items: ['優化音程練習與和絃辨認的譜例顯示：解決出現臨時升降記號時，上下兩行音符未對齊的問題，並將音符改為置中，閱讀更清楚', '優化各練習的音量平衡，高音域的音符聽起來更清晰；四部和聲的低音聲部略為提高，更容易辨識', '兩聲部曲調的解答頁新增單獨聆聽高音、低音聲部的按鈕'] },
-  { v: 'v.93', items: ['新增「高音質鋼琴音色」：改用 Salamander Grand Piano，音色更清晰、延音更自然', '新增「設定」頁面（選單頁最下方），可自由切換高音質音色與原本的標準音色；預設為高音質，若網路較慢或想要較快載入，可切換回原本的音色'] }
+  { v: 'v.93', items: ['新增「高音質鋼琴音色」：改用 Yamaha C5 Grand Piano，音色更清晰、延音更自然', '新增「設定」頁面（選單頁最下方），可自由切換高音質音色與原本的標準音色；預設為高音質，若網路較慢或想要較快載入，可切換回原本的音色'] }
 ];
 
 function showChangelog(){

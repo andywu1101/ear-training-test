@@ -1,5 +1,7 @@
-/* Salamander Grand Piano（Yamaha C5，公有領域）
-   來源：Tone.js 的取樣組，44.1 kHz 立體聲、約 37 kbps VBR、每三個半音一個取樣。
+/* Salamander Grand Piano — Alexander Holm 錄製，取樣自 Yamaha C5。
+   原以 CC BY 3.0 發布，作者於 2022-03-04 宣告釋出為公有領域。
+   原始錄音：48 kHz / 24 bit、16 層力度、兩支 AKG C414 架於琴弦上方約 12 公分。
+   本專案使用 Tone.js 的網頁版取樣組：44.1 kHz 立體聲、約 37 kbps VBR、每三個半音一個取樣。
    刻意不重新編碼——重壓一次會讓訊噪比從 47 dB 掉到 28 dB，聽起來明顯模糊。
    音高校正、音頭加工、逐音正規化全部在 piano-engine.js 播放時即時處理。 */
 if (typeof(MIDI) === 'undefined') var MIDI = {};
