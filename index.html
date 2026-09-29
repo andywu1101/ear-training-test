@@ -183,7 +183,8 @@ window.addEventListener('appinstalled', function(){
   .donate-card .menu-card-desc{ color: var(--ink-soft); }
   /* 贊助佔位彈窗 */
   /* 設定：卡片要跨滿整排（桌機版是靠各自的 class 指定，不是靠 :not(.practice-card)） */
-  .settings-card{ grid-column: 1 / -1; }
+  .settings-card{ grid-column: 1 / -1; padding:16px 22px; }
+  .settings-card .menu-card-title{ margin:0 0 4px; font-size:18px; }
   /* 設定頁 */
   .set-title{ font-family:var(--font-display); font-size:17px; font-weight:600; margin:0 0 14px; }
   .opt-list{ display:flex; flex-direction:column; gap:10px; }
@@ -487,8 +488,7 @@ window.addEventListener('appinstalled', function(){
       <!-- 設定 -->
       <div class="menu-card active-feature settings-card" onclick="showSettings()">
         <div>
-          <div class="menu-card-num">⚙️ 設定</div>
-          <h3 class="menu-card-title">設定</h3>
+          <h3 class="menu-card-title">⚙️ 設定</h3>
           <p class="menu-card-desc">應用調整</p>
         </div>
       </div>
