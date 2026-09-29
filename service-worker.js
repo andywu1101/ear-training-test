@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v92'; // v.92：音程與和絃的大譜表對齊與置中
+const CACHE_NAME = 'ear-training-shell-v93'; // v.93：可切換的鋼琴音色（Salamander）
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
@@ -22,7 +22,9 @@ const APP_SHELL = [
 const STATIC_ASSETS = [
   './vexflow-min.js',
   './soundfont-player.min.js',
+  './piano-engine.js',
   './acoustic_grand_piano-mp3.js',
+  './salamander-piano-mp3.js',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',

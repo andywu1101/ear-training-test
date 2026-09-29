@@ -182,6 +182,26 @@ window.addEventListener('appinstalled', function(){
   .donate-card .menu-card-title{ color: var(--wrong); margin:0 0 4px; font-size:18px; }
   .donate-card .menu-card-desc{ color: var(--ink-soft); }
   /* 贊助佔位彈窗 */
+  /* 設定：卡片要跨滿整排（桌機版是靠各自的 class 指定，不是靠 :not(.practice-card)） */
+  .settings-card{ grid-column: 1 / -1; }
+  /* 設定頁 */
+  .set-title{ font-family:var(--font-display); font-size:17px; font-weight:600; margin:0 0 14px; }
+  .opt-list{ display:flex; flex-direction:column; gap:10px; }
+  .opt-item{ display:flex; align-items:flex-start; gap:11px; width:100%; text-align:left;
+        font:inherit; padding:13px 14px; border-radius:12px; cursor:pointer;
+        border:1px solid var(--panel-border); background:var(--paper); color:var(--ink); }
+  .opt-item:active{ background:#eae7dc; }
+  .opt-item.on{ border-color:var(--accent); background:rgba(51,65,92,0.05); }
+  .opt-radio{ flex:0 0 18px; width:18px; height:18px; border-radius:50%; margin-top:2px;
+        border:1.5px solid var(--accent-line); position:relative; }
+  .opt-item.on .opt-radio{ border-color:var(--accent); }
+  .opt-item.on .opt-radio::after{ content:''; position:absolute; inset:3.5px;
+        border-radius:50%; background:var(--accent); }
+  .opt-body{ flex:1 1 auto; }
+  .opt-name{ display:block; font-size:14.5px; }
+  .opt-item.on .opt-name{ font-weight:600; color:var(--accent); }
+  .opt-sub{ display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.6; }
+  .set-toast{ font-size:12.5px; color:var(--correct); margin:12px 0 0; min-height:19px; }
   /* 導入及導出紀錄 */
   .bk-stat{ background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
             padding:11px 12px; margin:0 0 18px; font-size:13.5px; text-align:left; }
@@ -463,12 +483,21 @@ window.addEventListener('appinstalled', function(){
           <p class="menu-card-desc">整合所有練習答錯的題目，一次檢視各項目的錯題數量與最近紀錄，並可跳回該練習複習。</p>
         </div>
       </div>
+
+      <!-- 設定 -->
+      <div class="menu-card active-feature settings-card" onclick="showSettings()">
+        <div>
+          <div class="menu-card-num">⚙️ 設定</div>
+          <h3 class="menu-card-title">設定</h3>
+          <p class="menu-card-desc">應用調整</p>
+        </div>
+      </div>
     </div>
 
     <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
     <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.92　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.93　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -497,12 +526,40 @@ window.addEventListener('appinstalled', function(){
     </div>
   </div>
 
+  <div id="pageSettings" class="page-view">
+    <button class="nav-back-btn" onclick="showMenu()">← 回選單</button>
+    <h1>設定</h1>
+    <p class="subtitle">這些設定只會套用在這台裝置上，不會隨著練習紀錄一起導出。</p>
+
+    <div class="hub-group">
+      <h3 class="set-title">鋼琴音源</h3>
+      <div class="opt-list" id="pianoKitList">
+        <button type="button" class="opt-item" data-kit="salamander" onclick="setPianoKit('salamander')">
+          <span class="opt-radio"></span>
+          <span class="opt-body">
+            <span class="opt-name">Salamander（高音質）</span>
+            <span class="opt-sub">真實鋼琴錄音，檔案較大</span>
+          </span>
+        </button>
+        <button type="button" class="opt-item" data-kit="musyng" onclick="setPianoKit('musyng')">
+          <span class="opt-radio"></span>
+          <span class="opt-body">
+            <span class="opt-name">標準音色（原本的）</span>
+            <span class="opt-sub">載入較快，適合網路較慢時</span>
+          </span>
+        </button>
+      </div>
+      <p class="set-toast" id="pianoKitToast"></p>
+    </div>
+  </div>
+
   <div id="pageHub" class="page-view">
     <button class="nav-back-btn" onclick="showHubChoose()">← 返回</button>
     <h1>錯題本目錄</h1>
     <p class="subtitle">這裡整合各項練習累積的錯題（儲存在本機瀏覽器）。點「跳回複習」會直接開啟該練習的錯題本。</p>
     <div class="hub-total" id="hubTotal"></div>
     <div id="hubGroups"></div>
+
     <div class="report-wrap" style="margin-top:22px;"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
   </div>
 </div>
@@ -776,6 +833,42 @@ function bkRenderStat(){
   var btn = document.getElementById('bkExportBtn');
   if(btn){ btn.disabled = st.empty; }
 }
+
+
+/* ===== 設定：鋼琴音色 =====
+   實際的播放由各練習頁的 piano-engine.js 負責，這裡只負責記住選擇。
+   選單頁本身也會發聲（封面的示範音），所以切換後一併重新載入自己的音色。 */
+var PIANO_LS = 'earTrainer.settings.piano';
+function pianoKit(){
+  try{ var v = localStorage.getItem(PIANO_LS);
+       return (v === 'musyng' || v === 'salamander') ? v : 'salamander'; }
+  catch(e){ return 'salamander'; }
+}
+function renderPianoKit(){
+  var kit = pianoKit();
+  document.querySelectorAll('#pianoKitList .opt-item').forEach(function(b){
+    b.classList.toggle('on', b.dataset.kit === kit);
+  });
+}
+var pianoToastTimer = null;
+function setPianoKit(kit){
+  var before = pianoKit();
+  try{ localStorage.setItem(PIANO_LS, kit); }catch(e){}
+  renderPianoKit();
+  /* 選單頁本身不載入音色，各練習頁是進入時才載入音色，
+     所以這裡存好就好——但切換當下沒有任何聲音變化，要給使用者一個回饋。 */
+  var t = document.getElementById('pianoKitToast');
+  if(t){
+    t.textContent = (before === kit)
+      ? '目前使用：' + (kit === 'salamander' ? 'Salamander' : '標準音色')
+      : '✓ 已切換為' + (kit === 'salamander' ? ' Salamander' : '標準音色') + '，下次進入練習時生效';
+    clearTimeout(pianoToastTimer);
+    pianoToastTimer = setTimeout(function(){ if(t) t.textContent = ''; }, 4000);
+  }
+}
+function showSettings(){ renderPianoKit();
+  var t = document.getElementById('pianoKitToast'); if(t) t.textContent = '';
+  showPageId('pageSettings'); }
 
 function showBackup(){
   bkRenderStat();
@@ -1131,7 +1224,8 @@ window.CHANGELOG = [
   { v: 'v.89', items: ['節奏練習、單旋律曲調、兩聲部曲調三個項目新增「連結線」功能：在設定頁開啟後，題目必定會出現至少一次連結線，作答時選中一拍後，再按「⌒」就能連到下一拍，再按一次取消', '優化作答鍵盤，將「🗑️ 清空」改為「⌒ 連結線」', '同步更新模擬測驗「大學檔」的節奏、單旋律、兩聲部各段落一定會出現連結線（每段 1～2 條），考卷因結構調整，未完成的考試會自動重置，已完成的歷史成績與已保存的考卷不受影響', '優化節奏型按鈕的音符間距，四分音符加兩個十六分音符的節奏型（例如 ♩⌒♬）現在看得更清楚', '修正各練習的解答頁左上角改為「返回設定頁」，提交後不會再回到作答頁'] },
   { v: 'v.90', items: ['優化版面，並更新各設備加入主畫面的文案與功能'] },
   { v: 'v.91', items: ['優化各裝置的中文字體顯示，Android 與 Windows 上的閱讀體驗更美觀', '新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] },
-  { v: 'v.92', items: ['優化音程練習與和絃辨認的譜例顯示：解決出現臨時升降記號時，上下兩行音符未對齊的問題，並將音符改為置中，閱讀更清楚', '優化各練習的音量平衡，高音域的音符聽起來更清晰；四部和聲的低音聲部略為提高，更容易辨識', '兩聲部曲調的解答頁新增單獨聆聽高音、低音聲部的按鈕'] }
+  { v: 'v.92', items: ['優化音程練習與和絃辨認的譜例顯示：解決出現臨時升降記號時，上下兩行音符未對齊的問題，並將音符改為置中，閱讀更清楚', '優化各練習的音量平衡，高音域的音符聽起來更清晰；四部和聲的低音聲部略為提高，更容易辨識', '兩聲部曲調的解答頁新增單獨聆聽高音、低音聲部的按鈕'] },
+  { v: 'v.93', items: ['新增「高音質鋼琴音色」：改用 Salamander Grand Piano，音色更清晰、延音更自然', '新增「設定」頁面（選單頁最下方），可自由切換高音質音色與原本的標準音色；預設為高音質，若網路較慢或想要較快載入，可切換回原本的音色'] }
 ];
 
 function showChangelog(){

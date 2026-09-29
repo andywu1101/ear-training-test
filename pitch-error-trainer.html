@@ -15,6 +15,7 @@
 <!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
+<script src="piano-engine.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -387,7 +388,7 @@
   <!-- ================= 解答頁 ================= -->
   <div id="pagePEAnswer" class="page-view">
     <div class="top-bar-practice" style="margin-bottom:14px;">
-      <button class="nav-back-btn" style="margin:0;" onclick="showPage('pe-practice')">← 返回作答</button>
+      <button class="nav-back-btn" style="margin:0;" onclick="showPage('pe-settings')">← 返回設定</button>
       <span class="practice-status-badge" id="pe-ansBadge">解答對照</span>
       <div class="score-box"><div class="num" id="pe-ansScore">0 / 0</div></div>
     </div>
@@ -1427,10 +1428,22 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     }catch(e){}
     return audioCtx;
   }
+  /* 載入音色時的畫面提示。Salamander 要在瀏覽器解碼 30 個取樣，過程中顯示進度；
+     萬一載入失敗，引擎會自動退回原本的音色，不讓使用者卡住。 */
+  var PIANO_UI = {
+    onProgress: function(done, total){
+      var b = document.getElementById('loadingBanner');
+      if(b) b.textContent = '🎹 正在載入高音質鋼琴音色… ' + done + ' / ' + total;
+    },
+    onFallback: function(){
+      var b = document.getElementById('loadingBanner');
+      if(b) b.textContent = '🎹 高音質音色載入失敗，已改用原本的音色…';
+    }
+  };
+
   window.loadPiano = function(){
     const ctx = ensureAudio(); if(!ctx) return;
-    Soundfont.instrument(ctx, 'acoustic_grand_piano', { nameToUrl: function(){ return 'acoustic_grand_piano-mp3.js'; } })
-      .catch(function(){ return Soundfont.instrument(ctx, 'acoustic_grand_piano'); })
+    PianoEngine.load(ctx, PIANO_UI)
       .then(function(inst){
         pianoInst = inst;
         document.getElementById('loadingBanner').style.display = 'none';
