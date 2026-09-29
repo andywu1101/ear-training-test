@@ -622,6 +622,25 @@ function updateStaffHeader(pageId){
     return a;
   }
 
+  /* ===== 音區補償（v.92） =====
+     真實鋼琴低音響亮、高音單薄，加上低音的泛音會遮蔽上方的音，
+     所以把高音往上補一點，讓各音域聽起來一樣清楚。
+
+     TILT_DB  音區傾斜：每高一個八度補幾 dB。往上調高音更突出，往下調更接近原本的聲音。
+     GAIN_NORM 音數衰減：同時發聲越多顆，每顆越小聲，避免多音齊奏時削波糊成一團。
+               目前設為 0（＝不衰減），實聽後認為和絃的音量以不衰減為佳；
+               日後若覺得多音糊成一團，往上調（0.2～0.35）即可。
+               ⚠ 刻意寫成「只會衰減、不會放大」（Math.min(1, ...)），
+                 這樣單音的音量與改版前完全相同。
+     （08 音堆練習另有一套自己的常數，因為它是音團辨識、遮蔽最嚴重，這裡不共用。） */
+  const GAIN_BASE = 3.5, TILT_DB = 1.0, GAIN_NORM = 0;
+  const GAIN_MIN = 2.5, GAIN_MAX = 4.8;
+  function gainFor(midi, count){
+    const tilt = Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
+    const norm = Math.min(1, Math.pow(2 / Math.max(1, count || 1), GAIN_NORM));
+    return Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
+  }
+
   let audioCtx = null; let pianoInstrument = null; let pendingTimeouts = [];
   function trackTimeout(fn, delay){ const id = setTimeout(fn, delay); pendingTimeouts.push(id); return id; }
   function clearPendingTimeouts(){ pendingTimeouts.forEach(id => clearTimeout(id)); pendingTimeouts = []; }
@@ -661,7 +680,7 @@ function updateStaffHeader(pageId){
   function playBlock(root, intervals, repeats){
     if(!pianoInstrument) return 0; const ctx = audioCtx; let t = ctx.currentTime + 0.05;
     for(let r = 0; r < repeats; r++){
-      intervals.forEach(iv => pianoInstrument.play(root + iv, t, { duration: CHORD_HOLD_SEC, gain: 3.5 }));
+      intervals.forEach(iv => pianoInstrument.play(root + iv, t, { duration: CHORD_HOLD_SEC, gain: gainFor(root + iv, intervals.length) }));
       t += CHORD_HOLD_SEC + CHORD_TRIPLE_GAP;
     }
     const totalMs = (t - ctx.currentTime) * 1000; animatePlayhead(totalMs); return totalMs;
@@ -670,10 +689,10 @@ function updateStaffHeader(pageId){
   function playAscendingHarmonic(root, intervals){
     if(!pianoInstrument || intervals.length < 2) return 0;
     const ctx = audioCtx; let t = ctx.currentTime + 0.05;
-    pianoInstrument.play(root + intervals[0], t, { duration: 0.6, gain: 3.5 }); t += 0.55;
-    pianoInstrument.play(root + intervals[1], t, { duration: 0.6, gain: 3.5 }); t += 0.65;
-    pianoInstrument.play(root + intervals[0], t, { duration: CHORD_HOLD_SEC, gain: 3.5 });
-    pianoInstrument.play(root + intervals[1], t, { duration: CHORD_HOLD_SEC, gain: 3.5 });
+    pianoInstrument.play(root + intervals[0], t, { duration: 0.6, gain: gainFor(root + intervals[0], 1) }); t += 0.55;
+    pianoInstrument.play(root + intervals[1], t, { duration: 0.6, gain: gainFor(root + intervals[1], 1) }); t += 0.65;
+    pianoInstrument.play(root + intervals[0], t, { duration: CHORD_HOLD_SEC, gain: gainFor(root + intervals[0], 2) });
+    pianoInstrument.play(root + intervals[1], t, { duration: CHORD_HOLD_SEC, gain: gainFor(root + intervals[1], 2) });
     t += CHORD_HOLD_SEC + 0.2;
     const totalMs = (t - ctx.currentTime) * 1000; animatePlayhead(totalMs); return totalMs;
   }
@@ -1022,7 +1041,7 @@ function updateStaffHeader(pageId){
           dictSession.questions.forEach((q,qi) => {
             for(let r=0; r<3; r++){
               evs.push({qi, start: t-ctx.currentTime, dur: CHORD_HOLD_SEC});
-              q.intervals.forEach(iv => pianoInstrument.play(q.root+iv, t, {duration: CHORD_HOLD_SEC, gain: 3.5}));
+              q.intervals.forEach(iv => pianoInstrument.play(q.root+iv, t, {duration: CHORD_HOLD_SEC, gain: gainFor(q.root+iv, q.intervals.length)}));
               t += CHORD_HOLD_SEC + ((r<2)?CHORD_TRIPLE_GAP:DICT_PAUSE_BETWEEN_Q);
             }
           });
@@ -1205,7 +1224,7 @@ function updateStaffHeader(pageId){
           var ctx = audioCtx; var t = ctx.currentTime + 0.08; var evs = [];
           var G = EXm.GAPS; var hold = CHORD_HOLD_SEC;
           var repGap=G.repGap/1000, qGap=G.questionGap/1000, iGap=G.interleaveGap/1000, rGap=G.roundGap/1000;
-          function playOne(q){ q.intervals.forEach(function(iv){ pianoInstrument.play(q.root+iv, t, {duration:hold, gain:3.5}); }); }
+          function playOne(q){ q.intervals.forEach(function(iv){ pianoInstrument.play(q.root+iv, t, {duration:hold, gain:gainFor(q.root+iv, q.intervals.length)}); }); }
           if(playM==='A'){
             dictSession.questions.forEach(function(q,qi){
               for(var r=0;r<3;r++){ evs.push({qi:qi, start:t-ctx.currentTime, dur:hold}); playOne(q); t += hold + (r<2?repGap:qGap); }

@@ -556,6 +556,13 @@ window.addEventListener('resize', setVH); setVH();
 
 (function(){
   const VF = Vex.Flow;
+  /* 四部和聲的低音是聽寫的關鍵，但它同時被上方三個聲部的泛音遮蔽。
+     這裡不套用其他頁面的音區補償（本頁音域跨度大，補償反而會讓高音更突出、
+     把低音壓下去），只把低音單獨提高 0.5 dB。
+     +0.5 dB ＝ 10^(0.5/20) ≈ 1.059 倍。想調整就改 BASS_BOOST_DB。 */
+  const BASS_BOOST_DB = 0.5;
+  const BASS_GAIN = 3.5 * Math.pow(10, BASS_BOOST_DB / 20);
+
   let audioCtx = null; let pianoInst = null; let pendingTimers = [];
   function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
   window.fptStopAll = function() { 
@@ -2589,18 +2596,18 @@ window.addEventListener('resize', setVH); setVH();
       this.questionVoicings.forEach((v) => {
         let [s, a, tn, b] = v;
         if (modeStr === 'block') {
-            pianoInst.play(b, t - 0.010, { duration: measureDur * 0.95, gain: 3.5 });
+            pianoInst.play(b, t - 0.010, { duration: measureDur * 0.95, gain: BASS_GAIN });
             pianoInst.play(tn, t, { duration: measureDur * 0.95, gain: 3.5 });
             pianoInst.play(a, t, { duration: measureDur * 0.95, gain: 3.5 });
             pianoInst.play(s, t, { duration: measureDur * 0.95, gain: 3.5 });
         } else if (modeStr === 'arpeggio') {
-            pianoInst.play(b, t, { duration: measureDur, gain: 3.5 });
+            pianoInst.play(b, t, { duration: measureDur, gain: BASS_GAIN });
             pianoInst.play(tn, t + 0.3, { duration: measureDur - 0.3, gain: 3.5 });
             pianoInst.play(a, t + 0.6, { duration: measureDur - 0.6, gain: 3.5 });
             pianoInst.play(s, t + 0.9, { duration: measureDur - 0.9, gain: 3.5 });
             
             let remDur = Math.max(0.5, measureDur - 1.2);
-            pianoInst.play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: 3.5 });
+            pianoInst.play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: BASS_GAIN });
             pianoInst.play(tn, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
             pianoInst.play(a, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
             pianoInst.play(s, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
@@ -2628,18 +2635,18 @@ window.addEventListener('resize', setVH); setVH();
         item.questionVoicings.forEach((v) => {
             let [s, a, tn, b] = v;
             if (modeStr === 'block') {
-                pianoInst.play(b, t - 0.010, { duration: measureDur * 0.95, gain: 3.5 });
+                pianoInst.play(b, t - 0.010, { duration: measureDur * 0.95, gain: BASS_GAIN });
                 pianoInst.play(tn, t, { duration: measureDur * 0.95, gain: 3.5 });
                 pianoInst.play(a, t, { duration: measureDur * 0.95, gain: 3.5 });
                 pianoInst.play(s, t, { duration: measureDur * 0.95, gain: 3.5 });
             } else if (modeStr === 'arpeggio') {
-                pianoInst.play(b, t, { duration: measureDur, gain: 3.5 });
+                pianoInst.play(b, t, { duration: measureDur, gain: BASS_GAIN });
                 pianoInst.play(tn, t + 0.3, { duration: measureDur - 0.3, gain: 3.5 });
                 pianoInst.play(a, t + 0.6, { duration: measureDur - 0.6, gain: 3.5 });
                 pianoInst.play(s, t + 0.9, { duration: measureDur - 0.9, gain: 3.5 });
                 
                 let remDur = Math.max(0.5, measureDur - 1.2);
-                pianoInst.play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: 3.5 });
+                pianoInst.play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: BASS_GAIN });
                 pianoInst.play(tn, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
                 pianoInst.play(a, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });
                 pianoInst.play(s, t + 1.2, { duration: remDur * 0.95, gain: 3.5 });

@@ -1394,6 +1394,25 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
   /* ============================================================
      音訊
      ============================================================ */
+  /* ===== 音區補償（v.92） =====
+     真實鋼琴低音響亮、高音單薄，加上低音的泛音會遮蔽上方的音，
+     所以把高音往上補一點，讓各音域聽起來一樣清楚。
+
+     TILT_DB  音區傾斜：每高一個八度補幾 dB。往上調高音更突出，往下調更接近原本的聲音。
+     GAIN_NORM 音數衰減：同時發聲越多顆，每顆越小聲，避免多音齊奏時削波糊成一團。
+               目前設為 0（＝不衰減），實聽後認為和絃的音量以不衰減為佳；
+               日後若覺得多音糊成一團，往上調（0.2～0.35）即可。
+               ⚠ 刻意寫成「只會衰減、不會放大」（Math.min(1, ...)），
+                 這樣單音的音量與改版前完全相同。
+     （08 音堆練習另有一套自己的常數，因為它是音團辨識、遮蔽最嚴重，這裡不共用。） */
+  const GAIN_BASE = 3.5, TILT_DB = 1.0, GAIN_NORM = 0;
+  const GAIN_MIN = 2.5, GAIN_MAX = 4.8;
+  function gainFor(midi, count){
+    const tilt = Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
+    const norm = Math.min(1, Math.pow(2 / Math.max(1, count || 1), GAIN_NORM));
+    return Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
+  }
+
   let audioCtx = null, pianoInst = null, pendingTimers = [];
   function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
   window.peStopAll = function(){
@@ -2163,7 +2182,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           let total = lens[i]; let tied = tn[i]; let next = i + 1;
           while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
           const p = this.correctPitch[noteIdx + i];
-          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: 3.5 });
+          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
           time += total * secPer16th; i = next;
         }
         noteIdx += lens.length;
@@ -2262,7 +2281,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           let total = lens[i]; let tied = tn[i]; let next = i + 1;
           while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
           const p = src[noteIdx + i];
-          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: 3.5 });
+          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
           time += total * secPer16th; i = next;
         }
         noteIdx += lens.length;
@@ -2312,7 +2331,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           let total = lens[i]; let tied = tn[i]; let next = i + 1;
           while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
           const p = this.correctPitch[noteIdx + i];   // 播放 = 正確版
-          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: 3.5 });
+          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
           time += total * secPer16th; i = next;
         }
         noteIdx += lens.length;
