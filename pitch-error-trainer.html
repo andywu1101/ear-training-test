@@ -54,6 +54,8 @@
 
   .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
   .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); cursor: pointer; }
+  .rv-speed{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 16px; margin:18px 0 0; }
+  .rv-speed-label{ font-size:13px; color:var(--ink-soft); margin-bottom:8px; }
   .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
 
   .pattern-grid-header { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; }
@@ -435,6 +437,10 @@
     <h1>錯題本</h1>
     <p class="subtitle">收錄沒有全部找出來的題目，重整或關閉後仍會保留。可對照譜例與正確演奏，並分別聆聽。</p>
     <div id="pe-reviewList"></div>
+      <div class="rv-speed js-review-links">
+        <div class="rv-speed-label">🎵 播放速度　<span id="pe-rvBpmVal">80</span> BPM</div>
+        <input type="range" id="pe-rvBpm" class="bpm-slider" min="40" max="160" value="80">
+      </div>
       <div class="js-review-links" style="margin-top:20px;">
         <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
         <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
@@ -486,13 +492,46 @@ function scrollReviewToBottom(pageId){
   }catch(e){}
 }
 
+  /* ===== 錯題本的播放速度（v.94）=====
+     錯題本沒有設定頁，所以在頁面底部放一根拉桿，整頁共用一個速度。
+     每一題原本存了當時的 BPM，這裡一律以拉桿的值覆寫。
+     設定記在 localStorage，每個練習各自獨立（節奏與四部和聲的合適速度差很多）。 */
+  var RV_BPM_KEY = 'earTrainer.settings.reviewBpm.pitcherr';
+  var RV_BPM_DEFAULT = 80;
+  function reviewBpm(){
+    try{
+      var v = parseInt(localStorage.getItem(RV_BPM_KEY), 10);
+      return (v >= 20 && v <= 240) ? v : RV_BPM_DEFAULT;
+    }catch(e){ return RV_BPM_DEFAULT; }
+  }
+  /* 播放錯題時用這個包一層，取代題目裡存的 bpm */
+  function withReviewBpm(item){
+    if(!item) return item;
+    var o = {};
+    for(var k in item){ if(Object.prototype.hasOwnProperty.call(item, k)) o[k] = item[k]; }
+    o.bpm = reviewBpm();
+    return o;
+  }
+  function initReviewBpm(){
+    var sl = document.getElementById('pe-rvBpm');
+    var lab = document.getElementById('pe-rvBpmVal');
+    if(!sl) return;
+    sl.value = reviewBpm();
+    if(lab) lab.textContent = sl.value;
+    sl.oninput = function(){
+      if(lab) lab.textContent = sl.value;
+      try{ localStorage.setItem(RV_BPM_KEY, sl.value); }catch(e){}
+    };
+  }
+
+
 function showPage(pageId) {
   if (window.peStopAll) window.peStopAll();
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
   if (pageId === 'pe-settings') { document.getElementById('pagePESettings').classList.add('active'); if(window.peModule) peModule.refreshReviewCount(); }
   else if (pageId === 'pe-practice') document.getElementById('pagePEPractice').classList.add('active');
   else if (pageId === 'pe-answer') document.getElementById('pagePEAnswer').classList.add('active');
-  else if (pageId === 'pe-review') { document.getElementById('pagePEReview').classList.add('active'); if(window.peModule) peModule.renderReviewPage(); }
+  else if (pageId === 'pe-review') { document.getElementById('pagePEReview').classList.add('active'); if(window.peModule) peModule.renderReviewPage(); initReviewBpm(); }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -2241,8 +2280,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           + '<div class="pe-dbg" style="margin-top:10px;">' + escapeHtml(this.answerDetail(item)) + '</div>';
         list.appendChild(box);
 
-        box.querySelector('.pe-rv-correct').onclick = () => this.playStatic(item, false);
-        box.querySelector('.pe-rv-heard').onclick = () => this.playStatic(item, true);
+        box.querySelector('.pe-rv-correct').onclick = () => this.playStatic(withReviewBpm(item), false);
+        box.querySelector('.pe-rv-heard').onclick = () => this.playStatic(withReviewBpm(item), true);
 
         setTimeout(() => {
           this.drawAnswerSingle('pe-rv-top-' + uid, item);

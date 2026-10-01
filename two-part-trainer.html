@@ -16,6 +16,7 @@
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
+<script src="audio-export.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -54,6 +55,8 @@
 
   .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
   .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); cursor: pointer; }
+  .rv-speed{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 16px; margin:18px 0 0; }
+  .rv-speed-label{ font-size:13px; color:var(--ink-soft); margin-bottom:8px; }
   .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
 
   .pattern-grid-header { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; }
@@ -82,6 +85,7 @@
   .staff-scroll-container::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
 
   .unified-action-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .exp-btn{ flex:0 0 auto; min-width:52px; padding-left:12px; padding-right:12px; }
   .action-btn, .play-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s; border: none; }
   .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
   .play-btn { background: var(--accent); color: var(--panel); }
@@ -388,6 +392,7 @@
     <div class="unified-action-row" style="margin-bottom:14px;">
       <button class="action-btn" id="tp-ansPlayTop">🎵 正解高音</button>
       <button class="action-btn" id="tp-ansPlayBottom">🎵 正解低音</button>
+      <button class="action-btn exp-btn" id="tp-ansExport" title="導出正解音檔">⬇️</button>
     </div>
     <div class="review-label">你的作答（紅色為錯誤音符）：</div>
     <div class="review-staff"><div id="tp-ansUser"></div></div>
@@ -422,6 +427,10 @@
     <h1>錯題本</h1>
     <p class="subtitle">收錄答錯的兩聲部題，重整或關閉後仍會保留。可分別聆聽你的作答與正解，並對照紅色標錯音符。</p>
     <div id="tp-reviewList"></div>
+      <div class="rv-speed js-review-links">
+        <div class="rv-speed-label">🎵 播放速度　<span id="tp-rvBpmVal">80</span> BPM</div>
+        <input type="range" id="tp-rvBpm" class="bpm-slider" min="40" max="160" value="80">
+      </div>
       <div class="js-review-links" style="margin-top:20px;">
         <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
         <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
@@ -558,13 +567,46 @@ function scrollReviewToBottom(pageId){
   }catch(e){}
 }
 
+  /* ===== 錯題本的播放速度（v.94）=====
+     錯題本沒有設定頁，所以在頁面底部放一根拉桿，整頁共用一個速度。
+     每一題原本存了當時的 BPM，這裡一律以拉桿的值覆寫。
+     設定記在 localStorage，每個練習各自獨立（節奏與四部和聲的合適速度差很多）。 */
+  var RV_BPM_KEY = 'earTrainer.settings.reviewBpm.twopart';
+  var RV_BPM_DEFAULT = 80;
+  function reviewBpm(){
+    try{
+      var v = parseInt(localStorage.getItem(RV_BPM_KEY), 10);
+      return (v >= 20 && v <= 240) ? v : RV_BPM_DEFAULT;
+    }catch(e){ return RV_BPM_DEFAULT; }
+  }
+  /* 播放錯題時用這個包一層，取代題目裡存的 bpm */
+  function withReviewBpm(item){
+    if(!item) return item;
+    var o = {};
+    for(var k in item){ if(Object.prototype.hasOwnProperty.call(item, k)) o[k] = item[k]; }
+    o.bpm = reviewBpm();
+    return o;
+  }
+  function initReviewBpm(){
+    var sl = document.getElementById('tp-rvBpm');
+    var lab = document.getElementById('tp-rvBpmVal');
+    if(!sl) return;
+    sl.value = reviewBpm();
+    if(lab) lab.textContent = sl.value;
+    sl.oninput = function(){
+      if(lab) lab.textContent = sl.value;
+      try{ localStorage.setItem(RV_BPM_KEY, sl.value); }catch(e){}
+    };
+  }
+
+
 function showPage(pageId) {
   if (window.tpStopAll) window.tpStopAll();
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
   if (pageId === 'tp-settings') { document.getElementById('pageTpSettings').classList.add('active'); if(window.tpModule) window.tpModule.refreshReviewCount(); }
   else if (pageId === 'tp-practice') document.getElementById('pageTpPractice').classList.add('active');
   else if (pageId === 'tp-answer') document.getElementById('pageTpAnswer').classList.add('active');
-  else if (pageId === 'tp-review') { document.getElementById('pageTpReview').classList.add('active'); if(window.tpModule) window.tpModule.renderReviewPage(); }
+  else if (pageId === 'tp-review') { document.getElementById('pageTpReview').classList.add('active'); if(window.tpModule) window.tpModule.renderReviewPage(); initReviewBpm(); }
 }
 
 (function(){
@@ -1190,6 +1232,51 @@ function showPage(pageId) {
     return ev;
   }
 
+  /* ===== 導出正解音檔（v.94）=====
+     兩聲部要有標準音 A 與預備拍，只導出雙軌（不分軌）。
+     參數完全比照 playStaticGrand，速度用 item.bpm。 */
+  function buildExportEvents(seqT, seqB, pitchT, pitchB, item, tieT, tieB){
+    if(!seqT || !seqT.length) return null;
+    const TUNING_SEC = 2.0, GAP_SEC = 1.0;
+    const secPerUnit = 60 / item.bpm;
+    const numerator = parseInt(item.meter.split('/')[0], 10);
+    const secPer16th = item.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+    const beatUnits = item.meterType === 'simple' ? 4 : 6;
+    const ev = [{ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }];
+    let base = TUNING_SEC + GAP_SEC;
+    for(let i = 0; i < numerator; i++){
+      const strong = (item.meterType === 'simple') ? (i === 0) : (i % 3 === 0);
+      ev.push({ type: 'click', time: base + i * secPerUnit, freq: strong ? 1000 : 700, gain: 0.2 });
+    }
+    base += numerator * secPerUnit;
+    const bpb = item.beatsPerBar || (item.meterType === 'compound' ? numerator / 3 : numerator);
+    const track = function(seq, pitchArray, tieArr){
+      let t = base;
+      buildVoiceEvents(seq, pitchArray, tieArr || [], beatUnits, bpb).forEach(function(e){
+        if(e.midi !== null) ev.push({ midi: e.midi, time: t, duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, 2) });
+        t += e.len * secPer16th;
+      });
+    };
+    track(seqT, pitchT, tieT);
+    track(seqB, pitchB, tieB);
+    return ev;
+  }
+
+  async function doExportAudio(seqT, seqB, pitchT, pitchB, item, tieT, tieB){
+    const btn = document.getElementById('tp-ansExport');
+    const ev = buildExportEvents(seqT, seqB, pitchT, pitchB, item, tieT, tieB);
+    if(!ev || btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    try{
+      await AudioExport.exportEvents(ev, '兩聲部', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
+        onProgress: function(pr){ btn.textContent = Math.round(pr * 100) + '%'; }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
   /* which: 'both'（預設）／'top'／'bottom' —— 解答頁可以單獨聆聽某一個聲部 */
   function playStaticGrand(seqT, seqB, pitchT, pitchB, item, tieT, tieB, which) {
     window.tpStopAll();
@@ -1736,6 +1823,7 @@ function showPage(pageId) {
       document.getElementById('tp-ansPlayCorrect').onclick = function(){ playStaticGrand(cSeqT, cSeqB, cPitT, cPitB, item, cTie.top, cTie.bottom); };
       document.getElementById('tp-ansPlayTop').onclick = function(){ playStaticGrand(cSeqT, cSeqB, cPitT, cPitB, item, cTie.top, cTie.bottom, 'top'); };
       document.getElementById('tp-ansPlayBottom').onclick = function(){ playStaticGrand(cSeqT, cSeqB, cPitT, cPitB, item, cTie.top, cTie.bottom, 'bottom'); };
+      document.getElementById('tp-ansExport').onclick = function(){ doExportAudio(cSeqT, cSeqB, cPitT, cPitB, item, cTie.top, cTie.bottom); };
       return true;
     },
 
@@ -2026,8 +2114,8 @@ function showPage(pageId) {
           <div class="review-staff"><div id="tp-rev-correct-${uid}"></div></div>
         `;
         list.appendChild(box);
-        box.querySelector('.tp-rev-user').onclick = () => playStaticGrand(item.uSeqT, item.uSeqB, item.uPitchT, item.uPitchB, item, (item.uTie||{}).top, (item.uTie||{}).bottom);
-        box.querySelector('.tp-rev-correct').onclick = () => playStaticGrand(item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, item, (item.cTie||{}).top, (item.cTie||{}).bottom);
+        box.querySelector('.tp-rev-user').onclick = () => playStaticGrand(item.uSeqT, item.uSeqB, item.uPitchT, item.uPitchB, withReviewBpm(item), (item.uTie||{}).top, (item.uTie||{}).bottom);
+        box.querySelector('.tp-rev-correct').onclick = () => playStaticGrand(item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, withReviewBpm(item), (item.cTie||{}).top, (item.cTie||{}).bottom);
         setTimeout(() => {
           renderStaticGrand(`tp-rev-user-${uid}`, item.uSeqT, item.uSeqB, item.uPitchT, item.uPitchB, item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, item, item.uTie, item.cTie);
           renderStaticGrand(`tp-rev-correct-${uid}`, item.cSeqT, item.cSeqB, item.cPitchT, item.cPitchB, null, null, null, null, item, item.cTie, null);
@@ -2200,6 +2288,7 @@ function showPage(pageId) {
       document.getElementById('tp-ansPlayCorrect').onclick = () => { const it=this._ansItem; if(it) playStaticGrand(it.cSeqT, it.cSeqB, it.cPitchT, it.cPitchB, it, (it.cTie||{}).top, (it.cTie||{}).bottom); };
       document.getElementById('tp-ansPlayTop').onclick = () => { const it=this._ansItem; if(it) playStaticGrand(it.cSeqT, it.cSeqB, it.cPitchT, it.cPitchB, it, (it.cTie||{}).top, (it.cTie||{}).bottom, 'top'); };
       document.getElementById('tp-ansPlayBottom').onclick = () => { const it=this._ansItem; if(it) playStaticGrand(it.cSeqT, it.cSeqB, it.cPitchT, it.cPitchB, it, (it.cTie||{}).top, (it.cTie||{}).bottom, 'bottom'); };
+      document.getElementById('tp-ansExport').onclick = () => { const it=this._ansItem; if(it) doExportAudio(it.cSeqT, it.cSeqB, it.cPitchT, it.cPitchB, it, (it.cTie||{}).top, (it.cTie||{}).bottom); };
       document.getElementById('tp-ansNextBtn').onclick = () => {
         ensureAudio(); window.tpStopAll();
         this.userSeq.top = Array(this.totalBeats).fill('placeholder'); this.userSeq.bottom = Array(this.totalBeats).fill('placeholder');

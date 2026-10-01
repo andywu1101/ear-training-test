@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v93'; // v.93：可切換的鋼琴音色（Salamander）
+const CACHE_NAME = 'ear-training-shell-v94'; // v.94：導出正解音檔、錯題本速度拉桿
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
@@ -23,6 +23,8 @@ const STATIC_ASSETS = [
   './vexflow-min.js',
   './soundfont-player.min.js',
   './piano-engine.js',
+  './audio-export.js',
+  './lame.min.js',
   './acoustic_grand_piano-mp3.js',
   './salamander-piano-mp3.js',
   './icon-192.png',

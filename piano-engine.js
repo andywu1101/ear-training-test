@@ -210,8 +210,137 @@
     return m;
   }
 
+  /* ---------- 導出用：把一串音符離線算成音訊 ----------
+     導出不能用「邊播邊錄」（要等完整播放時間），而是用 OfflineAudioContext 重算一次。
+     兩套音色都支援：AudioBuffer 可以跨 context 共用，只要取樣率相同。 */
+
+  /* 把原本音色的 data URI 解碼成 AudioBuffer。
+     只解碼這一題用得到的音，不必整組 88 個都解（導出會快很多）。 */
+  var musyngData = null;
+  async function musyngBuffers(ctx, midis) {
+    if (!musyngData) {
+      if (!(global.MIDI && global.MIDI.Soundfont && global.MIDI.Soundfont.acoustic_grand_piano)) {
+        await loadScript(MUSYNG.file);
+      }
+      musyngData = global.MIDI.Soundfont.acoustic_grand_piano;
+    }
+    var byMidi = {};
+    Object.keys(musyngData).forEach(function (n) {
+      var mi = midiOfName(n);
+      if (mi !== null) byMidi[mi] = musyngData[n];
+    });
+    var avail = Object.keys(byMidi).map(Number);
+    var need = {};
+    midis.forEach(function (m) {
+      var best = avail[0];
+      avail.forEach(function (k) { if (Math.abs(k - m) < Math.abs(best - m)) best = k; });
+      need[best] = 1;
+    });
+    var out = {};
+    var keys = Object.keys(need).map(Number);
+    for (var i = 0; i < keys.length; i++) {
+      try { out[keys[i]] = await ctx.decodeAudioData(dataUriToBuf(byMidi[keys[i]])); } catch (e) {}
+    }
+    return out;
+  }
+
+  async function salamanderBuffers(ctx, midis) {
+    if (!salData) {
+      await loadScript(SAL.file);
+      salData = (global.MIDI && global.MIDI.Soundfont && global.MIDI.Soundfont.salamander_piano) || null;
+      if (!salData) throw new Error('Salamander 音色資料不完整');
+    }
+    var byMidi = {};
+    Object.keys(salData).forEach(function (n) {
+      var mi = midiOfName(n);
+      if (mi !== null) byMidi[mi] = salData[n];
+    });
+    var avail = Object.keys(byMidi).map(Number);
+    var need = {};
+    midis.forEach(function (m) {
+      var best = avail[0];
+      avail.forEach(function (k) { if (Math.abs(k - m) < Math.abs(best - m)) best = k; });
+      need[best] = 1;
+    });
+    var out = {};
+    var keys = Object.keys(need).map(Number);
+    for (var i = 0; i < keys.length; i++) {
+      try { out[keys[i]] = await ctx.decodeAudioData(dataUriToBuf(byMidi[keys[i]])); } catch (e) {}
+    }
+    return out;
+  }
+
+  /* events: [{ midi, time, duration, gain }]，time 與 duration 單位是秒。
+     回傳算好的 AudioBuffer。音色依使用者目前的設定，加工也完全一致——
+     所以導出的檔案跟他在 App 裡聽到的一模一樣。 */
+  async function renderOffline(events, opts) {
+    opts = opts || {};
+    var kit = opts.kit || currentKit();
+    var tail = 1.0;                       // 尾端留一點空間給最後一個音的 release
+    var total = 0;
+    events.forEach(function (e) {
+      var end = (e.type === 'click')
+        ? (e.time || 0) + 0.1
+        : (e.time || 0) + (e.duration || 3.3) + RELEASE;
+      if (end > total) total = end;
+    });
+    total += tail;
+
+    var OfflineCtx = global.OfflineAudioContext || global.webkitOfflineAudioContext;
+    var ctx = new OfflineCtx(2, Math.ceil(44100 * total), 44100);
+
+    /* 預備拍的節拍器是振盪器不是鋼琴音，這裡一起畫進去。
+       參數與各練習頁即時播放時完全相同（三角波、重拍 1000 Hz、弱拍 700 Hz）。 */
+    var clicks = events.filter(function (e) { return e.type === 'click'; });
+    clicks.forEach(function (e) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = e.freq || 700;
+      var t = e.time || 0;
+      g.gain.setValueAtTime(e.gain == null ? 0.2 : e.gain, t);
+      g.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + 0.05);
+    });
+
+    events = events.filter(function (e) { return e.type !== 'click'; });
+    var midis = events.map(function (e) { return e.midi; });
+
+    if (kit === 'salamander') {
+      var buffers = await salamanderBuffers(ctx, midis);
+      var gains = {};
+      Object.keys(buffers).forEach(function (k) { gains[k] = normGain(buffers[k]); });
+      var piano = new SalamanderPiano(ctx, buffers, gains);
+      events.forEach(function (e) {
+        piano.play(e.midi, e.time || 0, { duration: e.duration, gain: e.gain });
+      });
+    } else {
+      /* 原本的音色：沒有任何加工，直接排程，與 soundfont-player 的行為一致 */
+      var bufs = await musyngBuffers(ctx, midis);
+      var keys = Object.keys(bufs).map(Number);
+      events.forEach(function (e) {
+        var best = keys[0];
+        keys.forEach(function (k) { if (Math.abs(k - e.midi) < Math.abs(best - e.midi)) best = k; });
+        if (!bufs[best]) return;
+        var src = ctx.createBufferSource();
+        src.buffer = bufs[best];
+        src.playbackRate.value = Math.pow(2, (e.midi - best) / 12);
+        var g = ctx.createGain();
+        var base = (e.gain == null ? 3.5 : e.gain);
+        var t = e.time || 0, d = e.duration || 3.3;
+        g.gain.setValueAtTime(base, t);
+        g.gain.setValueAtTime(base, t + d);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d + RELEASE);
+        src.connect(g); g.connect(ctx.destination);
+        src.start(t); src.stop(t + d + RELEASE + 0.02);
+      });
+    }
+    return await ctx.startRendering();
+  }
+
   global.PianoEngine = {
     load: load,
+    renderOffline: renderOffline,
     currentKit: currentKit,
     setKit: setKit,
     DEFAULT_KIT: DEFAULT_KIT,

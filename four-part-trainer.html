@@ -19,6 +19,7 @@
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
+<script src="audio-export.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -89,6 +90,8 @@
   .mode-btn:hover{ border-color: var(--accent-line); color: var(--ink); }
   .mode-btn.active{ background: var(--ink); border-color: var(--ink); color: var(--panel); }
   .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); color: var(--ink); cursor: pointer; }
+  .rv-speed{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 16px; margin:18px 0 0; }
+  .rv-speed-label{ font-size:13px; color:var(--ink-soft); margin-bottom:8px; }
   .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
 
   .level-tabs{ display:flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
@@ -129,6 +132,7 @@
   .fpt-play-sticky .play-btn:disabled { box-shadow: none; }
   .action-btn, .play-btn { font-size: 14px; font-weight: 600; padding: 12px 20px; border-radius: 999px; cursor: pointer; transition: all 0.2s; border: none; }
   .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
+  .exp-btn{ flex:0 0 auto; min-width:52px; padding-left:12px; padding-right:12px; }
   .play-btn { background: var(--accent); color: var(--panel); box-shadow: 0 4px 12px rgba(51,65,92,0.2); }
   .play-btn:disabled, .action-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
   .play-caption { font-size: 13px; color: var(--ink-soft); font-weight: 600; text-align: center; }
@@ -290,6 +294,10 @@
     <p class="subtitle">這裡收錄你答錯的題目，可以重播聆聽、對照正解，反覆複習加強。</p>
     <div class="review-section" id="fpt-reviewSection" style="display:block;">
       <div id="fpt-reviewList"></div>
+      <div class="rv-speed js-review-links">
+        <div class="rv-speed-label">🎵 播放速度　<span id="fpt-rvBpmVal">64</span> BPM</div>
+        <input type="range" id="fpt-rvBpm" class="bpm-slider" min="40" max="120" value="64">
+      </div>
       <div class="js-review-links" style="margin-top:20px;">
         <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
         <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
@@ -415,6 +423,7 @@
     <div class="unified-action-row" style="margin-top:10px; margin-bottom:12px;">
       <button class="play-btn" id="btn-play-all-ans" disabled>🔊 聽完整正解</button>
       <button class="play-btn" id="btn-play-arp-ans" disabled>🎵 聽分解正解</button>
+      <button class="play-btn exp-btn" id="fpt-ansExport" title="導出正解音檔">⬇️</button>
     </div>
 
     <div class="review-label">你的作答 (紅色為錯誤)：</div>
@@ -536,6 +545,39 @@ function scrollReviewToBottom(pageId){
   }catch(e){}
 }
 
+  /* ===== 錯題本的播放速度（v.94）=====
+     錯題本沒有設定頁，所以在頁面底部放一根拉桿，整頁共用一個速度。
+     每一題原本存了當時的 BPM，這裡一律以拉桿的值覆寫。
+     設定記在 localStorage，每個練習各自獨立（節奏與四部和聲的合適速度差很多）。 */
+  var RV_BPM_KEY = 'earTrainer.settings.reviewBpm.fourpart';
+  var RV_BPM_DEFAULT = 64;
+  function reviewBpm(){
+    try{
+      var v = parseInt(localStorage.getItem(RV_BPM_KEY), 10);
+      return (v >= 20 && v <= 240) ? v : RV_BPM_DEFAULT;
+    }catch(e){ return RV_BPM_DEFAULT; }
+  }
+  /* 播放錯題時用這個包一層，取代題目裡存的 bpm */
+  function withReviewBpm(item){
+    if(!item) return item;
+    var o = {};
+    for(var k in item){ if(Object.prototype.hasOwnProperty.call(item, k)) o[k] = item[k]; }
+    o.bpm = reviewBpm();
+    return o;
+  }
+  function initReviewBpm(){
+    var sl = document.getElementById('fpt-rvBpm');
+    var lab = document.getElementById('fpt-rvBpmVal');
+    if(!sl) return;
+    sl.value = reviewBpm();
+    if(lab) lab.textContent = sl.value;
+    sl.oninput = function(){
+      if(lab) lab.textContent = sl.value;
+      try{ localStorage.setItem(RV_BPM_KEY, sl.value); }catch(e){}
+    };
+  }
+
+
 function showPage(pageId) {
   if (window.fptStopAll) window.fptStopAll();
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
@@ -546,7 +588,7 @@ function showPage(pageId) {
   else if (pageId === 'fpt-answer') document.getElementById('pageFptAnswer').classList.add('active');
   else if (pageId === 'fpt-review') {
     document.getElementById('pageFptReview').classList.add('active');
-    if (window.fptModule) window.fptModule.renderReviewPage();
+    if (window.fptModule) window.fptModule.renderReviewPage(); initReviewBpm();
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -2585,6 +2627,41 @@ window.addEventListener('resize', setVH); setVH();
       }
     },
 
+    /* ===== 導出正解音檔（v.94）=====
+       完全比照「完整四部」的播放方式——包含低音提早 10 ms 與 BASS_GAIN 加成，
+       速度也用目前設定的 bpm，所以導出的檔案跟按下播放聽到的一樣。
+       四部和聲要有標準音 A。 */
+    buildExportEvents: function() {
+      if (!this.questionVoicings || !this.questionVoicings.length) return null;
+      var TUNING_SEC = 2.0, GAP_SEC = 1.0;
+      var secPerBeat = 60 / this.bpm;
+      var measureDur = 4 * secPerBeat;
+      var ev = [{ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }];
+      var t = TUNING_SEC + GAP_SEC;
+      this.questionVoicings.forEach(function(v) {
+        var s0 = v[0], a0 = v[1], tn = v[2], b0 = v[3];
+        ev.push({ midi: b0, time: Math.max(0, t - 0.010), duration: measureDur * 0.95, gain: BASS_GAIN });
+        ev.push({ midi: tn, time: t, duration: measureDur * 0.95, gain: 3.5 });
+        ev.push({ midi: a0, time: t, duration: measureDur * 0.95, gain: 3.5 });
+        ev.push({ midi: s0, time: t, duration: measureDur * 0.95, gain: 3.5 });
+        t += measureDur;
+      });
+      return ev;
+    },
+
+    exportAudio: function() {
+      var btn = document.getElementById('fpt-ansExport');
+      var ev = this.buildExportEvents();
+      if (!ev || btn.disabled) return;
+      btn.disabled = true; var old = btn.textContent;
+      AudioExport.exportEvents(ev, '四部和聲', {
+        onStage: function (st) { btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
+        onProgress: function (pr) { btn.textContent = Math.round(pr * 100) + '%'; }
+      }).then(function(){ btn.textContent = '✓'; })
+        .catch(function(){ btn.textContent = '✗'; })
+        .then(function(){ setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600); });
+    },
+
     playProgression: function(modeStr) {
       if (!pianoInst || this.isPlaying) return;
       this.isPlaying = true; 
@@ -2642,8 +2719,9 @@ window.addEventListener('resize', setVH); setVH();
         this.isPlaying = true;
         const ctx = ensureAudio();
         // 錯題本重播：不播標準音、不停頓，直接聆聽和聲
+        // 速度用錯題本底部拉桿的設定，整頁共用（不用題目存下來的 bpm）
         let t = ctx.currentTime + 0.1;
-        let secPerBeat = 60 / this.bpm;
+        let secPerBeat = 60 / reviewBpm();
         let measureDur = 4 * secPerBeat;
 
         item.questionVoicings.forEach((v) => {
@@ -2901,6 +2979,7 @@ window.addEventListener('resize', setVH); setVH();
       document.getElementById('btn-play-arp').onclick = () => { if(this.mode==='test'&&this.testSession)this.testSession.replaysLeft--; this.playProgression('arpeggio'); };
       // 解答頁的播放按鈕（不受測驗次數限制，可自由聆聽正解）
       document.getElementById('btn-play-all-ans').onclick = () => this.playProgression('block');
+      document.getElementById('fpt-ansExport').onclick = () => this.exportAudio();
       document.getElementById('btn-play-arp-ans').onclick = () => this.playProgression('arpeggio');
 
       document.getElementById('btn-case-switch').onclick = (e) => {

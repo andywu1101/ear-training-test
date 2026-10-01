@@ -16,6 +16,7 @@
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
+<script src="audio-export.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -84,6 +85,7 @@
   .unified-action-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
   .action-btn, .play-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s; }
   .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
+  .exp-btn{ flex:0 0 auto; min-width:52px; padding-left:12px; padding-right:12px; }
   .play-btn, .btn-submit { background: var(--accent); color: var(--panel); border: none; }
   .play-btn:disabled, .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; background: var(--ink-soft); }
   .play-caption { font-size: 12px; color: var(--ink-soft); font-weight: 600; text-align: center; }
@@ -316,6 +318,7 @@
       <button class="play-btn" id="ps-ansPlayCorrect">🎧 聽正確音堆</button>
       <button class="action-btn" id="ps-ansPlayArp">🔁 分解琶音</button>
       <button class="action-btn" id="ps-ansPlayMine" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽我寫的</button>
+      <button class="action-btn exp-btn" id="ps-ansExport" title="導出正解音檔">⬇️</button>
       <button class="action-btn" id="ps-ansTuning" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
     </div>
 
@@ -911,6 +914,36 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     midis.forEach(m => pianoInst.play(m, t, { duration: STACK_SUSTAIN, gain: gainFor(m, n) }));
     if(onDone) pendingTimers.push(setTimeout(onDone, (STACK_SUSTAIN + 0.2) * 1000));
   }
+  /* ===== 導出正解音檔（v.94）=====
+     音堆練習要有標準音 A，只導出齊奏（不含分解琶音）。 */
+  const EXPORT_TUNING_SEC = 2.0;
+  const EXPORT_GAP_SEC = 1.0;
+
+  function buildExportEvents(){
+    const midis = (window.psModule && psModule.correctMidis) ? psModule.correctMidis : [];
+    if(!midis.length) return null;
+    const ev = [{ midi: 69, time: 0, duration: EXPORT_TUNING_SEC, gain: 3.5 }];
+    const t = EXPORT_TUNING_SEC + EXPORT_GAP_SEC;
+    const n = midis.length;
+    midis.forEach(m => ev.push({ midi: m, time: t, duration: STACK_SUSTAIN, gain: gainFor(m, n) }));
+    return ev;
+  }
+
+  async function doExportAudio(){
+    const btn = document.getElementById('ps-ansExport');
+    const ev = buildExportEvents();
+    if(!ev || btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    try{
+      await AudioExport.exportEvents(ev, '音堆', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
+        onProgress: function(pr){ btn.textContent = Math.round(pr * 100) + '%'; }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
   function playArpeggio(midis, onDone){
     const ctx = ensureAudio();
     if(!ctx || !pianoInst || !midis.length) return;
@@ -1285,6 +1318,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
     document.getElementById('ps-ansNextBtn').onclick = () => { showPage('ps-practice'); psModule.newQuestion(); };
     document.getElementById('ps-ansPlayCorrect').onclick = () => { window.psStopAll(); playMidis(psModule.correctMidis); };
+    document.getElementById('ps-ansExport').onclick = doExportAudio;
     document.getElementById('ps-ansPlayArp').onclick = () => { window.psStopAll(); playArpeggio(psModule.correctMidis); };
     document.getElementById('ps-ansPlayMine').onclick = () => { window.psStopAll(); playMidis(psModule.user.map(midiOf)); };
     document.getElementById('ps-ansTuning').onclick = () => { ensureAudio(); playTuningA(); };
