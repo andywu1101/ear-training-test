@@ -162,6 +162,7 @@
   .review-section h2{ font-family: var(--font-display); font-size: 20px; font-weight: 600; margin: 0 0 6px; }
   .review-section .hint{ color: var(--ink-soft); font-size: 13px; margin: 0 0 18px; }
   .review-empty{ color: var(--ink-soft); font-size: 14px; padding: 28px; text-align:center; border: 1px dashed var(--panel-border); border-radius: 12px; }
+  .dict-detail{ margin-top:18px; text-align:left; }
   .review-item{ display:flex; align-items:center; gap: 16px; padding: 16px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; margin-bottom: 12px; flex-wrap: wrap; }
   .review-staff-mini{ flex-shrink: 0; }
   .review-meta{ flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 6px; }
@@ -348,10 +349,14 @@
       <div class="test-summary" id="int-dictSummary" style="display:none;">
         <div class="test-score-big" id="int-dictScore">0 / 10</div>
         <div class="test-score-label">聽寫結束</div>
-        <p>答錯的題目已收進「錯題本」（並標註題號），可從設定頁的錯題本入口對照正解。</p>
+        <p>答錯的題目已收進「錯題本」（並標註題號）。下方可逐題對照正解。</p>
+        <div id="int-dictDetail" class="dict-detail"></div>
         <button class="test-again-btn" id="int-dictExport">⬇️ 導出整段音檔</button>
         <button class="test-again-btn" id="int-dictAgainBtn">🔁 再聽寫一次</button>
+        <button class="test-back-btn js-review-links" onclick="showPage('int-review')">📕 本項錯題本</button>
+        <button class="test-back-btn js-review-links" onclick="location.href='index.html#hub-practice'">📘 錯題本目錄</button>
         <button class="test-back-btn" onclick="showPage('int-settings')">↩ 重新調整設定</button>
+        <button class="test-back-btn" onclick="location.href='index.html#menu'">🏠 回選單</button>
       </div>
 
       <div id="int-questionPanel">
@@ -730,6 +735,42 @@ function updateStaffHeader(pageId){
   /* 連續聽寫的整段導出：完全比照「播放整段」的排程——
      每題播三次、三次之間 CHORD_TRIPLE_GAP，題與題之間 DICT_PAUSE_BETWEEN_Q。
      題數依使用者在設定頁選的數量，不固定 10 題。前面一樣先給標準音 A。 */
+  /* 連續聽寫提交後的逐題對照。
+     版面與模擬測驗的考卷回顧一致：小譜例 ＋ 你的答案／正解 ＋ 播放鈕。
+     ⚠ dictSession 與 QUALITIES 宣告在內層作用域，這裡看不到，必須由呼叫端傳進來。 */
+  function renderDictDetail(questions, labels){
+    const box = document.getElementById('int-dictDetail');
+    if(!box || !questions || !questions.length) return;
+    box.innerHTML = '';
+    questions.forEach((q, i) => {
+      const slot = document.getElementById('int-slot-' + i);
+      const tag = slot ? slot.querySelector('.dict-tag') : null;
+      const uk = tag ? tag.dataset.key : null;
+      const ok = (uk === q.qualityKey);
+
+      const row = document.createElement('div'); row.className = 'review-item';
+      const mini = document.createElement('div'); mini.className = 'review-staff-mini';
+      row.appendChild(mini);
+      try{ renderGrandStaff(mini, q.root, q.intervals, q.steps, 210, 210); }catch(e){}
+
+      const meta = document.createElement('div'); meta.className = 'review-meta';
+      meta.innerHTML = '<div class="q-num-badge">【第 ' + (i+1) + ' 題】' + (ok ? '✓' : '✗') + '</div>' +
+        '<div class="review-answers">你的答案：<span class="' + (ok ? 'right-ans' : 'wrong-ans') + '">' +
+        (uk ? (labels[uk] || uk) : '（未作答）') + '</span><br>正解答案：<span class="right-ans">' +
+        (labels[q.qualityKey] || q.qualityKey) + '</span></div>';
+
+      const actions = document.createElement('div'); actions.className = 'review-actions';
+      const b1 = document.createElement('button'); b1.className = 'icon-btn'; b1.textContent = '🔊 和聲';
+      b1.onclick = function(){ window.stopAllPlayback(); playBlock(q.root, q.intervals, 1); };
+      const b2 = document.createElement('button'); b2.className = 'icon-btn'; b2.textContent = '🔁 上行＋和聲';
+      b2.onclick = function(){ window.stopAllPlayback(); playAscendingHarmonic(q.root, q.intervals); };
+      actions.appendChild(b1); actions.appendChild(b2);
+
+      row.appendChild(meta); row.appendChild(actions);
+      box.appendChild(row);
+    });
+  }
+
   function buildDictExportEvents(questions){
     if(!questions || !questions.length) return null;
     const ev = [{ midi: 69, time: 0, duration: EXPORT_TUNING_SEC, gain: 3.5 }];
@@ -1166,6 +1207,8 @@ function updateStaffHeader(pageId){
             if(isC) cor++; else addToRev(q, uk, i+1);
           });
           dictSession.submitted = true; document.getElementById('int-dictPanel').style.display='none'; document.getElementById('int-dictSummary').style.display='block'; document.getElementById('int-dictScore').textContent=`${cor} / ${dictSession.questions.length}`;
+          (function(){ var lb = {}; Object.keys(QUALITIES).forEach(function(k){ lb[k] = QUALITIES[k].label; });
+            renderDictDetail(dictSession.questions, lb); })();
         };
         document.getElementById('int-dictExport').onclick = () => { if(dictSession) doExportDict(dictSession.questions); };
         document.getElementById('int-dictAgainBtn').onclick = () => {
