@@ -1,0 +1,2397 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>單旋律曲調 - 音樂聽力練習</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="聽力訓練">
+<meta name="theme-color" content="#33415c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
+<script src="soundfont-player.min.js"></script>
+<script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
+<script src="piano-engine.js"></script>
+<script src="audio-export.js"></script>
+<script src="sheet-export.js"></script>
+<script src="export-menu.js"></script>
+<script src="vexflow-min.js"></script>
+<script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
+<style>
+  :root{
+    --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
+    --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
+    --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper); color: var(--ink); font-family: var(--font-body); }
+  .wrap { height: 100%; display: flex; flex-direction: column; max-width: 820px; margin: 0 auto; width: 100%; }
+
+  .page-view { display: none; height: 100%; flex-direction: column; animation: fadeIn 0.2s ease-out; }
+  .page-view.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ================= 設定頁 / 解答頁 / 錯題本頁（可捲動） ================= */
+  #pageMelSettings, #pageMelAnswer, #pageMelReview { overflow-y: auto; padding: 20px 16px 64px; }
+  .nav-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .nav-back-btn, .reset-cache-btn {
+    display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid var(--panel-border); background: var(--panel); color: var(--ink); cursor: pointer; text-decoration: none;
+  }
+  .reset-cache-btn { color: #8a6d20; border-color: #ffd885; background: #fff8e6; margin-left: 8px; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: 28px; margin: 0 0 8px; }
+  .subtitle { color: var(--ink-soft); font-size: 13.5px; margin: 0 0 20px; line-height: 1.5; }
+
+  .switch-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .switch-group { display: flex; flex-direction: column; gap: 8px; }
+  .switch-group-label { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+  .switch-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mode-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 10px; background: transparent; border: 1px solid var(--panel-border); color: var(--ink-soft); cursor: pointer; }
+  .mode-btn.active { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+
+  .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); cursor: pointer; }
+  .rv-speed{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 16px; margin:18px 0 0; }
+  .rv-speed-label{ font-size:13px; color:var(--ink-soft); margin-bottom:8px; }
+  .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
+
+  .pattern-grid-header { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; }
+  .exp-mini{ padding-left:10px; padding-right:10px; min-width:44px; }
+  .select-all-btn { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--panel-border); background: var(--panel); font-weight: bold; cursor: pointer; }
+  .pattern-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 24px; }
+  .pattern-item { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; border: 2px solid var(--panel-border); border-radius: 10px; padding: 4px; cursor: pointer; transition: 0.1s; height: 60px; overflow: hidden; }
+  .pattern-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .pattern-item svg { pointer-events: none; }
+
+  .start-big-btn { width: 100%; font-weight: 700; font-size: 16px; padding: 16px; border-radius: var(--radius); background: var(--accent); color: var(--panel); border: none; cursor: pointer; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(51,65,92,0.2); transition: filter 0.2s; }
+  .start-big-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .review-entry-btn{ width:100%; padding:14px; border-radius:999px; font-weight:700; font-size:15px; background:transparent; color:var(--ink); border:1px solid var(--ink); cursor:pointer; margin-bottom:20px; }
+  .review-entry-btn:hover, .review-entry-btn:active{ background:var(--ink); color:var(--panel); }
+
+  /* ================= 作答頁 (上下分層) ================= */
+  .practice-top-fixed { flex: 0 0 auto; padding: 12px 16px; background: var(--paper); z-index: 10; border-bottom: 1px solid var(--panel-border); box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+  .practice-bottom-scroll { flex: 1 1 auto; overflow-y: auto; padding: 16px; background: var(--panel); }
+
+  .top-bar-practice { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .practice-status-badge { font-family: var(--font-mono); font-size: 12px; background: var(--panel); border: 1px solid var(--panel-border); padding: 6px 12px; border-radius: 999px; color: var(--ink-soft); }
+  .score-box { text-align: right; font-family: var(--font-mono); }
+  .score-box .num { font-size: 18px; font-weight: 700; color: var(--accent); line-height: 1; }
+
+  .staff-scroll-container { overscroll-behavior-x: contain; width: 100%; background: #fff; border: 1px solid var(--hairline); border-radius: 12px; padding: 10px 4px; box-shadow: inset 0 0 8px rgba(0,0,0,0.02); margin-bottom: 8px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+  .staff-scroll-container::-webkit-scrollbar { height: 6px; }
+  .staff-scroll-container::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
+
+  .unified-action-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .exp-btn{ flex:0 0 auto; min-width:52px; padding-left:12px; padding-right:12px; }
+  .action-btn, .play-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s; }
+  .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
+  .play-btn, .btn-submit { background: var(--accent); color: var(--panel); border: none; }
+  .play-btn:disabled, .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; background: var(--ink-soft); }
+  .play-caption { font-size: 12px; color: var(--ink-soft); font-weight: 600; text-align: center; }
+
+  /* 膠囊分頁卡設計 */
+  .editor-tabs-container { display: flex; justify-content: center; align-items: center; margin-bottom: 14px; }
+  .editor-tabs { display: inline-flex; background: var(--paper); border: 1px solid var(--panel-border); border-radius: 999px; padding: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+  .tab-btn { font-size: 13.5px; font-weight: 700; padding: 8px 22px; border-radius: 999px; border: none; background: transparent; color: var(--ink-soft); cursor: pointer; transition: all 0.15s; }
+  .tab-btn.active { background: var(--accent); color: var(--panel); box-shadow: 0 2px 8px rgba(51,65,92,0.25); }
+
+  /* 節奏鍵盤 */
+  .rhythm-keypad { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; padding-bottom: 40px; }
+  .rhythm-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 60px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); overflow: hidden; transition: all 0.1s; }
+  .rhythm-btn:active { transform: scale(0.94); border-color: var(--accent); }
+
+  /* 音高鍵盤 */
+  .pitch-keypad { display: flex; flex-direction: column; gap: 8px; max-width: 500px; margin: 0 auto; padding-bottom: 40px; }
+  .pitch-row-acc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pitch-row-notes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pitch-row-notes3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pitch-row-oct { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .p-btn { background: #fff; border: 2px solid var(--panel-border); border-radius: 12px; font-weight: 700; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); transition: 0.1s; }
+  .p-btn:active { transform: scale(0.95); border-color: var(--accent); }
+  .p-btn.acc-btn { height: 38px; font-size: 16px; background: var(--panel); }
+  .p-btn.acc-btn.active { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  .p-btn.note-btn { height: 55px; font-size: 18px; }
+  .p-btn.note-btn span { font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-top: 2px; }
+  .p-btn.oct-btn { height: 42px; font-size: 13px; background: var(--panel); }
+
+  .feedback-text { text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 6px; display: none; }
+  .feedback-text.correct { color: var(--correct); display: block; }
+  .feedback-text.wrong { color: var(--wrong); display: block; }
+  .answer-big-feedback{ font-family: var(--font-display); font-size: 22px; font-weight: 700; text-align:center; margin: 6px 0 14px; }
+  .answer-big-feedback.correct{ color: var(--correct); }
+  .answer-big-feedback.wrong{ color: var(--wrong); }
+
+  .review-section h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 12px; }
+  .review-item { background: #fff; border: 1px solid var(--panel-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .review-label { font-size: 12px; font-weight: bold; color: var(--ink-soft); margin-bottom: 4px; }
+  .review-staff { overscroll-behavior-x: contain; background: var(--panel); border-radius: 8px; padding: 10px 4px; margin-bottom: 12px; border: 1px solid var(--hairline); width: 100%; overflow-x: auto; overflow-y: hidden; }
+
+  .loading-banner { text-align: center; font-size: 12px; color: var(--ink-soft); background: #fff; padding: 8px; border-radius: 8px; margin-bottom: 16px; }
+
+  @media (min-width: 768px) {
+    .wrap { border-left: 1px solid var(--hairline); border-right: 1px solid var(--hairline); background: var(--paper); box-shadow: 0 0 20px rgba(0,0,0,0.05); }
+    .practice-top-fixed { padding: 20px 40px; }
+    .practice-bottom-scroll { padding: 20px 40px; }
+    .rhythm-keypad { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 16px; }
+    .rhythm-btn { height: 75px; }
+    .pattern-item { height: 65px; }
+    .action-btn, .play-btn { font-size: 14px; padding: 12px 20px; }
+  }
+
+  @media (orientation: landscape) and (max-width: 900px) {
+    .practice-top-fixed { padding: 4px 10px; }
+    .top-bar-practice { margin-bottom: 4px; }
+    .score-box .num { font-size: 16px; }
+    .staff-scroll-container { margin-bottom: 4px; padding: 4px; }
+    .unified-action-row { margin-bottom: 4px; }
+    .play-caption { margin-top: 0; }
+    .rhythm-btn { height: 50px; }
+    .pattern-item { height: 45px; }
+    .p-btn.note-btn { height: 45px; }
+    .p-btn.acc-btn { height: 32px; }
+  }
+
+  /* ===== 玩法說明按鈕與彈窗 ===== */
+  .help-btn{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-body); font-size:13px; font-weight:600; color:var(--accent); background:#fff; border:1px solid var(--accent-line); padding:8px 14px; border-radius:999px; cursor:pointer; touch-action:manipulation; white-space:nowrap; }
+  .help-btn:hover, .help-btn:active{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .help-modal{ display:none; position:fixed; inset:0; z-index:1000; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .help-modal.open{ display:flex; align-items:flex-start; justify-content:center; }
+  .help-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; max-width:560px; width:100%; margin:auto; padding:24px 22px 22px; box-shadow:0 20px 50px rgba(0,0,0,0.28); position:relative; animation:helpIn .2s ease-out; }
+  @keyframes helpIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+  .help-box h2{ font-family:var(--font-display); font-size:22px; font-weight:600; margin:0 30px 6px 0; }
+  .help-box h3{ font-family:var(--font-body); font-size:13.5px; font-weight:700; color:var(--accent); margin:16px 0 5px; }
+  .help-box p{ font-size:13.5px; line-height:1.8; color:var(--ink); margin:0 0 8px; }
+  .help-box .help-lead{ color:var(--ink-soft); font-size:13px; margin-bottom:4px; }
+  .help-box b{ font-weight:700; }
+  .help-close{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:50%; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink); font-size:20px; line-height:1; cursor:pointer; }
+  .help-close:hover{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .help-common{ margin-top:18px; padding-top:14px; border-top:1px dashed var(--panel-border); }
+  .help-common h3{ color:var(--ink-soft); }
+  .help-common p{ font-size:12.5px; line-height:1.75; color:var(--ink-soft); }
+  .help-foot{ margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+  .help-foot button, .help-foot .help-video{ font-family:var(--font-body); font-weight:700; font-size:14px; padding:11px 26px; border-radius:999px; cursor:pointer; touch-action:manipulation; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; }
+  .help-foot button{ background:var(--accent); color:var(--panel); border:1px solid var(--accent); }
+  .help-foot .help-video{ background:#fff; color:var(--accent); border:1px solid var(--accent); }
+  .help-foot .help-video:hover, .help-foot .help-video:active{ background:var(--accent); color:var(--panel); }
+
+  /* ===== 版面壓縮：比照四部和聲的密度（考試與練習皆適用） =====
+     重點：上方固定區可壓縮（flex:0 1 auto）、譜例設高度上限，
+     讓下方作答鍵盤拿到剩餘空間，不再被譜例擠扁。 */
+  /* 上方區不壓縮：播放列一定完整顯示；空間不足時由下方鍵盤區自行捲動 */
+  .practice-top-fixed { flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; overflow: visible; padding: 8px 10px; }
+  .practice-bottom-scroll { min-height: 0; }
+  /* 提示字沒有內容時不佔空間（播放中／播放完畢仍會顯示） */
+  .play-caption:empty { display: none; }
+  .top-bar-practice { margin-bottom: 6px; }
+  /* 不可壓縮：避免考試模式下外框被擠短而切到譜例；內容垂直置中，真的放不下才捲動 */
+  .staff-scroll-container { flex: 0 0 auto; min-height: 0; max-height: 40dvh; max-height: calc(var(--app-vh, 1vh) * 40); overflow-y: hidden; display: flex; align-items: center; padding: 4px 3px; margin-bottom: 4px; }
+  .unified-action-row { margin-bottom: 4px; }
+  .play-caption { margin-top: 0; }
+  .practice-bottom-scroll { padding: 10px 10px 14px; }
+  @media (min-width: 768px) {
+    .practice-top-fixed { padding: 10px 24px; }
+    .practice-bottom-scroll { padding: 12px 24px 16px; }
+  }
+  @media (orientation: landscape) and (max-width: 900px) {
+    .staff-scroll-container { max-height: 52dvh; max-height: calc(var(--app-vh, 1vh) * 52); }
+  }
+
+  /* ===== 電腦版（螢幕寬 ≥1024px）：放寬版面，手機不受影響 ===== */
+  @media (min-width: 1024px) {
+    .staff-scroll-container { max-height: 55vh; max-height: calc(var(--app-vh, 1vh) * 55); padding: 14px 10px; margin-bottom: 12px; }
+    .practice-top-fixed { padding: 18px 28px; }
+    .top-bar-practice { margin-bottom: 14px; }
+    .unified-action-row { margin-bottom: 10px; gap: 12px; }
+    .practice-bottom-scroll { padding: 20px 28px 28px; }
+    .action-btn, .play-btn { font-size: 15px; padding: 13px 24px; }
+    .rhythm-btn { height: 84px; }
+    .rhythm-keypad { gap: 16px; }
+    .p-btn { font-size: 16px; }
+    .pattern-item { height: 72px; }
+  }
+
+  /* 解答頁／錯題本：譜例與內容不可被 flex 壓縮（頁面本身可捲動），
+     避免內容超過一個畫面時譜例被壓扁、下方譜表被裁掉。 */
+  #pageMelAnswer > *, #pageMelReview > * { flex-shrink: 0; }
+  .review-staff { flex: 0 0 auto; }
+
+  /* 左緣 24px 是防返回手勢的攔截區，作答頁的返回鍵往右挪一點避開 */
+  #pageMelPractice .nav-back-btn { margin-left: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="loading-banner" id="loadingBanner">🎹 正在載入高音質鋼琴音色，請稍候…</div>
+
+  <div id="pageMelSettings" class="page-view active">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="location.href='index.html#menu'">← 回選單</button>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+        <button class="help-btn" onclick="openHelp('mel-helpModal')">❔ 玩法說明</button>
+        <button class="reset-cache-btn" onclick="forceResetCache()">🔄 重置快取</button>
+      </div>
+    </div>
+
+    <h1>單旋律曲調 — 設定</h1>
+    <p class="subtitle">訓練對單旋律樂句的音高與節奏記憶，支援無升降記號隨機無調性出題，以臨時記號作答。</p>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">練習模式</div>
+        <div class="switch-btns" id="mel-modeSwitch">
+          <button class="mode-btn active" data-mode="practice">練習模式</button>
+          <button class="mode-btn" data-mode="test">測驗模式 (限制次數)</button>
+        </div>
+      </div>
+      <div class="switch-group">
+        <div class="switch-group-label">譜號選項</div>
+        <div class="switch-btns" id="mel-clefSwitch">
+          <button class="mode-btn active" data-clef="treble">高音譜號 (Treble)</button>
+          <button class="mode-btn" data-clef="bass">低音譜號 (Bass)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="switch-row">
+      <div class="switch-group">
+        <div class="switch-group-label">拍號 (Meter)</div>
+        <div class="switch-btns" id="mel-meterSwitch">
+          <button class="mode-btn active" data-meter="2/4" data-type="simple">2/4</button>
+          <button class="mode-btn" data-meter="3/4" data-type="simple">3/4</button>
+          <button class="mode-btn" data-meter="4/4" data-type="simple">4/4</button>
+          <button class="mode-btn" data-meter="3/8" data-type="compound">3/8</button>
+          <button class="mode-btn" data-meter="6/8" data-type="compound">6/8</button>
+          <button class="mode-btn" data-meter="12/8" data-type="compound">12/8</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-row">
+      <div class="switch-group">
+        <div class="switch-group-label">小節數 (Bars)</div>
+        <select id="mel-barsSelect" class="select-box">
+          <option value="1">1 小節</option>
+          <option value="2" selected>2 小節</option>
+          <option value="3">3 小節</option>
+          <option value="4">4 小節 (上限)</option>
+        </select>
+      </div>
+      <div class="switch-group" id="mel-tieWrapper">
+        <div class="switch-group-label">連結線 <span id="mel-tieNote" style="color:var(--ink-soft); font-weight:400;"></span></div>
+        <div class="switch-btns" id="mel-tieSwitch">
+          <button class="mode-btn active" data-tie="off">關閉</button>
+          <button class="mode-btn" data-tie="on">開啟</button>
+        </div>
+      </div>
+      <div class="switch-group" id="testReplayWrapper" style="display:none;">
+        <div class="switch-group-label">限制重播次數</div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <select id="mel-testReplaySelect" class="select-box">
+            <option value="1">1 次</option>
+            <option value="2">2 次</option>
+            <option value="3" selected>3 次</option>
+            <option value="4">4 次</option>
+            <option value="5">5 次</option>
+            <option value="6">6 次</option>
+            <option value="custom">自定義...</option>
+          </select>
+          <input type="number" id="mel-testReplayInput" class="select-box" style="display:none; width: 75px; text-align: center; cursor: text;" min="1" max="20" value="10" placeholder="次數">
+        </div>
+      </div>
+      <div class="switch-group" style="flex:1;">
+        <div class="switch-group-label">播放速度: <span id="bpmSym">♩</span> = <span id="bpmVal">80</span> BPM</div>
+        <input type="range" id="mel-bpm" class="bpm-slider" min="40" max="160" value="80" oninput="document.getElementById('bpmVal').innerText = this.value">
+      </div>
+    </div>
+
+    <div class="pattern-grid-header">
+      <div class="switch-group-label">勾選出題節奏型 (以 1 拍為單位，無休止符)</div>
+      <button class="select-all-btn" id="selectAllBtn">☑️ 全選 / 全不選</button>
+    </div>
+
+    <div class="pattern-grid" id="settingsPatternGrid"></div>
+
+    <button class="start-big-btn" id="mel-enterBtn" disabled>🎯 開始單旋律訓練 →</button>
+    <button class="review-entry-btn" onclick="showPage('mel-review')">📕 錯題本（<span id="mel-reviewCount">0</span> 題）</button>
+  </div>
+
+  <div id="pageMelPractice" class="page-view">
+    <div class="practice-top-fixed">
+      <div class="top-bar-practice">
+        <button class="nav-back-btn" style="margin:0;" onclick="showPage('mel-settings')">← 返回設定頁</button>
+        <span class="practice-status-badge" id="mel-statusBadge">高音｜2/4拍｜2小節｜80 BPM</span>
+        <div class="score-box"><div class="num" id="mel-scoreNum">0/0</div></div>
+      </div>
+
+      <div class="staff-scroll-container" id="staffContainerOuter">
+        <div id="staffInnerWrapper" style="margin: 0 auto; display: block; position: relative; width: max-content; min-width: 100%;">
+          <div id="mel-staff-svg" style="position: relative; display: inline-block; width: 100%;"></div>
+        </div>
+      </div>
+
+      <div class="unified-action-row">
+        <button class="play-btn" id="mel-playBtn" disabled>▶ 播放題目</button>
+        <button class="action-btn" id="tuningABtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <span id="mel-editBtns" style="display:flex; gap:8px;">
+          <button class="action-btn" id="mel-tieBtn" style="display:none;">⌒ 連結線</button>
+          <button class="action-btn" id="mel-backspaceBtn">⌫ 退格</button>
+          <button class="action-btn btn-submit" id="mel-submitBtn" disabled>✔ 提交</button>
+        </span>
+      </div>
+      <div class="play-caption" id="mel-playCaption"></div>
+    </div>
+
+    <div class="practice-bottom-scroll">
+      <div class="editor-tabs-container">
+        <div class="editor-tabs">
+          <button class="tab-btn active" id="tab-rhythm" onclick="melModule.switchTab('rhythm')">🎵 1. 編輯節奏</button>
+          <button class="tab-btn" id="tab-pitch" onclick="melModule.switchTab('pitch')">🎹 2. 編輯音高</button>
+        </div>
+      </div>
+
+      <div id="panel-rhythm">
+        <div class="rhythm-keypad" id="mel-keypad"></div>
+      </div>
+
+      <div id="panel-pitch" style="display:none;">
+        <div class="pitch-keypad">
+          <div class="pitch-row-acc">
+            <button class="p-btn acc-btn" id="acc-b" onclick="melModule.setAccidental('b')">♭ 降</button>
+            <button class="p-btn acc-btn active" id="acc-n" onclick="melModule.setAccidental('n')">♮ 還原</button>
+            <button class="p-btn acc-btn" id="acc-s" onclick="melModule.setAccidental('#')">♯ 升</button>
+          </div>
+          <div class="pitch-row-notes">
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('C')">C<span>Do</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('D')">D<span>Re</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('E')">E<span>Mi</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('F')">F<span>Fa</span></button>
+          </div>
+          <div class="pitch-row-notes3">
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('G')">G<span>Sol</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('A')">A<span>La</span></button>
+            <button class="p-btn note-btn" onclick="melModule.inputPitch('B')">B<span>Ti</span></button>
+          </div>
+          <div class="pitch-row-oct">
+            <button class="p-btn oct-btn" onclick="melModule.shiftOctave(-1)">▼ 低八度 <span id="oct-label-low"></span></button>
+            <button class="p-btn oct-btn" onclick="melModule.shiftOctave(1)">▲ 高八度 <span id="oct-label-high"></span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 【單旋律】解答頁（提交作答後） -->
+  <div id="pageMelAnswer" class="page-view">
+    <div class="top-bar-practice" style="margin-bottom:14px;">
+      <button class="nav-back-btn" style="margin:0;" onclick="showPage('mel-settings')">← 返回設定</button>
+      <span class="practice-status-badge" id="mel-ansBadge">解答對照</span>
+      <div class="score-box"><div class="num" id="mel-ansScore">0/0</div></div>
+    </div>
+    <div id="mel-ansFeedback" class="answer-big-feedback"></div>
+    <div class="unified-action-row" style="margin-bottom:14px;">
+      <button class="action-btn" id="mel-ansPlayUser" style="color:var(--wrong); border-color:var(--wrong);">🔊 聽你的作答</button>
+      <button class="play-btn" id="mel-ansPlayCorrect">🔁 聽正解</button>
+      <button class="action-btn exp-btn" id="mel-ansExport" title="導出正解">⬇️</button>
+    </div>
+    <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+    <div class="review-staff"><div id="mel-ansUser"></div></div>
+    <div class="review-label" style="margin-top:8px;">正確解答：</div>
+    <div class="review-staff"><div id="mel-ansCorrect"></div></div>
+    <div class="unified-action-row" style="margin-top:18px;">
+      <button class="action-btn btn-submit" id="mel-ansNextBtn" style="flex:1; padding:14px;">下一題 →</button>
+    </div>
+    <div class="unified-action-row js-paper-links" style="margin-top:10px; display:none;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" id="mel-paperBack">📝 回顧此考卷錯題</button>
+    </div>
+    <div class="unified-action-row js-paper-links" style="margin-top:10px; display:none;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='exam.html#papers'">📚 模擬考錯題本目錄</button>
+    </div>
+    <div class="unified-action-row js-review-links" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="showPage('mel-review')">📕 本項錯題本</button>
+    </div>
+    <div class="unified-action-row js-review-links" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#hub-practice'">📘 錯題本目錄</button>
+    </div>
+    <div class="unified-action-row" style="margin-top:10px;">
+      <button class="nav-back-btn" style="flex:1; margin:0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+    </div>
+  </div>
+
+  <!-- 【單旋律】錯題本頁 -->
+  <div id="pageMelReview" class="page-view">
+    <div class="nav-header-row">
+      <button class="nav-back-btn" onclick="showPage('mel-settings')">← 返回設定頁</button>
+      <button class="reset-cache-btn" id="mel-clearReviewBtn">🗑️ 清空錯題本</button>
+    </div>
+    <h1>錯題本</h1>
+    <p class="subtitle">收錄答錯的旋律題，重整或關閉後仍會保留。可分別聆聽你的作答與正解，並對照紅色標錯音符。</p>
+    <div id="mel-reviewList"></div>
+      <div class="rv-speed js-review-links">
+        <div class="rv-speed-label">🎵 播放速度　<span id="mel-rvBpmVal">80</span> BPM</div>
+        <input type="range" id="mel-rvBpm" class="bpm-slider" min="40" max="160" value="80">
+      </div>
+      <div class="js-review-links" style="margin-top:20px;">
+        <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
+        <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#menu'">🏠 回選單</button>
+      </div>
+    <p id="mel-reviewEmpty" class="subtitle" style="text-align:center; margin-top:24px;">目前沒有錯題紀錄，繼續加油！🎵</p>
+  </div>
+</div>
+
+<script src="exam-common.js"></script>
+<script>
+/* ===== 統一錯題本儲存（六個練習共用，寫入 localStorage，供 index 總覽聚合） ===== */
+window.REVIEW_STORE = {
+  PREFIX: 'earTrainer.review.',
+  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行' },
+  TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html' },
+  load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
+  save(type, arr){ try { localStorage.setItem(this.PREFIX+type, JSON.stringify(arr)); } catch(e){} },
+  MAX_ITEMS: 50,   // 每類錯題本最多保留最新 50 筆，避免長期累積塞滿瀏覽器儲存空間
+  add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); while(a.length > this.MAX_ITEMS) a.shift(); this.save(type,a); return a; },
+  clear(type){ this.save(type, []); },
+  count(type){ return this.load(type).length; },
+  /* 實際題數：連續聽寫一筆裡面含多題（v.95 起），要把它們一起算進來，
+     否則總覽顯示的「題數」會比實際少很多。舊資料沒有 source 欄位，一筆就是一題。 */
+  questionCount(type){
+    return this.load(type).reduce(function(n, it){
+      return n + ((it && it.source === 'dictation') ? ((it.questions || []).length || 0) : 1);
+    }, 0);
+  }
+};
+
+function forceResetCache() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(r => r.forEach(x => x.unregister()));
+  if ('caches' in window) caches.keys().then(n => n.forEach(x => caches.delete(x)));
+  alert("🟢 已清除舊快取，將為您重新載入！"); window.location.reload(true);
+}
+// 解答／錯題本：讓「你的作答」與「正解」兩張譜的水平捲軸同步移動
+function syncStaffScroll(idA, idB){
+  var a = document.getElementById(idA), b = document.getElementById(idB);
+  if(!a || !b) return;
+  a = a.closest('.review-staff'); b = b.closest('.review-staff');
+  if(!a || !b || a._syncBound) return;
+  a._syncBound = true; b._syncBound = true;
+  var syncing = false;
+  var link = function(from, to){
+    from.addEventListener('scroll', function(){
+      if(syncing){ syncing = false; return; }
+      syncing = true; to.scrollLeft = from.scrollLeft;
+    }, { passive: true });
+  };
+  link(a, b); link(b, a);
+}
+
+/* 依「離前一個音最近」決定八度：候選為參考音上下各一個八度，
+   取音級距離最小的那一個（七個字母是奇數，不會出現平手）。 */
+function nearestOctFor(step, ref, fallbackOct, loOct, hiOct){
+  var L = ['C','D','E','F','G','A','B'];
+  if(!ref) return Math.min(Math.max(fallbackOct, loOct), hiOct);
+  var ri = ref.oct * 7 + L.indexOf(ref.step);
+  var best = null, bestD = 999;
+  for(var o = ref.oct - 1; o <= ref.oct + 1; o++){
+    if(o < loOct || o > hiOct) continue;
+    var d = Math.abs((o * 7 + L.indexOf(step)) - ri);
+    if(d < bestD){ bestD = d; best = o; }
+  }
+  return (best === null) ? Math.min(Math.max(ref.oct, loOct), hiOct) : best;
+}
+
+/* 切換題目、進入解答頁與錯題本時，譜例一律從第一小節開始顯示 */
+function resetStaffScroll(){
+  var el = document.getElementById('staffContainerOuter');
+  if(el) el.scrollLeft = 0;
+}
+function resetReviewScroll(ids){
+  ids.forEach(function(id){
+    var d = document.getElementById(id);
+    if(!d) return;
+    var w = d.closest('.review-staff') || d.closest('.staff-scroll-container');
+    if(w) w.scrollLeft = 0;
+  });
+}
+
+/* 考卷回顧：共用的頁首處理（標題、得分、隱藏「下一題」、顯示回顧按鈕） */
+function setPaperHead(p, KEY, badgeId, scoreId, fbId, nextBtnId, backBtnId, paperId, pageId){
+  var EXm = window.EXAM;
+  var preset = (EXm.PRESETS[p.preset || 'standard'] || {});
+  var secLabel = (EXm.SECTIONS[KEY] || {}).label || '';
+  var when = (function(ts){ try{ var d = new Date(ts);
+    return d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0');
+  }catch(e){ return ''; } })(p.date);
+
+  // 從成績單的分項列找出這一段的得分
+  var score = null, max = null;
+  (preset.groups || []).forEach(function(g, i){
+    if(g.keys && g.keys.length === 1 && g.keys[0] === KEY){
+      var row = (p.rows || [])[i] || {};
+      score = row.score; max = (row.max != null) ? row.max : g.max;
+    }
+  });
+
+  var badge = document.getElementById(badgeId);
+  if(badge) badge.textContent = (preset.short || '') + '　·　' + when + '　·　' + secLabel;
+  var sc = document.getElementById(scoreId);
+  if(sc && score != null) sc.textContent = score + ' / ' + max;
+  var fb = document.getElementById(fbId);
+  if(fb && score != null){
+    var full = (score >= max);
+    var base = (fb.className.indexOf('feedback-text') >= 0) ? 'feedback-text ' : 'answer-big-feedback ';
+    fb.className = base + (full ? 'correct' : 'wrong');
+    fb.textContent = full ? '✓ 這一項全對' : ('得分 ' + score + ' / ' + max);
+  }
+  var nb = document.getElementById(nextBtnId); if(nb) nb.style.display = 'none';
+  var bb = document.getElementById(backBtnId);
+  if(bb) bb.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); };
+  /* 左上角的返回鍵也導回這份考卷（原本是「返回作答」或「回選單」） */
+  var topBack = pageId ? document.querySelector('#' + pageId + ' .nav-back-btn') : null;
+  if(topBack){ topBack.textContent = '← 回到這份考卷';
+               topBack.onclick = function(){ location.href = 'exam.html#paper=' + encodeURIComponent(paperId); }; }
+  Array.prototype.forEach.call(document.querySelectorAll('.js-paper-links'), function(el){ el.style.display = ''; });
+  Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
+}
+
+/* 進入點：網址帶 ?paper=&section= 時，改走考卷回顧 */
+function bootPaperReview(mod){
+  try{
+    var q = new URLSearchParams(location.search);
+    var pid = q.get('paper'), sec = q.get('section');
+    if(!pid || !sec || !window.EXAM || !mod || !mod.paperReview) return false;
+    return !!mod.paperReview(pid, sec);
+  }catch(e){ return false; }
+}
+
+/* 錯題本：舊的在上、新的在下，進入時直接跳到最下面（考卷回顧模式除外） */
+function scrollReviewToBottom(pageId){
+  try{
+    if(new URLSearchParams(location.search).get('paper')) return;
+    setTimeout(function(){
+      var el = document.getElementById(pageId);
+      if(el && el.scrollHeight > el.clientHeight + 4){ el.scrollTop = el.scrollHeight; }
+      else { window.scrollTo(0, document.documentElement.scrollHeight); }
+    }, 260);
+  }catch(e){}
+}
+
+  /* ===== 錯題本的播放速度（v.94）=====
+     錯題本沒有設定頁，所以在頁面底部放一根拉桿，整頁共用一個速度。
+     每一題原本存了當時的 BPM，這裡一律以拉桿的值覆寫。
+     設定記在 localStorage，每個練習各自獨立（節奏與四部和聲的合適速度差很多）。 */
+  var RV_BPM_KEY = 'earTrainer.settings.reviewBpm.melody';
+  var RV_BPM_DEFAULT = 80;
+  function reviewBpm(){
+    try{
+      var v = parseInt(localStorage.getItem(RV_BPM_KEY), 10);
+      return (v >= 20 && v <= 240) ? v : RV_BPM_DEFAULT;
+    }catch(e){ return RV_BPM_DEFAULT; }
+  }
+  /* 播放錯題時用這個包一層，取代題目裡存的 bpm */
+  function withReviewBpm(item){
+    if(!item) return item;
+    var o = {};
+    for(var k in item){ if(Object.prototype.hasOwnProperty.call(item, k)) o[k] = item[k]; }
+    o.bpm = reviewBpm();
+    return o;
+  }
+  function initReviewBpm(){
+    var sl = document.getElementById('mel-rvBpm');
+    var lab = document.getElementById('mel-rvBpmVal');
+    if(!sl) return;
+    sl.value = reviewBpm();
+    if(lab) lab.textContent = sl.value;
+    sl.oninput = function(){
+      if(lab) lab.textContent = sl.value;
+      try{ localStorage.setItem(RV_BPM_KEY, sl.value); }catch(e){}
+    };
+  }
+
+
+function showPage(pageId) {
+  if (window.melStopAll) window.melStopAll();
+  document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+  if (pageId === 'mel-settings') { document.getElementById('pageMelSettings').classList.add('active'); if(window.melModule) window.melModule.refreshReviewCount(); }
+  else if (pageId === 'mel-practice') document.getElementById('pageMelPractice').classList.add('active');
+  else if (pageId === 'mel-answer') document.getElementById('pageMelAnswer').classList.add('active');
+  else if (pageId === 'mel-review') { document.getElementById('pageMelReview').classList.add('active'); if(window.melModule) window.melModule.renderReviewPage(); initReviewBpm(); }
+}
+
+(function(){
+  const SIMPLE_ORDER = ['4', '2-2', '1-1-1-1', '2-1-1', '1-1-2', '1-2-1', '3-1', '1-3', '3tuplet'];
+  const COMPOUND_ORDER = [
+    '6', '4-2', '2-4', '4-1-1', '1-1-4', '2-2-2', '2-2-1-1', '2-1-1-2',
+    '1-1-2-2', '2-1-1-1-1', '1-1-2-1-1', '1-1-1-1-2', '1-1-1-1-1-1', '3-1-1-1', '1-1-1-3', '1-3-1-1',
+    '1-1-3-1', '3-1-2', '3-2-1', '2-3-1', '2-1-3', '1-3-2', '1-2-3', '4~1-1',
+    '1-1~4', '3-3', '2-1-2-1', '1-2-1-2', '1-2-2-1', '1-1~3-1', '1-2-1-1-1', '1-1-1-2-1'
+  ];
+
+  function parsePatternId(id) {
+    if (id === '3tuplet') {
+      return { lengths: [4/3, 4/3, 4/3], tieNext: [false, false, false], isTuplet: true };
+    }
+    let lengths = []; let tieNext = [];
+    let tokens = id.split(/([-\~])/);
+    for (let i = 0; i < tokens.length; i += 2) {
+      lengths.push(Number(tokens[i]));
+      if (i + 1 < tokens.length) tieNext.push(tokens[i + 1] === '~');
+      else tieNext.push(false);
+    }
+    return { lengths, tieNext, isTuplet: false };
+  }
+
+  const ALL_BLOCKS = {};
+  SIMPLE_ORDER.forEach(id => { ALL_BLOCKS[id] = { id, ...parsePatternId(id), type: 'simple', beats: 1 }; });
+  COMPOUND_ORDER.forEach(id => { ALL_BLOCKS[id] = { id, ...parsePatternId(id), type: 'compound', beats: 1 }; });
+
+  const VF = Vex.Flow;
+
+  function createEnhancedTie(firstNote, lastNote, extraRight) {
+    const pad = (extraRight === undefined) ? 30 : extraRight;
+    if (pad && typeof firstNote.setExtraRightPx === 'function') firstNote.setExtraRightPx(pad);
+    const t = new VF.StaveTie({ first_note: firstNote, last_note: lastNote, first_indices: [0], last_indices: [0] });
+    t.__firstNote = firstNote;   // 畫之前才依符桿方向決定弧線朝上或朝下
+    return t;
+  }
+
+  /* 連結線弧線畫在符頭側（符桿向上→弧線在下，符桿向下→弧線在上）。
+     ⚠ VexFlow 的 setDirection 語意與直覺相反：傳入的值要與符桿方向「同號」。
+     符桿方向會被 Beam 改寫，所以一定要在 beam 畫完之後、tie 畫之前才套用。 */
+  function applyTieDirections(ties) {
+    (ties || []).forEach(function(t){
+      let dir = 1;
+      try { if (t.__firstNote && typeof t.__firstNote.getStemDirection === 'function') dir = t.__firstNote.getStemDirection() || 1; } catch(e) {}
+      t.setDirection(dir);
+    });
+  }
+
+  /* ===== 跨拍連結線（tieAcross） =====
+     tieAcross[i] === true 表示第 i 拍的最後一音連到第 i+1 拍的第一音。
+     規則：只在小節內、不跨小節線；連鎖最多三個音（A⌒B⌒C 可，再延長不可）。 */
+
+  const TIE_UNIT = 3;   // 時值放大倍率：三連音的 4/3 乘 3 後才是整數，避免浮點誤差
+
+  /* 拍界：第 i 拍與第 i+1 拍之間。連結線可以跨小節線，所以只要不是最後一拍就成立。
+     （小節末拍的連結線＝跨小節，判定時由 compareBars 另外檢查，見下方說明。） */
+  function isInnerBoundary(i, beatsPerBar, totalBeats) {
+    return i >= 0 && i < totalBeats - 1;
+  }
+
+  // 這個拍界是不是跨小節線
+  function isBarBoundary(i, beatsPerBar) {
+    return ((i + 1) % beatsPerBar) === 0;
+  }
+
+  function chainLenIfSet(tieAcross, i) {
+    let len = 1;
+    for (let k = i - 1; k >= 0 && tieAcross[k]; k--) len++;
+    for (let k = i + 1; k < tieAcross.length && tieAcross[k]; k++) len++;
+    return len;
+  }
+
+  function canToggleTie(seq, tieAcross, i, beatsPerBar) {
+    if (!isInnerBoundary(i, beatsPerBar, seq.length)) return false;
+    if (tieAcross[i]) return true;
+    if (seq[i] === 'placeholder' || seq[i + 1] === 'placeholder') return false;
+    return chainLenIfSet(tieAcross, i) <= 2;
+  }
+
+  function flattenBar(seq, tieAcross, from, to) {
+    const vals = []; let blank = false;
+    let pending = 0, active = false;
+    for (let i = from; i < to; i++) {
+      const id = seq[i];
+      if (!id || id === 'placeholder') {
+        if (active) { vals.push(pending); pending = 0; active = false; }
+        blank = true; continue;
+      }
+      const blk = ALL_BLOCKS[id]; if (!blk) { blank = true; continue; }
+      const L = blk.lengths, TN = blk.tieNext || [];
+      for (let j = 0; j < L.length; j++) {
+        const v = Math.round(L[j] * TIE_UNIT);
+        if (active) pending += v; else { pending = v; active = true; }
+        let tiedOut;
+        if (j < L.length - 1) tiedOut = !!TN[j];
+        else tiedOut = !!(tieAcross && tieAcross[i]) && (i + 1 < to) && seq[i + 1] && seq[i + 1] !== 'placeholder';
+        if (!tiedOut) { vals.push(pending); pending = 0; active = false; }
+      }
+    }
+    if (active) vals.push(pending);
+    return { vals: vals, blank: blank };
+  }
+
+  /* 逐小節比對（方案 C）：小節內仍然各自攤平時值，不把跨小節的音合併起來，
+     另外再檢查「這個小節的末拍有沒有連到下一小節」是否與正解相同。
+     這樣「小節」仍是判定與標紅的單位，而跨小節連結線的對錯也會被抓到。
+     （已窮舉驗證：本系統的格子固定、等價記譜不存在，所以這樣的判定結果
+       與「整條攤平一次比完」完全相同。） */
+  function compareBars(userSeq, qSeq, tieU, tieQ, beatsPerBar, barsCount) {
+    const out = [];
+    const total = barsCount * beatsPerBar;
+    for (let b = 0; b < barsCount; b++) {
+      const from = b * beatsPerBar, to = from + beatsPerBar;
+      const u = flattenBar(userSeq, tieU, from, to);
+      const q = flattenBar(qSeq, tieQ, from, to);
+      let same = !u.blank && !q.blank && u.vals.length === q.vals.length && u.vals.every((v, k) => v === q.vals[k]);
+      const last = to - 1;                       // 這個小節的末拍
+      if (same && last < total - 1 && !!(tieU||[])[last] !== !!(tieQ||[])[last]) same = false;
+      out.push(same);
+    }
+    return out;
+  }
+
+  function markWrongBeats(userSeq, qSeq, tieU, tieQ, beatsPerBar, barsCount) {
+    const total = barsCount * beatsPerBar;
+    const wrong = new Array(total).fill(false);
+    const barOK = compareBars(userSeq, qSeq, tieU, tieQ, beatsPerBar, barsCount);
+    for (let b = 0; b < barsCount; b++) {
+      if (barOK[b]) continue;
+      const from = b * beatsPerBar, to = from + beatsPerBar;
+      for (let i = from; i < to; i++) {
+        if (userSeq[i] !== qSeq[i]) wrong[i] = true;
+        // 連結線不同時前後兩拍都標紅（跨小節時，紅色會落在下一小節的第一拍）
+        if (isInnerBoundary(i, beatsPerBar, total) && !!tieU[i] !== !!tieQ[i]) { wrong[i] = true; wrong[i + 1] = true; }
+      }
+    }
+    return wrong;
+  }
+
+  const EXTRA_SPACING_IDS = ['4-1-1', '1-1-4', '4~1-1', '1-1~4'];
+  const NOTE_TO_SEMI = { 'C':0, 'D':2, 'E':4, 'F':5, 'G':7, 'A':9, 'B':11 };
+
+  function getPitchFromObj(pObj) {
+    if(!pObj) return 69;
+    let midi = (pObj.oct + 1) * 12 + NOTE_TO_SEMI[pObj.step];
+    if(pObj.acc === '#') midi += 1;
+    else if(pObj.acc === 'b') midi -= 1;
+    return midi;
+  }
+
+  function getVexKey(pObj, clef) {
+    if(!pObj) return clef === 'treble' ? 'a/4' : 'c/3';
+    return `${pObj.step.toLowerCase()}/${pObj.oct}`;
+  }
+
+  function applyAccidental(note, pObj, measureAccState) {
+    if(!pObj) return;
+    let step = pObj.step.toUpperCase();
+    let acc = pObj.acc || 'n';
+    let needsAcc = false;
+
+    if (acc === 'n') {
+      if (measureAccState[step] && measureAccState[step] !== 'n') needsAcc = true;
+    } else {
+      if (measureAccState[step] !== acc) needsAcc = true;
+    }
+
+    if (needsAcc) {
+      note.addAccidental(0, new VF.Accidental(acc));
+      measureAccState[step] = acc;
+    }
+  }
+
+  function getVexNotes(block, isWrong, pitchArray, startIndex, clef, activeNoteIdx = -1, measureAccState = {}, miniature = false) {
+    let notes = []; let ties = []; let tuplet = null;
+    let lengths = block.lengths; let tieNext = block.tieNext || [];
+    let noteCount = lengths.length;
+
+    if (block.isTuplet) {
+      for(let i=0; i<3; i++) {
+        let pObj = pitchArray ? pitchArray[startIndex + i] : null;
+        let n = new VF.StaveNote({ clef: clef, keys: [getVexKey(pObj, clef)], duration: '8', auto_stem: true });
+        applyAccidental(n, pObj, measureAccState);
+        if(isWrong) n.setStyle({ fillStyle: 'var(--wrong)', strokeStyle: 'var(--wrong)' });
+        if((startIndex + i) === activeNoteIdx) n.setStyle({ fillStyle: 'var(--accent)', strokeStyle: 'var(--accent)' });
+        notes.push(n);
+      }
+      tuplet = new VF.Tuplet(notes, { num_notes: 3, notes_occupied: 2, ratioed: false });
+      let beams = [new VF.Beam(notes, true)];
+      return { notes, ties, beams, tuplet, noteCount: 3 };
+    }
+
+    let needsExtraSpacing = !miniature && EXTRA_SPACING_IDS.includes(block.id);
+    lengths.forEach((len, idx) => {
+      let pObj = pitchArray ? pitchArray[startIndex + idx] : null;
+      let n1;
+      if(len===1) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'16', auto_stem: true });
+      else if(len===2) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'8', auto_stem: true });
+      else if(len===3) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'8', auto_stem: true }).addDot(0);
+      else if(len===4) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true });
+      else if(len===6) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true }).addDot(0);
+
+      applyAccidental(n1, pObj, measureAccState);
+
+      if(isWrong) n1.setStyle({ fillStyle: 'var(--wrong)', strokeStyle: 'var(--wrong)' });
+      if((startIndex + idx) === activeNoteIdx) n1.setStyle({ fillStyle: 'var(--accent)', strokeStyle: 'var(--accent)' });
+      if(needsExtraSpacing && typeof n1.setExtraRightPx === 'function') n1.setExtraRightPx(25);
+      notes.push(n1);
+    });
+
+    for(let idx = 0; idx < tieNext.length; idx++) {
+      if(tieNext[idx] && idx + 1 < notes.length) ties.push(createEnhancedTie(notes[idx], notes[idx + 1], miniature ? 0 : undefined));
+    }
+
+    const beamNotes = notes.filter(n => n.duration.includes('8') || n.duration.includes('16'));
+    const beams = beamNotes.length > 1 ? [new VF.Beam(beamNotes, true)] : [];
+    return { notes, ties, beams, tuplet, noteCount };
+  }
+
+  /* 節奏型小圖（設定頁與作答鍵盤的按鈕）的音符排版。
+
+     絕大多數節奏型維持 VexFlow 原本的 FormatAndDraw，只有下列四個例外：
+     它們是「一個四分音符 ＋ 兩個十六分音符」的組合，Formatter 按時值比例分配的結果是
+     四分音符吃掉大半寬度、兩個十六分音符擠成一團，連結線也短到看不清。
+     這四個改成手動指定落點，間距依「時值^K」分配。
+     K = 1 是原本的純比例（差距過大），K = 0 是完全平均（看不出長短）。 */
+  const MINI_CUSTOM = { '4~1-1': 1, '1-1~4': 1, '4-1-1': 1, '1-1-4': 1 };
+  const MINI_GAP_K = 0.7;
+  const MINI_RIGHT_PAD = 12;       // 右緣留給最後一個符頭（畫布 260 ÷ scale 1.25 ＝ 有效寬度只有 208）
+  const MINI_HEAD_CENTRE = 28.5;   // 符頭視覺中心相對 tickContext 座標的偏移（實測）
+
+  function layoutMiniNotes(notes, lengths, stave) {
+    if (!notes.length) return;
+    const left = stave.getNoteStartX();
+    const right = stave.getX() + stave.getWidth() - MINI_RIGHT_PAD;
+    const put = function(note, absX){
+      const tc = note.getTickContext();
+      if (tc) tc.setX(absX - left);
+    };
+
+    /* 單音（6、4）置中。
+       ⚠ 實測：tickContext 設 T，符頭實際畫在 T + noteStartX + 23，符頭本身寬約 11。
+       getWidth() 在這裡回傳幾乎 0、getNoteHeadBeginX() 也對不上，只能用實測值。 */
+    if (notes.length === 1) {
+      put(notes[0], stave.getX() + stave.getWidth() / 2 - MINI_HEAD_CENTRE);
+      return;
+    }
+
+    /* 每個音各佔一段寬度，寬度依「時值^K」分配。
+       最後一個音佔的那一段是尾端留白——四分音符擺在最後時（1-1-4），
+       它的長度就是靠這段留白表現的，不能把它推到右緣，否則前面的十六分音符反而被拉開。 */
+    let weights = [], total = 0;
+    for (let i = 0; i < notes.length; i++) {
+      const len = (lengths && lengths[i]) ? lengths[i] : 1;
+      const wgt = Math.pow(len, MINI_GAP_K);
+      weights.push(wgt); total += wgt;
+    }
+    if (!(total > 0)) return;
+    let x = left;
+    for (let i = 0; i < notes.length; i++) {
+      put(notes[i], x);
+      x += (right - left) * (weights[i] / total);
+    }
+  }
+
+  function drawMiniRhythm(container, blockId) {
+    try {
+      container.innerHTML = ''; const block = ALL_BLOCKS[blockId];
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(260, 110);
+      const svg = container.querySelector('svg');
+      svg.setAttribute('viewBox', '0 20 260 65'); svg.style.width = '100%'; svg.style.height = '100%';
+      const ctx = renderer.getContext(); ctx.scale(1.25, 1.25);
+      const stave = new VF.Stave(5, 5, 200).setContext(ctx).draw();
+      const custom = !!MINI_CUSTOM[blockId] || block.lengths.length === 1;
+      const { notes, ties, beams, tuplet } = getVexNotes(block, false, null, 0, 'treble', -1, {}, custom);
+
+      if (custom) {
+        const voice = new VF.Voice({ num_beats: 4, beat_value: 4 }).setStrict(false).addTickables(notes);
+        new VF.Formatter().joinVoices([voice]).format([voice], 200);
+        layoutMiniNotes(notes, block.lengths, stave);
+        voice.draw(ctx, stave);
+      } else {
+        VF.Formatter.FormatAndDraw(ctx, stave, notes);
+      }
+
+      beams.forEach(b => b.setContext(ctx).draw());
+      applyTieDirections(ties);
+      ties.forEach(t => t.setContext(ctx).draw());
+      if(tuplet) tuplet.setContext(ctx).draw();
+    } catch(e) {}
+  }
+
+  // 繪製主譜；靜態渲染（解答頁 / 錯題本）時透過 ctxOverride 指定該題自身的拍號、小節設定（clef 仍由參數指定）
+/* 小節寬度：取「所有相關序列中，單一小節音符最多的那一個」來決定。
+     解答頁的兩張譜要傳入同一組序列，才會等寬、捲軸同步時對得齊。 */
+  const NOTE_W = 32;
+  function maxNotesPerBar(seqs, beatsPerBar){
+    let best = 0;
+    (seqs || []).forEach(function(seq){
+      if(!seq || !seq.length) return;
+      let cnt = 0, beats = 0;
+      seq.forEach(function(id){
+        const blk = (id && id !== 'placeholder') ? ALL_BLOCKS[id] : null;
+        cnt += blk ? blk.lengths.length : 1;
+        beats += blk ? blk.beats : 1;
+        if(beats >= beatsPerBar){ if(cnt > best) best = cnt; cnt = 0; beats = 0; }
+      });
+      if(cnt > best) best = cnt;
+    });
+    return best;
+  }
+
+  function renderMainStaff(containerId, seq, pitchArray, interactive = false, correctSeq = null, correctPitch = null, clef = 'treble', activeTab = 'rhythm', activeSlot = 0, activeNote = 0, ctxOverride = null, tieAcross = null, correctTie = null) {
+    try {
+      const container = document.getElementById(containerId); if (!container) return;
+      const cfg = ctxOverride || { barsCount: melModule.barsCount, beatsPerBar: melModule.beatsPerBar, meter: melModule.meter, meterType: melModule.meterType };
+      const outerContainer = document.getElementById('staffContainerOuter');
+      const innerWrapper = document.getElementById('staffInnerWrapper');
+      let currentScrollLeft = 0;
+      if (outerContainer && interactive && innerWrapper) {
+        currentScrollLeft = outerContainer.scrollLeft;
+        innerWrapper.style.minWidth = innerWrapper.scrollWidth + 'px';
+      }
+      container.innerHTML = '';
+
+      const _refSeqs = [seq, correctSeq];
+      if(interactive && melModule && melModule.questionSeq) _refSeqs.push(melModule.questionSeq);
+      const minMeasureWidth = Math.max(240, maxNotesPerBar(_refSeqs, cfg.beatsPerBar) * NOTE_W);
+      const requiredWidth = (minMeasureWidth * cfg.barsCount) + 70;  // +10：終止線較寬，右側多留空間
+      const totalWidth = requiredWidth; const usableWidth = totalWidth - 10;
+      const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(totalWidth, 130);
+      const ctx = renderer.getContext();
+      let xPos = 5; const barWidth = (usableWidth - 60) / cfg.barsCount;
+
+      let bars = []; let currentBar = []; let currentBeats = 0;
+      seq.forEach(id => {
+        currentBar.push(id);
+        let b = id === 'placeholder' ? 1 : ALL_BLOCKS[id].beats;
+        currentBeats += b;
+        if(currentBeats >= cfg.beatsPerBar) { bars.push(currentBar); currentBar = []; currentBeats = 0; }
+      });
+      while(bars.length < cfg.barsCount) bars.push([]);
+
+      let globalBeatIdx = 0; let globalNoteIdx = 0;
+      let beatFirstNotes = []; let allIndividualNotes = [];
+      const tieArr = tieAcross || [];
+      let crossTies = [], pendingCross = null;   // 跨小節連結線：等所有小節排版完才畫
+      let tiedInFromPrevBar = false;             // 這一小節的第一個音是不是從上一小節連過來
+      let pendingCrossPitch = null;              // 上一小節末音的音高（給臨時記號用）
+      // 節奏是否算錯改用「逐小節攤平時值」判定（連結線不同時前後兩拍都標紅）
+      const wrongRhythmBeats = (correctSeq && correctPitch)
+        ? markWrongBeats(seq, correctSeq, tieArr, correctTie || [], cfg.beatsPerBar, cfg.barsCount)
+        : null;
+
+      for(let b = 0; b < cfg.barsCount; b++) {
+        const isFirst = (b === 0); const sWidth = isFirst ? barWidth + 60 : barWidth;
+        const stave = new VF.Stave(xPos, 20, sWidth);
+        if(isFirst) stave.addClef(clef).addTimeSignature(cfg.meter);
+        if(b === cfg.barsCount - 1) stave.setEndBarType(VF.Barline.type.END);    // 最後一小節：終止線
+        stave.setContext(ctx).draw();
+
+        let barNotes = []; let barBeams = []; let barTies = []; let barTuplets = [];
+        let barKeys = bars[b] || [];
+        let barBeatNotes = {}; let barStartIdx = globalBeatIdx;
+        let filledBeats = barKeys.reduce((acc, k) => acc + (k === 'placeholder' ? 1 : ALL_BLOCKS[k].beats), 0);
+        while(filledBeats < cfg.beatsPerBar) { barKeys.push('placeholder'); filledBeats++; }
+
+        let measureAccState = {};
+        /* 被連結線從上一小節連過來的音，是同一個音的延續，不可以重複標記臨時記號。
+           作法是把上一小節末音的升降狀態先寫進本小節的狀態表，applyAccidental 就不會再畫。 */
+        if (tiedInFromPrevBar && pendingCrossPitch) {
+          measureAccState[String(pendingCrossPitch.step).toUpperCase()] = pendingCrossPitch.acc || 'n';
+        }
+
+        barKeys.forEach(id => {
+          if (id !== 'placeholder') {
+            const block = ALL_BLOCKS[id];
+            let isWrong = false;
+            if(correctSeq && correctPitch) {
+              if(wrongRhythmBeats && wrongRhythmBeats[globalBeatIdx]) isWrong = true;
+              else {
+                for(let k = 0; k < block.lengths.length; k++) {
+                  let pU = getPitchFromObj(pitchArray[globalNoteIdx + k]);
+                  let pC = getPitchFromObj(correctPitch[globalNoteIdx + k]);
+                  if(pU !== pC) { isWrong = true; break; }
+                }
+              }
+            }
+            let hlNoteIdx = (interactive && activeTab === 'pitch') ? activeNote : -1;
+            const { notes, ties, beams, tuplet, noteCount } = getVexNotes(block, isWrong, pitchArray, globalNoteIdx, clef, hlNoteIdx, measureAccState);
+            barNotes.push(...notes); barBeams.push(...beams); barTies.push(...ties);
+            if(tuplet) barTuplets.push(tuplet);
+            beatFirstNotes[globalBeatIdx] = notes[0];
+            barBeatNotes[globalBeatIdx] = notes;
+            notes.forEach(n => allIndividualNotes.push(n));
+            globalNoteIdx += noteCount;
+          } else {
+            let ghostKey = clef === 'treble' ? 'a/4' : 'c/3';
+            let ghost = new VF.StaveNote({ clef: clef, keys:[ghostKey], duration: 'qr' });
+            if(cfg.meterType === 'compound') ghost.addDot(0);
+            ghost.setStyle({ fillStyle: '#e0e0e0', strokeStyle: '#e0e0e0' });
+            barNotes.push(ghost);
+            beatFirstNotes[globalBeatIdx] = ghost;
+            allIndividualNotes.push(ghost);
+            globalNoteIdx += 1;
+          }
+          globalBeatIdx++;
+        });
+        // 小節內的跨拍連結線
+        for (let i = barStartIdx; i < globalBeatIdx - 1; i++) {
+          if (!tieArr[i]) continue;
+          const na = barBeatNotes[i], nc = barBeatNotes[i + 1];
+          if (!na || !nc || !na.length || !nc.length) continue;
+          barTies.push(createEnhancedTie(na[na.length - 1], nc[0]));
+        }
+
+        /* 跨小節的連結線：兩端在不同的 stave，必須等兩個小節都排版完才能畫。 */
+        if (pendingCross && barBeatNotes[barStartIdx] && barBeatNotes[barStartIdx].length) {
+          crossTies.push(createEnhancedTie(pendingCross, barBeatNotes[barStartIdx][0], 0));
+          pendingCross = null;
+        }
+        const barLastIdx = globalBeatIdx - 1;
+        if (tieArr[barLastIdx] && barBeatNotes[barLastIdx] && barBeatNotes[barLastIdx].length) {
+          const arr = barBeatNotes[barLastIdx];
+          pendingCross = arr[arr.length - 1];
+          pendingCrossPitch = pitchArray ? pitchArray[globalNoteIdx - 1] : null;
+          tiedInFromPrevBar = true;     // 下一小節的第一個音是連過來的
+        } else { pendingCross = null; pendingCrossPitch = null; tiedInFromPrevBar = false; }
+
+        if(barNotes.length > 0) {
+          VF.Formatter.FormatAndDraw(ctx, stave, barNotes);
+          barBeams.forEach(bm => bm.setContext(ctx).draw());
+          applyTieDirections(barTies);
+          barTies.forEach(t => t.setContext(ctx).draw());
+          barTuplets.forEach(tp => tp.setContext(ctx).draw());
+        }
+        xPos += sWidth;
+      }
+
+      // 所有小節都排版完了，這時才畫跨小節的連結線
+      applyTieDirections(crossTies);
+      crossTies.forEach(t => t.setContext(ctx).draw());
+
+      if(interactive && melModule.hasPlayed) {
+        let overlay = document.createElement('div');
+        overlay.style.position = 'absolute'; overlay.style.top = '0'; overlay.style.left = '0';
+        overlay.style.width = '100%'; overlay.style.height = '100%'; overlay.style.pointerEvents = 'none';
+        container.appendChild(overlay);
+
+        if(activeTab === 'rhythm') {
+          for(let i = 0; i < beatFirstNotes.length; i++) {
+            let fn = beatFirstNotes[i]; let nn = beatFirstNotes[i+1];
+            let stave = fn.getStave(); if(!stave) continue;
+            let nx = typeof fn.getAbsoluteX === 'function' ? fn.getAbsoluteX() : stave.getX() + fn.getTickContext().getX();
+            let x = nx - 12; let y = stave.getYForLine(0) - 18; let h = 86; let w = 30;
+            if(nn && nn.getStave() === stave) {
+              let n2x = typeof nn.getAbsoluteX === 'function' ? nn.getAbsoluteX() : stave.getX() + nn.getTickContext().getX();
+              w = n2x - nx;
+            } else w = stave.getX() + stave.getWidth() - nx + 10;
+            let slot = document.createElement('div'); slot.id = 'mel-slot-' + i;
+            slot.style.position = 'absolute'; slot.style.left = x + 'px'; slot.style.top = y + 'px';
+            slot.style.width = Math.max(w, 20) + 'px'; slot.style.height = h + 'px';
+            slot.style.cursor = 'pointer'; slot.style.pointerEvents = 'auto'; slot.style.borderRadius = '8px'; slot.style.transition = 'all 0.1s';
+            if(i === activeSlot && activeSlot !== -1) { slot.style.border = '2px solid var(--accent)'; slot.style.backgroundColor = 'var(--accent-soft)'; slot.style.zIndex = '10'; }
+            else { slot.style.border = '1px dashed transparent'; slot.style.zIndex = '1'; }
+            slot.onclick = () => { melModule.activeSlotIdx = i; melModule.updateUI(); };
+            overlay.appendChild(slot);
+          }
+        } else if(activeTab === 'pitch') {
+          for(let i = 0; i < allIndividualNotes.length; i++) {
+            if (melModule.isNoteTiedToPrevious(i)) continue;
+
+            let fn = allIndividualNotes[i];
+            let stave = fn.getStave(); if(!stave) continue;
+            let nx = typeof fn.getAbsoluteX === 'function' ? fn.getAbsoluteX() : stave.getX() + fn.getTickContext().getX();
+            let x = nx - 8; let y = stave.getYForLine(0) - 18; let h = 86; let w = 22;
+
+            let nn = null;
+            for (let nextI = i + 1; nextI < allIndividualNotes.length; nextI++) {
+                if (!melModule.isNoteTiedToPrevious(nextI)) { nn = allIndividualNotes[nextI]; break; }
+            }
+
+            if(nn && nn.getStave() === stave) {
+              let n2x = typeof nn.getAbsoluteX === 'function' ? nn.getAbsoluteX() : stave.getX() + nn.getTickContext().getX();
+              w = n2x - nx;
+            } else w = stave.getX() + stave.getWidth() - nx + 10;
+
+            let slot = document.createElement('div'); slot.id = 'mel-note-' + i;
+            slot.style.position = 'absolute'; slot.style.left = x + 'px'; slot.style.top = y + 'px';
+            slot.style.width = Math.max(w, 18) + 'px'; slot.style.height = h + 'px';
+            slot.style.cursor = 'pointer'; slot.style.pointerEvents = 'auto'; slot.style.borderRadius = '6px'; slot.style.transition = 'all 0.1s';
+            if(i === activeNote && activeNote !== -1) { slot.style.border = '2px solid var(--accent)'; slot.style.backgroundColor = 'var(--accent-soft)'; slot.style.zIndex = '10'; }
+            else if(melModule.lastEditedNoteIdx === i) { /* 記號會套用到的音 */ slot.style.border = '2px dashed var(--accent-line)'; slot.style.zIndex = '5'; }
+            else { slot.style.border = '1px dashed transparent'; slot.style.zIndex = '1'; }
+            slot.onclick = () => { melModule.activeNoteIdx = i; melModule.lastEditedNoteIdx = null; melModule.updateUI(); };
+            overlay.appendChild(slot);
+          }
+        }
+      }
+      if(outerContainer && interactive && innerWrapper) {
+        outerContainer.scrollLeft = currentScrollLeft;
+        innerWrapper.style.minWidth = '';
+      }
+    } catch(e) { console.error("Main Staff Error:", e); }
+  }
+
+  // 靜態渲染包裝：解答頁與錯題本用該題自身的設定繪譜
+  function renderStaticStaff(containerId, seq, pitchArray, correctSeq, correctPitch, item, tieAcross, correctTie) {
+    renderMainStaff(containerId, seq, pitchArray, false, correctSeq, correctPitch, item.clef, 'rhythm', -1, -1, {
+      barsCount: item.barsCount, beatsPerBar: item.beatsPerBar, meter: item.meter, meterType: item.meterType
+    }, tieAcross || [], correctTie || []);
+  }
+
+  /* ===== 音區補償（v.92） =====
+     真實鋼琴低音響亮、高音單薄，加上低音的泛音會遮蔽上方的音，
+     所以把高音往上補一點，讓各音域聽起來一樣清楚。
+
+     TILT_DB  音區傾斜：每高一個八度補幾 dB。往上調高音更突出，往下調更接近原本的聲音。
+     GAIN_NORM 音數衰減：同時發聲越多顆，每顆越小聲，避免多音齊奏時削波糊成一團。
+               目前設為 0（＝不衰減），實聽後認為和絃的音量以不衰減為佳；
+               日後若覺得多音糊成一團，往上調（0.2～0.35）即可。
+               ⚠ 刻意寫成「只會衰減、不會放大」（Math.min(1, ...)），
+                 這樣單音的音量與改版前完全相同。
+     （08 音堆練習另有一套自己的常數，因為它是音團辨識、遮蔽最嚴重，這裡不共用。） */
+  const GAIN_BASE = 3.5, TILT_DB = 1.0, GAIN_NORM = 0;
+  const GAIN_MIN = 2.5, GAIN_MAX = 4.8;
+  function gainFor(midi, count){
+    const tilt = Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
+    const norm = Math.min(1, Math.pow(2 / Math.max(1, count || 1), GAIN_NORM));
+    return Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
+  }
+
+  let audioCtx = null; let pianoInst = null; let pendingTimers = [];
+  function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
+  window.melStopAll = function() {
+    if(pianoInst) pianoInst.stop();
+    clearTimers(); melModule.testSession.isRunning = false; melModule.isPlaying = false; melModule.updatePlayBtn();
+  };
+  function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }catch(e){} return audioCtx; }
+  /* 載入音色時的畫面提示。Salamander 要在瀏覽器解碼 30 個取樣，過程中顯示進度；
+     萬一載入失敗，引擎會自動退回原本的音色，不讓使用者卡住。 */
+  var PIANO_UI = {
+    onProgress: function(done, total){
+      var b = document.getElementById('loadingBanner');
+      if(b) b.textContent = '🎹 正在載入高音質鋼琴音色… ' + done + ' / ' + total;
+    },
+    onFallback: function(){
+      var b = document.getElementById('loadingBanner');
+      if(b) b.textContent = '🎹 高音質音色載入失敗，已改用原本的音色…';
+    }
+  };
+
+  window.loadPiano = function(){
+    const ctx = ensureAudio(); if(!ctx) return;
+    PianoEngine.load(ctx, PIANO_UI).then(inst => {
+      pianoInst = inst; document.getElementById('loadingBanner').style.display = 'none'; melModule.updatePlayBtn();
+      if(window.EXAM && window.EXAM.isExamMode() && melModule._examReady) melModule._examReady();
+    }).catch(()=>{ document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>'; });
+  };
+
+  // 靜態播放：解答頁 / 錯題本用該題自身的拍號、速度與音高播放（不動作答狀態）
+  /* 播放事件：把整條攤平成「一次發聲」的清單（連結線的兩端合併成一個長音）。
+     midi 為 null 代表未填的一拍。連結線兩端的音高是綁定的，取第一個音即可。 */
+  function buildMelodyEvents(seq, pitchArray, tieAcross, beatUnits, beatsPerBar) {
+    const ev = []; let noteIdx = 0;
+    let pending = 0, active = false, curMidi = null;
+    const flush = function(){ if(active){ ev.push({ midi: curMidi, len: pending }); pending = 0; active = false; } };
+    for (let i = 0; i < seq.length; i++) {
+      const id = seq[i];
+      if (!id || id === 'placeholder') { flush(); ev.push({ midi: null, len: beatUnits }); noteIdx += 1; continue; }
+      const blk = ALL_BLOCKS[id]; if (!blk) { flush(); ev.push({ midi: null, len: beatUnits }); noteIdx += 1; continue; }
+      const L = blk.lengths, TN = blk.tieNext || [];
+      for (let j = 0; j < L.length; j++) {
+        if (!active) { curMidi = getPitchFromObj(pitchArray[noteIdx + j]); pending = L[j]; active = true; }
+        else pending += L[j];
+        let tiedOut;
+        if (j < L.length - 1) tiedOut = !!TN[j];
+        else tiedOut = !!(tieAcross && tieAcross[i]) && isInnerBoundary(i, beatsPerBar, seq.length)
+                       && seq[i + 1] && seq[i + 1] !== 'placeholder';
+        if (!tiedOut) flush();
+      }
+      noteIdx += L.length;
+    }
+    flush();
+    return ev;
+  }
+
+  /* ===== 導出正解音檔（v.94）=====
+     單旋律要有標準音 A 與預備拍：標準音 2 秒 → 間隔 1 秒 → 預備拍 → 題目。
+     節拍器與音符參數完全比照 playStatic。 */
+  function buildExportEvents(seq, pitchArray, item, tieAcross){
+    if(!seq || !seq.length) return null;
+    const TUNING_SEC = 2.0, GAP_SEC = 1.0;
+    const tieArr = tieAcross || [];
+    const secPerUnit = 60 / item.bpm;
+    const numerator = parseInt(item.meter.split('/')[0], 10);
+    const secPer16th = item.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+    const beatUnits = item.meterType === 'simple' ? 4 : 6;
+    const ev = [{ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }];
+    let t = TUNING_SEC + GAP_SEC;
+    for(let i = 0; i < numerator; i++){
+      const strong = (item.meterType === 'simple') ? (i === 0) : (i % 3 === 0);
+      ev.push({ type: 'click', time: t + i * secPerUnit, freq: strong ? 1000 : 700, gain: 0.2 });
+    }
+    t += numerator * secPerUnit;
+    const bpb = item.beatsPerBar || (item.meterType === 'compound' ? numerator / 3 : numerator);
+    buildMelodyEvents(seq, pitchArray, tieArr, beatUnits, bpb).forEach(function(e){
+      if(e.midi !== null) ev.push({ midi: e.midi, time: t, duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, 1) });
+      t += e.len * secPer16th;
+    });
+    return ev;
+  }
+
+  /* 譜例導出：另外畫一份乾淨的譜 */
+  let __shotSeq = 0;
+  function offscreenStaff(draw){
+    const id = '__shot' + (++__shotSeq);
+    const holder = document.createElement('div');
+    holder.id = id;
+    holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:900px;';
+    document.body.appendChild(holder);
+    try{ draw(id); }catch(e){}
+    return { holder: holder, svg: holder.querySelector('svg') };
+  }
+
+  async function doExportSheet(seq, pitchArray, item, tieAcross){
+    const btn = window.__expBtn || document.getElementById('mel-ansExport');
+    if(btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    const made = offscreenStaff(id => renderStaticStaff(id, seq, pitchArray, null, null, item, tieAcross, null));
+    try{
+      if(!made.svg) throw new Error('沒有譜例');
+      await SheetExport.exportSheets([{ svg: made.svg }], '單旋律', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    finally{ made.holder.remove(); }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
+  async function doExportAudio(seq, pitchArray, item, tieAcross){
+    const btn = window.__expBtn || document.getElementById('mel-ansExport');
+    const ev = buildExportEvents(seq, pitchArray, item, tieAcross);
+    if(!ev || btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    try{
+      await AudioExport.exportEvents(ev, '單旋律', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
+        onProgress: function(pr){ btn.textContent = Math.round(pr * 100) + '%'; }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
+  function playStatic(seq, pitchArray, item, tieAcross) {
+    window.melStopAll();
+    if(!pianoInst) return;
+    const tieArr = tieAcross || [];   // 舊錯題本／舊考卷沒有這個欄位，視為沒有連結線
+    const ctx = ensureAudio(); let time = ctx.currentTime + 0.1;
+    let secPerUnit = 60 / item.bpm; let numerator = parseInt(item.meter.split('/')[0], 10);
+    let secPer16th = item.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+    let beatUnits = item.meterType === 'simple' ? 4 : 6;
+    for(let i=0; i<numerator; i++) {
+      let o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle';
+      o.frequency.value = (item.meterType === 'simple' ? i === 0 : i % 3 === 0) ? 1000 : 700;
+      g.gain.setValueAtTime(0.2, time + i * secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time + i * secPerUnit + 0.05);
+      o.connect(g); g.connect(ctx.destination); o.start(time + i * secPerUnit); o.stop(time + i * secPerUnit + 0.05);
+    }
+    time += numerator * secPerUnit;
+    const bpb = item.beatsPerBar || (item.meterType === 'compound' ? numerator / 3 : numerator);
+    buildMelodyEvents(seq, pitchArray, tieArr, beatUnits, bpb).forEach(function(e){
+      if(e.midi !== null) pianoInst.play(e.midi, time, { duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, 1) });
+      time += e.len * secPer16th;
+    });
+    melModule.isPlaying = true; melModule.updatePlayBtn();
+    const timerId = setTimeout(() => { melModule.isPlaying = false; melModule.updatePlayBtn(); }, (time-ctx.currentTime)*1000 + 100);
+    pendingTimers.push(timerId);
+  }
+
+  const melModule = {
+    mode: 'practice', clef: 'treble', meter: '2/4', meterType: 'simple', barsCount: 2, beatsPerBar: 2, bpm: 80, totalBeats: 4,
+    selectedPatterns: new Set(), questionSeq: [], questionPitch: [], userSeq: [], userPitch: [],
+    tieEnabled: false, questionTie: [], userTie: [], tieMin: 1, tieMax: 0,
+    isPlaying: false, hasPlayed: false, activeTab: 'rhythm', activeSlotIdx: 0, activeNoteIdx: 0,
+    lastEditedNoteIdx: null, currentAccidental: 'n', currentOctave: 4,
+    score: { c:0, t:0 }, testSession: { isRunning: false, replaysLeft: 0, totalPlays: 0 }, _ansItem: null,
+
+    initSettings: function() {
+      const grid = document.getElementById('settingsPatternGrid'); grid.innerHTML = '';
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      this.selectedPatterns.clear();
+      order.forEach(id => {
+        this.selectedPatterns.add(id);
+        const item = document.createElement('div'); item.className = 'pattern-item selected';
+        const svgContainer = document.createElement('div'); item.appendChild(svgContainer);
+        item.onclick = () => {
+          if(this.selectedPatterns.has(id)) { this.selectedPatterns.delete(id); item.classList.remove('selected'); }
+          else { this.selectedPatterns.add(id); item.classList.add('selected'); }
+          document.getElementById('mel-enterBtn').disabled = this.selectedPatterns.size === 0;
+        };
+        grid.appendChild(item); setTimeout(() => drawMiniRhythm(svgContainer, id), 10);
+      });
+      document.getElementById('mel-enterBtn').disabled = false;
+    },
+
+    sanitizePitch: function(p) {
+      if (p.step === 'C' && p.acc === 'b') { p.step = 'B'; p.oct -= 1; p.acc = 'n'; }
+      if (p.step === 'B' && p.acc === '#') { p.step = 'C'; p.oct += 1; p.acc = 'n'; }
+      if (p.step === 'F' && p.acc === 'b') { p.step = 'E'; p.acc = 'n'; }
+      if (p.step === 'E' && p.acc === '#') { p.step = 'F'; p.acc = 'n'; }
+      if (p.step === 'D' && p.acc === 'b') { p.step = 'C'; p.acc = '#'; }
+      if (p.step === 'G' && p.acc === 'b') { p.step = 'F'; p.acc = '#'; }
+      if (p.step === 'A' && p.acc === '#') { p.step = 'B'; p.acc = 'b'; }
+      if (p.step === 'D' && p.acc === '#') { p.step = 'E'; p.acc = 'b'; }
+      return p;
+    },
+
+    generateQuestion: function() {
+      resetStaffScroll();
+      this.questionSeq = []; this.questionPitch = [];
+      const pool = Array.from(this.selectedPatterns);
+      for(let i=0; i<this.totalBeats; i++) this.questionSeq.push(pool[Math.floor(Math.random() * pool.length)]);
+      this.questionTie = this.buildQuestionTie();
+
+      const steps = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+      const accs = ['n', 'n', 'n', 'n', '#', 'b'];
+      let baseOct = this.clef === 'treble' ? 4 : 3;
+      let lastStepIdx = 0; let lastOct = baseOct;
+
+      let tiedFromPrev = false;
+
+      for(let i=0; i<this.totalBeats; i++) {
+        let block = ALL_BLOCKS[this.questionSeq[i]];
+        let numNotes = block.lengths.length;
+        for(let k=0; k<numNotes; k++) {
+          let newPitch;
+          if (tiedFromPrev) {
+             let prevPitch = this.questionPitch[this.questionPitch.length - 1];
+             newPitch = { step: prevPitch.step, oct: prevPitch.oct, acc: prevPitch.acc };
+          } else {
+             let stepIdx = (lastStepIdx + (Math.floor(Math.random() * 5) - 2) + 7) % 7;
+             let oct = lastOct;
+             if(stepIdx < lastStepIdx && Math.random() < 0.2) oct += 1;
+             if(stepIdx > lastStepIdx && Math.random() < 0.2) oct -= 1;
+             if(this.clef === 'treble') { oct = Math.max(4, Math.min(5, oct)); }
+             else { oct = Math.max(2, Math.min(3, oct)); }
+             let acc = accs[Math.floor(Math.random() * accs.length)];
+
+             newPitch = { step: steps[stepIdx], oct: oct, acc: acc };
+             newPitch = this.sanitizePitch(newPitch);
+          }
+
+          this.questionPitch.push(newPitch);
+          lastStepIdx = steps.indexOf(newPitch.step); lastOct = newPitch.oct;
+          // 一拍的最後一個音：改看跨拍連結線，讓被連結的兩個音音高相同
+          tiedFromPrev = (k < numNotes - 1)
+            ? !!(block.tieNext && block.tieNext[k])
+            : !!this.questionTie[i];
+        }
+      }
+    },
+
+    /* 跨拍連結線的出題：只在小節內、連鎖最多三個音、
+       數量在 tieMin～tieMax 之間（練習用 1～小節數，考試由 exam 設定覆寫）。 */
+    buildQuestionTie: function() {
+      const n = this.totalBeats;
+      const tie = new Array(n).fill(false);
+      if (!this.tieEnabled) return tie;
+
+      const slots = [];
+      for (let i = 0; i < n - 1; i++) if (isInnerBoundary(i, this.beatsPerBar, n)) slots.push(i);
+      if (!slots.length) return tie;   // 3/8 這種每小節只有一拍的拍號，小節內沒有拍界
+
+      const maxN = Math.min(this.tieMax || this.barsCount, slots.length);
+      const minN = Math.min(Math.max(this.tieMin || 1, 1), maxN);
+      const want = minN + Math.floor(Math.random() * (maxN - minN + 1));
+
+      for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); const t = slots[i]; slots[i] = slots[j]; slots[j] = t; }
+      let placed = 0;
+      for (let k = 0; k < slots.length && placed < want; k++) {
+        const i = slots[k];
+        if (tie[i]) continue;
+        if (chainLenIfSet(tie, i) > 2) continue;
+        tie[i] = true; placed++;
+      }
+      return tie;
+    },
+
+    /* ⌒ 按鈕：開關關閉時隱藏（按鈕列自然收合）；只在「編輯節奏」分頁可用。
+       選中最後一拍、小節最後一拍、空白拍、或連鎖會超過三個音時灰掉。 */
+    /* ⌒ 要作用在哪一個拍界：
+       「編輯節奏」分頁看目前選中的拍；
+       「編輯音高」分頁看目前選中的音——只有當它是「那一拍的最後一個音」時才成立，
+       因為連結線一定是從一拍的末音連到下一拍的首音。
+       回傳拍界索引，不能操作時回傳 -1。 */
+    _tieSlotForActive: function() {
+      if (!this.hasPlayed) return -1;
+      if (this.activeTab === 'rhythm') return this.activeSlotIdx;
+      const nIdx = this.activeNoteIdx;
+      if (nIdx < 0) return -1;
+      const b = this._beatIdxOfNote(nIdx);
+      const lastNoteOfBeat = this._firstNoteIdxOfBeat(b) + this._noteCountOf(this.userSeq[b]) - 1;
+      return (nIdx === lastNoteOfBeat) ? b : -1;
+    },
+
+    refreshTieBtn: function() {
+      const btn = document.getElementById('mel-tieBtn'); if(!btn) return;
+      if (!this.tieEnabled) { btn.style.display = 'none'; return; }
+      btn.style.display = '';
+      const i = this._tieSlotForActive();
+      const ok = i >= 0 && canToggleTie(this.userSeq, this.userTie, i, this.beatsPerBar);
+      btn.disabled = !ok;
+      btn.style.opacity = ok ? '1' : '0.35';
+      btn.textContent = (ok && this.userTie[i]) ? '⌒ 取消連結' : '⌒ 連結線';
+    },
+
+    toggleTie: function() {
+      const i = this._tieSlotForActive();
+      if (!this.tieEnabled || i < 0) return;
+      if (!canToggleTie(this.userSeq, this.userTie, i, this.beatsPerBar)) return;
+      this.userTie[i] = !this.userTie[i];
+      // 連結線改變會影響音高綁定：讓被連結的第二個音跟著前一個音
+      this.syncTiedPitches();
+      this.updateUI();
+    },
+
+    /* 連結線兩端的音高必須相同。加上連結線時，後面那個音沿用前一個音；
+       取消時保留當下的音高（使用者可再自行修改）。 */
+    syncTiedPitches: function() {
+      let noteIdx = 0;
+      for (let b = 0; b < this.userSeq.length; b++) {
+        const cnt = this._noteCountOf(this.userSeq[b]);
+        const lastIdx = noteIdx + cnt - 1;
+        if (this.isNoteTiedToNext(lastIdx) && this.userPitch[lastIdx] && this.userPitch[lastIdx + 1]) {
+          const src = this.userPitch[lastIdx];
+          this.userPitch[lastIdx + 1] = { step: src.step, oct: src.oct, acc: src.acc, entered: !!src.entered };
+        }
+        noteIdx += cnt;
+      }
+    },
+
+    /* 刪掉第 i 拍時，該拍前後兩條連結線一律清除。
+       （換成別的節奏型則保留連結線，會自動接到新的最後一個音。） */
+    clearTieAround: function(i) {
+      if (i > 0) this.userTie[i-1] = false;
+      if (i < this.userTie.length) this.userTie[i] = false;
+    },
+
+    /* 連結線可以跨小節線，所以任何拍號都能使用（3/8 每小節只有一拍，
+       它的連結線一定是跨小節的）。這裡只負責清掉提示文字。 */
+    syncTieSwitch: function() {
+      const note = document.getElementById('mel-tieNote');
+      if (note) note.textContent = '';
+    },
+
+    getTotalNoteCount: function(seq) {
+      return seq.reduce((acc, id) => {
+        if(id === 'placeholder') return acc + 1;
+        return acc + ALL_BLOCKS[id].lengths.length;
+      }, 0);
+    },
+
+    isNoteTiedToNext: function(idx) {
+      if (idx < 0) return false;
+      let count = 0;
+      for(let b = 0; b < this.userSeq.length; b++) {
+        let blockId = this.userSeq[b];
+        if (blockId === 'placeholder') {
+          if (idx === count) return false;
+          count += 1; continue;
+        }
+        let block = ALL_BLOCKS[blockId];
+        if(idx >= count && idx < count + block.lengths.length) {
+          let currNoteInBeat = idx - count;
+          // 一拍的最後一個音：改看跨拍連結線（下一拍必須存在且已填）
+          if (currNoteInBeat === block.lengths.length - 1) {
+            return !!(this.userTie && this.userTie[b])
+                   && isInnerBoundary(b, this.beatsPerBar, this.userSeq.length)
+                   && this.userSeq[b + 1] && this.userSeq[b + 1] !== 'placeholder';
+          }
+          return block.tieNext && block.tieNext[currNoteInBeat];
+        }
+        count += block.lengths.length;
+      }
+      return false;
+    },
+
+    isNoteTiedToPrevious: function(idx) {
+      if (idx <= 0) return false;
+      return this.isNoteTiedToNext(idx - 1);
+    },
+
+    _noteCountOf: function(id) { return id === 'placeholder' ? 1 : ALL_BLOCKS[id].lengths.length; },
+
+    /* 依「拍」重建音高：改某一拍的節奏時，只重建那一拍，其餘各拍的音高原封不動。
+       （舊做法是照流水號對位，改一拍會讓後面所有音高整串位移。）
+       儲存格式不變，因此計分、繪譜、錯題本、考試存檔都不受影響。 */
+    rebuildUserPitchArray: function() {
+      let defOct = this.clef === 'treble' ? 4 : 3, defStep = this.clef === 'treble' ? 'A' : 'C';
+      let seqNow = this.userSeq;
+      let seqPrev = this._pitchSeqSnapshot;
+      let newPitch = [];
+      if (Array.isArray(seqPrev) && seqPrev.length === seqNow.length) {
+        let oldOff = 0;
+        for (let b = 0; b < seqNow.length; b++) {
+          let oldN = this._noteCountOf(seqPrev[b]);
+          let newN = this._noteCountOf(seqNow[b]);
+          for (let k = 0; k < newN; k++) {
+            let src = (k < oldN) ? this.userPitch[oldOff + k] : null;
+            newPitch.push(src ? src : { step: defStep, oct: defOct, acc: 'n', entered: false });
+          }
+          oldOff += oldN;   // 一律照舊拍長前進，確保後面各拍仍對得回原位
+        }
+      } else {
+        // 沒有對照表（首次建立／小節數改變）時，退回原本的流水號對位
+        let totalNotes = this.getTotalNoteCount(this.userSeq);
+        for (let i = 0; i < totalNotes; i++) {
+          newPitch.push(this.userPitch[i] ? this.userPitch[i] : { step: defStep, oct: defOct, acc: 'n', entered: false });
+        }
+      }
+      this.userPitch = newPitch;
+      this._pitchSeqSnapshot = seqNow.slice();
+    },
+
+    /* 拍 ↔ 音 的對應：讓兩個分頁的游標互相同步 */
+    _firstNoteIdxOfBeat: function(beatIdx) {
+      let n = 0;
+      for (let i = 0; i < this.userSeq.length; i++) {
+        if (i === beatIdx) return n;
+        n += this._noteCountOf(this.userSeq[i]);
+      }
+      return Math.max(0, n - 1);
+    },
+    _beatIdxOfNote: function(noteIdx) {
+      let n = 0;
+      for (let i = 0; i < this.userSeq.length; i++) {
+        let c = this._noteCountOf(this.userSeq[i]);
+        if (noteIdx < n + c) return i;
+        n += c;
+      }
+      return Math.max(0, this.userSeq.length - 1);
+    },
+
+    switchTab: function(tab) {
+      let prevTab = this.activeTab;
+      this.activeTab = tab;
+      this.lastEditedNoteIdx = null;
+      // 切換分頁時同步游標：看到的框就是接下來會生效的位置
+      if (tab === 'rhythm' && prevTab === 'pitch' && this.activeNoteIdx !== -1) {
+        this.activeSlotIdx = this._beatIdxOfNote(this.activeNoteIdx);
+      } else if (tab === 'pitch' && prevTab === 'rhythm' && this.activeSlotIdx !== -1) {
+        this._pendingNoteFromSlot = this.activeSlotIdx;
+      }
+      document.getElementById('tab-rhythm').className = `tab-btn ${tab === 'rhythm' ? 'active' : ''}`;
+      document.getElementById('tab-pitch').className = `tab-btn ${tab === 'pitch' ? 'active' : ''}`;
+      document.getElementById('panel-rhythm').style.display = tab === 'rhythm' ? 'block' : 'none';
+      document.getElementById('panel-pitch').style.display = tab === 'pitch' ? 'block' : 'none';
+
+      if(tab === 'rhythm') {
+        if(this.activeSlotIdx === -1) this.activeSlotIdx = 0;
+      } else {
+        let defPat = this.meterType === 'simple' ? '4' : '6';
+        for(let i = 0; i < this.userSeq.length; i++) {
+          if(this.userSeq[i] === 'placeholder') this.userSeq[i] = defPat;
+        }
+        this.rebuildUserPitchArray();
+
+        // 由節奏分頁切過來：框停在該拍的第一個音
+        if (this._pendingNoteFromSlot !== undefined && this._pendingNoteFromSlot !== null) {
+          this.activeNoteIdx = this._firstNoteIdxOfBeat(this._pendingNoteFromSlot);
+          this._pendingNoteFromSlot = null;
+        }
+        if(this.activeNoteIdx < 0 || this.activeNoteIdx >= this.userPitch.length) this.activeNoteIdx = 0;
+
+        let totalNotes = this.getTotalNoteCount(this.userSeq);
+        while (this.activeNoteIdx < totalNotes && this.isNoteTiedToPrevious(this.activeNoteIdx)) {
+            this.activeNoteIdx++;
+        }
+        if (this.activeNoteIdx >= totalNotes) this.activeNoteIdx = -1;
+
+        this.currentOctave = (this.activeNoteIdx !== -1 && this.userPitch[this.activeNoteIdx]) ? this.userPitch[this.activeNoteIdx].oct : (this.clef === 'treble' ? 4 : 3);
+        this.updateOctaveLabels();
+      }
+      this.updateUI();
+    },
+
+    // 更新升降按鈕視覺狀態與「待套用」記號（先按記號、再輸入音名的舊行為用）
+    setPendingAccidental: function(acc) {
+      this.currentAccidental = acc;
+      document.getElementById('acc-b').className = `p-btn acc-btn ${acc === 'b' ? 'active' : ''}`;
+      document.getElementById('acc-n').className = `p-btn acc-btn ${acc === 'n' ? 'active' : ''}`;
+      document.getElementById('acc-s').className = `p-btn acc-btn ${acc === '#' ? 'active' : ''}`;
+    },
+
+    // 升降按鈕邏輯：
+    //  1) 剛輸入完一個音（lastEditedNoteIdx）→ 直接修改那個音（事後修飾，不前進）。
+    //  2) 沒有剛輸入的音、但目前有選中的音（activeNoteIdx，例如用點選跳過去的）→ 套用到該音一次，然後跳到下一個音。
+    //  3) 都沒有（焦點已到結尾）→ 暫存記號待下次輸入。
+    setAccidental: function(acc) {
+      let afterIdx = this.lastEditedNoteIdx;
+      if (afterIdx !== null && afterIdx !== -1 && this.userPitch[afterIdx]) {
+        this._applyAccidentalToIdx(afterIdx, acc);
+        this.setPendingAccidental('n');
+        this.updateUI();
+        return;
+      }
+      let selIdx = this.activeNoteIdx;
+      if (selIdx !== -1 && this.userPitch[selIdx]) {
+        this._applyAccidentalToIdx(selIdx, acc);
+        this.lastEditedNoteIdx = selIdx; // 記住剛修飾的音，之後再按記號可再改同一音
+        // 修改既有音：框留在該音不移動，連按多次都改同一個音（所見即所改）
+        this.activeNoteIdx = selIdx;
+        this.setPendingAccidental('n');
+        this.updateUI();
+        return;
+      }
+      this.setPendingAccidental(acc);
+    },
+
+    _applyAccidentalToIdx: function(idx, acc) {
+      let base = this.userPitch[idx];
+      // 作答輸入不做異名同音轉換：你按什麼就顯示什麼（A♯ 就是 A♯）。對錯以音高比對，不受拼法影響。
+      let np = { step: base.step, oct: base.oct, acc: acc, entered: !!base.entered };
+      this.userPitch[idx] = np;
+      let propagateIdx = idx;
+      while (this.isNoteTiedToNext(propagateIdx)) {
+        if (propagateIdx + 1 < this.userPitch.length) this.userPitch[propagateIdx + 1] = { step: np.step, oct: np.oct, acc: np.acc, entered: np.entered };
+        propagateIdx++;
+      }
+      this.currentOctave = np.oct; this.updateOctaveLabels();
+    },
+
+    updateOctaveLabels: function() {
+      document.getElementById('oct-label-low').textContent = `(Oct ${this.currentOctave - 1})`;
+      document.getElementById('oct-label-high').textContent = `(Oct ${this.currentOctave + 1})`;
+    },
+
+    shiftOctave: function(delta) {
+      this.currentOctave += delta;
+      if(this.currentOctave < 1) this.currentOctave = 1; if(this.currentOctave > 7) this.currentOctave = 7;
+      this.updateOctaveLabels();
+
+      let targetIdx = (this.lastEditedNoteIdx !== null) ? this.lastEditedNoteIdx : this.activeNoteIdx;
+
+      if(targetIdx !== -1 && this.userPitch[targetIdx]) {
+        this.userPitch[targetIdx].oct += delta;
+        if(this.userPitch[targetIdx].oct < 1) this.userPitch[targetIdx].oct = 1;
+        if(this.userPitch[targetIdx].oct > 7) this.userPitch[targetIdx].oct = 7;
+
+        let propagateIdx = targetIdx;
+        while(this.isNoteTiedToNext(propagateIdx)) {
+          if(propagateIdx + 1 < this.userPitch.length) {
+            this.userPitch[propagateIdx + 1].oct = this.userPitch[targetIdx].oct;
+          }
+          propagateIdx++;
+        }
+        this.updateUI();
+      }
+    },
+
+    inputPitch: function(stepInput) {
+      if(!this.hasPlayed || this.activeNoteIdx === -1) return;
+      let step = stepInput;
+      // 八度自動選擇：以「該格的前一個音」為基準取最近的八度；沒有前一音就用後一音
+      let ref = null;
+      for(let i = this.activeNoteIdx - 1; i >= 0; i--){ if(this.userPitch[i] && this.userPitch[i].entered){ ref = this.userPitch[i]; break; } }
+      if(!ref){
+        let nx = this.activeNoteIdx + 1;
+        while(nx < this.userPitch.length && this.isNoteTiedToPrevious(nx)) nx++;   // 跳過本音的連音延續
+        if(this.userPitch[nx] && this.userPitch[nx].entered) ref = this.userPitch[nx];
+      }
+      let oct = nearestOctFor(step, ref, (this.clef === 'treble' ? 4 : 3), 1, 7);
+
+      this.userPitch[this.activeNoteIdx] = { step: step, oct: oct, acc: this.currentAccidental, entered: true };
+      this.currentOctave = oct; this.updateOctaveLabels();
+
+      let accToApply = this.currentAccidental;
+      if(this.currentAccidental !== 'n') this.setPendingAccidental('n');
+
+      let propagateIdx = this.activeNoteIdx;
+      while(this.isNoteTiedToNext(propagateIdx)) {
+        if(propagateIdx + 1 < this.userPitch.length) {
+          this.userPitch[propagateIdx + 1] = { step: step, oct: oct, acc: accToApply, entered: true };
+        }
+        propagateIdx++;
+      }
+
+      this.lastEditedNoteIdx = this.activeNoteIdx;
+
+      let totalNotes = this.getTotalNoteCount(this.userSeq);
+      let nextIdx = this.activeNoteIdx + 1;
+
+      while (nextIdx < totalNotes && this.isNoteTiedToPrevious(nextIdx)) {
+          nextIdx++;
+      }
+
+      if(nextIdx < totalNotes) this.activeNoteIdx = nextIdx;
+      // 已是最後一個音：框留在最後一格（不消失），方便繼續修改／加記號
+
+      this.updateUI();
+    },
+
+    playSequence: function(seq, pitchArray, onEnd) {
+      if(!pianoInst || this.isPlaying) return;
+      this.isPlaying = true; this.updatePlayBtn();
+
+      // 播放／重播不移動作答框，維持在原本位置
+      this.updateUI();
+
+      const ctx = ensureAudio(); let time = ctx.currentTime + 0.1;
+      let secPerUnit = 60 / this.bpm; let numerator = parseInt(this.meter.split('/')[0], 10);
+      let secPer16th = this.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+
+      for(let i=0; i<numerator; i++) {
+        let o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle';
+        o.frequency.value = (this.meterType === 'simple' ? i === 0 : i % 3 === 0) ? 1000 : 700;
+        g.gain.setValueAtTime(0.2, time + i * secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time + i * secPerUnit + 0.05);
+        o.connect(g); g.connect(ctx.destination); o.start(time + i * secPerUnit); o.stop(time + i * secPerUnit + 0.05);
+      }
+      time += numerator * secPerUnit;
+
+      const beatUnits = this.meterType === 'simple' ? 4 : 6;
+      const tieArr = (seq === this.questionSeq) ? this.questionTie : this.userTie;
+      buildMelodyEvents(seq, pitchArray, tieArr || [], beatUnits, this.beatsPerBar).forEach(function(e){
+        if(e.midi !== null) pianoInst.play(e.midi, time, { duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, 1) });
+        time += e.len * secPer16th;
+      });
+      const timerId = setTimeout(() => { this.isPlaying = false; this.updatePlayBtn(); if(onEnd) onEnd(); }, (time-ctx.currentTime)*1000 + 100);
+      pendingTimers.push(timerId);
+    },
+
+    /* ===== 模擬測驗：考試模式 ===== */
+    paperReview: function(paperId, KEY){
+      const EXm = window.EXAM; if(!EXm) return false;
+      const p = EXm.getPaper(paperId); if(!p) return false;
+      const d = p.data && p.data[KEY]; if(!d || !d.questions) return false;
+      const cfg = (p.config && p.config[KEY]) || {};
+      const item = { clef: cfg.clef || 'treble', meter: cfg.meter, meterType: cfg.meterType,
+                     barsCount: cfg.bars,
+                     beatsPerBar: (function(){ var b = parseInt((cfg.meter||'4/4').split('/')[0],10); return cfg.meterType==='compound' ? b/3 : b; })(),
+                     bpm: cfg.bpm || 80 };
+      const qSeq = (d.questions.seq || []).slice();
+      const qPit = JSON.parse(JSON.stringify(d.questions.pitch || []));
+      const uSeq = (d.answers && d.answers.seq) ? d.answers.seq.slice() : [];
+      const uPit = (d.answers && d.answers.pitch) ? JSON.parse(JSON.stringify(d.answers.pitch)) : [];
+      // 舊考卷沒有 tie 欄位，一律讀成沒有連結線
+      const qTie = (d.questions.tie || []).slice();
+      const uTie = (d.answers && d.answers.tie) ? d.answers.tie.slice() : [];
+      setPaperHead(p, KEY, 'mel-ansBadge', 'mel-ansScore', 'mel-ansFeedback', 'mel-ansNextBtn', 'mel-paperBack', paperId, 'pageMelAnswer');
+      showPage('mel-answer');
+      setTimeout(function(){
+        renderStaticStaff('mel-ansUser', uSeq, uPit, qSeq, qPit, item, uTie, qTie);
+        renderStaticStaff('mel-ansCorrect', qSeq, qPit, null, null, item, qTie, null);
+        syncStaffScroll('mel-ansUser', 'mel-ansCorrect');
+        resetReviewScroll(['mel-ansUser','mel-ansCorrect']);
+      }, 60);
+      document.getElementById('mel-ansPlayUser').onclick = function(){ playStatic(uSeq, uPit, item, uTie); };
+      document.getElementById('mel-ansPlayCorrect').onclick = function(){ playStatic(qSeq, qPit, item, qTie); };
+      document.getElementById('mel-ansExport').onclick = function(){
+        window.__expBtn = null;
+        ExportMenu.open({ subtitle: '這一題的正解',
+          onAudio: function(){ doExportAudio(qSeq, qPit, item, qTie); },
+          onSheet: function(){ doExportSheet(qSeq, qPit, item, qTie); } });
+      };
+      return true;
+    },
+
+    examBootstrap: function() {
+      const EXm = window.EXAM; if(!EXm) return;
+      const KEY = EXm.currentSection(); if(!KEY || KEY.indexOf('melody') !== 0) return;
+      const cfg = EXm.configFor(KEY) || {};
+      const self = this;
+
+      ensureAudio(); window.melStopAll();
+      this.mode = 'practice';
+      this.clef = cfg.clef || 'treble';
+      this.meter = cfg.meter; this.meterType = cfg.meterType;
+      this.barsCount = cfg.bars; this.bpm = cfg.bpm || 80;
+      this.beatsPerBar = parseInt(this.meter.split('/')[0], 10);
+      if(this.meterType === 'compound') this.beatsPerBar /= 3;
+      this.totalBeats = this.barsCount * this.beatsPerBar;
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      this.selectedPatterns = new Set(order);
+
+      // 連結線：由考卷設定決定（大學檔至少 1 次、至多 2 次；高中檔沒有這個欄位＝不出）
+      this.tieEnabled = !!cfg.tie;
+      this.tieMin = cfg.tieMin || 1; this.tieMax = cfg.tieMax || 2;
+
+      const sd = EXm.sectionData(KEY, function(){
+        self.generateQuestion();
+        return { questions: { seq: self.questionSeq.slice(), tie: self.questionTie.slice(), pitch: JSON.parse(JSON.stringify(self.questionPitch)) }, labels: {} };
+      });
+      if(!sd) return;
+      this.questionSeq = sd.questions.seq.slice();
+      this.questionTie = (sd.questions.tie || []).slice();
+      this.questionPitch = JSON.parse(JSON.stringify(sd.questions.pitch));
+      this.userSeq = (sd.answers && sd.answers.seq) ? sd.answers.seq.slice() : Array(this.totalBeats).fill('placeholder');
+      // 舊考卷沒有 tie 欄位，一律讀成沒有連結線
+      this.userTie = (sd.answers && sd.answers.tie) ? sd.answers.tie.slice() : Array(this.totalBeats).fill(false);
+      this.userPitch = (sd.answers && sd.answers.pitch) ? JSON.parse(JSON.stringify(sd.answers.pitch)) : [];
+      this.hasPlayed = !!sd.played;
+      this.activeSlotIdx = 0; this.activeNoteIdx = 0; this.lastEditedNoteIdx = null;
+
+      const badge = document.getElementById('mel-statusBadge');
+      if(badge) badge.textContent = `${this.clef==='treble'?'高音':'低音'}｜${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
+      const back = document.querySelector('#pageMelPractice .nav-back-btn'); if(back) back.style.display = 'none';
+      const sub = document.getElementById('mel-submitBtn'); if(sub) sub.style.display = 'none';
+
+      this.renderKeypad(); showPage('mel-practice');
+      setTimeout(() => self.updateUI(), 150);
+
+      const host = document.getElementById('pageMelPractice');
+      const lockEl = document.querySelector('#pageMelPractice .practice-top-fixed');
+      if(lockEl && !lockEl.id) lockEl.id = 'exam-lockwrap';
+
+      const maxPlays = cfg.plays || 5;
+      let used = (sd.playCount || 0);
+      function headText(){ return '播放剩餘 <b>' + Math.max(0, maxPlays-used) + '</b> / ' + maxPlays + ' 次'; }
+      EXm.buildHeader(host, KEY, headText());
+
+      // 逐拍計分：節奏對→每個錯音 -1；節奏錯但音數同→ -2 再每錯音 -1；節奏錯且音數不同→該拍 -4
+      function saveNow(){
+        EXm.saveAnswers(KEY, { seq: self.userSeq.slice(), tie: self.userTie.slice(), pitch: JSON.parse(JSON.stringify(self.userPitch||[])) });
+        /* 節奏是否算對：先看該小節攤平後的時值序列，相同就整小節算對（記譜寫法不同也算對）；
+           不同時才逐拍比，連結線不同算在前面那一拍（不另計單位，併入該拍的節奏錯誤）。 */
+        const barOK = compareBars(self.userSeq, self.questionSeq, self.userTie, self.questionTie,
+                                  self.beatsPerBar, self.barsCount);
+        const totalBeats = self.barsCount * self.beatsPerBar;
+        const beats = []; let qOff = 0, uOff = 0, blank = 0, tieUnits = 0;
+        for(let i=0; i<self.questionSeq.length; i++){
+          const qid = self.questionSeq[i], uid = self.userSeq[i];
+          const qN = ALL_BLOCKS[qid] ? ALL_BLOCKS[qid].lengths.length : 0;
+          const uN = (uid && uid !== 'placeholder' && ALL_BLOCKS[uid]) ? ALL_BLOCKS[uid].lengths.length : 0;
+          if(!uid || uid === 'placeholder') blank++;
+          const tieBad = isInnerBoundary(i, self.beatsPerBar, totalBeats)
+                         && !!self.userTie[i] !== !!self.questionTie[i];
+          /* 只有連結線寫錯（節奏型本身正確）時，不走 beatLoss 的「節奏錯 2 單位」，
+             改成另計 1 單位，與節奏練習頁的規則一致。 */
+          const inBarOK = barOK[Math.floor(i / self.beatsPerBar)];
+          const tieOnly = !inBarOK && (uid === qid) && tieBad;
+          if (tieOnly) tieUnits++;
+          const rhythmOK = inBarOK ? true : (uid === qid);
+          const sameCount = (uN === qN);
+          let wrong = 0; const n = Math.min(qN, uN);
+          for(let k=0; k<n; k++){
+            const qp = self.questionPitch[qOff+k], up = (self.userPitch||[])[uOff+k];
+            if(!up || !qp || getPitchFromObj(up) !== getPitchFromObj(qp)) wrong++;
+          }
+          beats.push({ rhythmOK: rhythmOK, sameCount: sameCount, wrongPitches: wrong });
+          qOff += qN; uOff += uN;
+        }
+        const max = EXm.maxFor(KEY);
+        const lost = EXm.beatLoss(beats) + tieUnits;   // 逐拍失分單位 ＋ 連結線單位
+        const badBeats = beats.filter(function(b){ return !b.rhythmOK || b.wrongPitches>0; }).length + tieUnits;
+        EXm.saveResult(KEY, { lostUnits: lost, max: max, unanswered: blank,
+          detail: [{ correct: badBeats===0, your: '有誤 '+badBeats+' 拍', right: '共 '+beats.length+' 拍' }] });
+      }
+      saveNow();
+      const _origUpdateUI = this.updateUI.bind(this);
+      this.updateUI = function(){ _origUpdateUI(); saveNow(); };
+
+      const pb = document.getElementById('mel-playBtn');
+      function refreshPlayBtn(){
+        const left = maxPlays - used;
+        if(self.isPlaying || self._examTuning){ pb.textContent = '🔊 播放中...'; pb.disabled = true; return; }
+        pb.disabled = !pianoInst || left <= 0;
+        pb.textContent = left > 0 ? `▶ 播放題目（剩餘 ${left} 次）` : '▶ 已用完播放次數';
+        EXm.buildHeader(host, KEY, headText());
+      }
+      this.updatePlayBtn = function(){ refreshPlayBtn(); };
+      this._examReady = refreshPlayBtn;
+      refreshPlayBtn();
+
+      pb.onclick = function(){
+        ensureAudio();
+        if(!pianoInst || self.isPlaying || self._examTuning || used >= maxPlays) return;
+        const firstTime = (used === 0);
+        used++;
+        const s = EXm.loadSession(); if(s && s.data && s.data[KEY]){ s.data[KEY].playCount = used; s.data[KEY].played = true; EXm.saveSession(s); }
+        self.hasPlayed = true; EXm.setPlaying(true);
+        function runSeq(){
+          self._examTuning = false;
+          document.getElementById('mel-playCaption').textContent = '🔊 播放中...';
+          self.playSequence(self.questionSeq, self.questionPitch, function(){
+            EXm.setPlaying(false);
+            document.getElementById('mel-playCaption').textContent = (maxPlays-used) > 0 ? `✅ 播放完畢，可再播 ${maxPlays-used} 次` : '✅ 播放次數已用完，請完成作答';
+            refreshPlayBtn();
+          });
+        }
+        if(firstTime){
+          // 第一次播放先給標準音 A440（2 秒），再進預備拍
+          self._examTuning = true; refreshPlayBtn();
+          document.getElementById('mel-playCaption').textContent = '🎵 標準音 A＝440Hz（2 秒）…';
+          pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: 3.5 });
+          const tid = setTimeout(runSeq, 2600); pendingTimers.push(tid);
+        } else {
+          runSeq();
+        }
+        refreshPlayBtn();
+      };
+
+      EXm.guardVisibility(KEY, function(){ window.melStopAll(); self._examTuning = false; EXm.setPlaying(false); refreshPlayBtn(); });
+      EXm.buildBar(host, saveNow);
+    },
+
+    renderKeypad: function() {
+      const pad = document.getElementById('mel-keypad'); pad.innerHTML = '';
+      const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+      order.forEach(id => {
+        if(!this.selectedPatterns.has(id)) return;
+        const btn = document.createElement('div'); btn.className = 'rhythm-btn';
+        const svgDiv = document.createElement('div'); btn.appendChild(svgDiv);
+        btn.onclick = () => {
+          if(!this.hasPlayed || this.activeSlotIdx === -1) return;
+          let reqBeats = ALL_BLOCKS[id].beats; let available = 0; let removeCount = 0;
+          for(let i = this.activeSlotIdx; i < this.userSeq.length; i++) {
+            available += this.userSeq[i] === 'placeholder' ? 1 : ALL_BLOCKS[this.userSeq[i]].beats;
+            removeCount++; if(available >= reqBeats) break;
+          }
+          if(available >= reqBeats) {
+            this.userSeq.splice(this.activeSlotIdx, removeCount, id);
+            let overshot = available - reqBeats;
+            for(let k=0; k<overshot; k++) this.userSeq.splice(this.activeSlotIdx + 1 + k, 0, 'placeholder');
+            this.rebuildUserPitchArray();
+            let nextSlot = this.activeSlotIdx + 1;
+            if(nextSlot < this.userSeq.length) this.activeSlotIdx = nextSlot; else this.activeSlotIdx = this.userSeq.length - 1;
+            this.updateUI();
+          }
+        };
+        pad.appendChild(btn); setTimeout(() => drawMiniRhythm(svgDiv, id), 10);
+      });
+    },
+
+    updateUI: function() {
+      renderMainStaff('mel-staff-svg', this.userSeq, this.userPitch, true, null, null, this.clef, this.activeTab, this.activeSlotIdx, this.activeNoteIdx, null, this.userTie, null);
+      this.refreshTieBtn();
+      // 提交鈕在播放後即可按；未填的格子會在提交時跳出提醒並計為錯誤
+      document.getElementById('mel-submitBtn').disabled = !this.hasPlayed;
+
+      const containerOuter = document.getElementById('staffContainerOuter');
+      let targetEl = null;
+      if(this.activeTab === 'rhythm' && this.activeSlotIdx !== -1) targetEl = document.getElementById('mel-slot-' + this.activeSlotIdx);
+      else if(this.activeTab === 'pitch' && this.activeNoteIdx !== -1) targetEl = document.getElementById('mel-note-' + this.activeNoteIdx);
+
+      if(containerOuter && targetEl) {
+        const slotLeft = targetEl.offsetLeft; const slotWidth = targetEl.offsetWidth;
+        const containerWidth = containerOuter.clientWidth; const currentScroll = containerOuter.scrollLeft;
+        if(slotLeft < currentScroll || (slotLeft + slotWidth) > (currentScroll + containerWidth)) {
+          containerOuter.scrollTo({ left: slotLeft - (containerWidth / 2) + (slotWidth / 2), behavior: 'smooth' });
+        }
+      }
+    },
+
+    updatePlayBtn: function() {
+      const b = document.getElementById('mel-playBtn');
+      if(this.isPlaying) {
+          b.textContent = '🔊 播放中...';
+          b.disabled = true;
+      } else {
+          if (this.mode === 'test') {
+              if (this.testSession.replaysLeft > 0) {
+                  b.textContent = `▶ 播放題目 (剩 ${this.testSession.replaysLeft} 次)`;
+                  b.disabled = !pianoInst;
+              } else {
+                  b.textContent = '🚫 次數用盡';
+                  b.disabled = true;
+              }
+          } else {
+              b.textContent = '▶ 播放題目';
+              b.disabled = !pianoInst;
+          }
+      }
+    },
+
+    refreshReviewCount: function() {
+      const el = document.getElementById('mel-reviewCount'); if(el) el.textContent = window.REVIEW_STORE.count('melody');
+    },
+
+    showAnswerPage: function(isCorrect) {
+      const item = {
+        correctSeq: [...this.questionSeq], correctPitch: JSON.parse(JSON.stringify(this.questionPitch)),
+        userSeq: [...this.userSeq], userPitch: JSON.parse(JSON.stringify(this.userPitch)), clef: this.clef,
+        correctTie: [...this.questionTie], userTie: [...this.userTie],
+        meter: this.meter, meterType: this.meterType, barsCount: this.barsCount, beatsPerBar: this.beatsPerBar, bpm: this.bpm,
+        label: `${this.clef === 'treble' ? '高音' : '低音'}・${this.meter}拍・${this.barsCount}小節`, correctText: '（旋律聽寫）', yourText: ''
+      };
+      this._ansItem = item;
+      document.getElementById('mel-ansBadge').textContent = isCorrect ? '✅ 答對了' : '📖 解答對照';
+      const fb = document.getElementById('mel-ansFeedback');
+      fb.textContent = isCorrect ? '🎉 完全正確！樂感太棒了！' : '❌ 音高或節奏有誤，來看看正解對照';
+      fb.className = 'answer-big-feedback ' + (isCorrect ? 'correct' : 'wrong');
+      document.getElementById('mel-ansScore').textContent = `${this.score.c}/${this.score.t}`;
+      if(!isCorrect){ window.REVIEW_STORE.add('melody', item); this.refreshReviewCount(); }
+      showPage('mel-answer');
+      setTimeout(() => {
+        renderStaticStaff('mel-ansUser', item.userSeq, item.userPitch, item.correctSeq, item.correctPitch, item, item.userTie, item.correctTie);
+        renderStaticStaff('mel-ansCorrect', item.correctSeq, item.correctPitch, null, null, item, item.correctTie, null);
+        syncStaffScroll('mel-ansUser', 'mel-ansCorrect');
+        resetReviewScroll(['mel-ansUser','mel-ansCorrect']);
+      }, 60);
+    },
+
+    renderReviewPage: function() {
+      this.refreshReviewCount();
+      const list = document.getElementById('mel-reviewList'); const empty = document.getElementById('mel-reviewEmpty');
+      if(!list) return; list.innerHTML = '';
+      const items = window.REVIEW_STORE.load('melody');
+      if(items.length === 0){ if(empty) empty.style.display = 'block'; return; }
+      if(empty) empty.style.display = 'none';
+      scrollReviewToBottom('pageMelReview');
+      items.forEach((item, ri) => {
+        const uid = item.id || ('m'+ri);
+        const box = document.createElement('div'); box.className = 'review-item';
+        box.innerHTML = `
+          <div style="font-size:13px; font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <span style="color:var(--wrong);">❌ 錯題（${item.label || ''}）</span>
+            <div style="display:flex; gap:8px;">
+              <button class="select-all-btn mel-rev-user" style="color:var(--wrong); border-color:var(--wrong); background:var(--wrong-soft);">🔊 聽你的作答</button>
+              <button class="select-all-btn mel-rev-correct">🔁 聽正解</button>
+              <button class="select-all-btn exp-mini mel-rev-export" title="導出正解">⬇️</button>
+            </div>
+          </div>
+          <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+          <div class="review-staff"><div id="mel-rev-user-${uid}"></div></div>
+          <div class="review-label" style="margin-top:8px;">正確解答：</div>
+          <div class="review-staff"><div id="mel-rev-correct-${uid}"></div></div>
+        `;
+        list.appendChild(box);
+        box.querySelector('.mel-rev-user').onclick = () => playStatic(item.userSeq, item.userPitch, withReviewBpm(item), item.userTie);
+        box.querySelector('.mel-rev-correct').onclick = () => playStatic(item.correctSeq, item.correctPitch, withReviewBpm(item), item.correctTie);
+        box.querySelector('.mel-rev-export').onclick = (ev) => {
+          window.__expBtn = ev.currentTarget;
+          ExportMenu.open({ subtitle: '這一題的正解',
+            onAudio: () => doExportAudio(item.correctSeq, item.correctPitch, withReviewBpm(item), item.correctTie),
+            onSheet: () => doExportSheet(item.correctSeq, item.correctPitch, withReviewBpm(item), item.correctTie) });
+        };
+        setTimeout(() => {
+          renderStaticStaff(`mel-rev-user-${uid}`, item.userSeq, item.userPitch, item.correctSeq, item.correctPitch, item, item.userTie, item.correctTie);
+          renderStaticStaff(`mel-rev-correct-${uid}`, item.correctSeq, item.correctPitch, null, null, item, item.correctTie, null);
+          syncStaffScroll(`mel-rev-user-${uid}`, `mel-rev-correct-${uid}`);
+          resetReviewScroll([`mel-rev-user-${uid}`, `mel-rev-correct-${uid}`]);
+        }, 50);
+      });
+    },
+
+    setupEvents: function() {
+      document.querySelectorAll('#mel-modeSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.mode = b.dataset.mode; document.querySelectorAll('#mel-modeSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+        document.getElementById('testReplayWrapper').style.display = this.mode === 'test' ? 'flex' : 'none';
+      });
+
+      document.getElementById('mel-testReplaySelect').onchange = (e) => {
+        document.getElementById('mel-testReplayInput').style.display = (e.target.value === 'custom') ? 'inline-block' : 'none';
+      };
+
+      document.querySelectorAll('#mel-clefSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.clef = b.dataset.clef; document.querySelectorAll('#mel-clefSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+      });
+      document.querySelectorAll('#mel-meterSwitch .mode-btn').forEach(b => b.onclick = () => {
+        this.meter = b.dataset.meter; this.meterType = b.dataset.type;
+        document.querySelectorAll('#mel-meterSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+        this.syncTieSwitch();
+        document.getElementById('bpmSym').textContent = this.meterType === 'simple' ? '♩' : '♪';
+        this.initSettings();
+      });
+
+      document.querySelectorAll('#mel-tieSwitch .mode-btn').forEach(b => b.onclick = () => {
+        if (b.disabled) return;
+        this.tieEnabled = (b.dataset.tie === 'on');
+        document.querySelectorAll('#mel-tieSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
+      });
+
+      document.getElementById('selectAllBtn').onclick = () => {
+        const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+        const items = document.querySelectorAll('.pattern-item');
+        if(this.selectedPatterns.size === order.length) { this.selectedPatterns.clear(); items.forEach(i => i.classList.remove('selected')); }
+        else { order.forEach(id => this.selectedPatterns.add(id)); items.forEach(i => i.classList.add('selected')); }
+        document.getElementById('mel-enterBtn').disabled = this.selectedPatterns.size === 0;
+      };
+
+      document.getElementById('mel-enterBtn').onclick = () => {
+        ensureAudio(); window.melStopAll();
+
+        this.barsCount = parseInt(document.getElementById('mel-barsSelect').value, 10);
+        this.beatsPerBar = parseInt(this.meter.split('/')[0], 10);
+        if(this.meterType==='compound') this.beatsPerBar /= 3;
+        this.totalBeats = this.barsCount * this.beatsPerBar;
+        this.bpm = parseInt(document.getElementById('mel-bpm').value, 10);
+
+        if (this.mode === 'test') {
+            let selectVal = document.getElementById('mel-testReplaySelect').value;
+            let plays = 3;
+            if (selectVal === 'custom') {
+                let customVal = parseInt(document.getElementById('mel-testReplayInput').value, 10);
+                if (isNaN(customVal) || customVal < 1) customVal = 1;
+                if (customVal > 20) customVal = 20;
+                document.getElementById('mel-testReplayInput').value = customVal;
+                plays = customVal;
+            } else {
+                plays = parseInt(selectVal, 10);
+            }
+            this.testSession.totalPlays = plays;
+            this.testSession.replaysLeft = this.testSession.totalPlays;
+        }
+
+        document.getElementById('mel-statusBadge').textContent = `${this.clef === 'treble' ? '高音' : '低音'}｜${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
+        this.userSeq = Array(this.totalBeats).fill('placeholder');
+        this.userTie = Array(this.totalBeats).fill(false);
+        this.tieMin = 1; this.tieMax = this.barsCount;   // 練習：至少 1 次、上限＝小節數
+        this.userPitch = []; this._pitchSeqSnapshot = null;
+        this.hasPlayed = false; this.activeSlotIdx = 0; this.activeNoteIdx = 0; this.lastEditedNoteIdx = null;
+        this.generateQuestion();
+        this.rebuildUserPitchArray();
+
+        document.getElementById('mel-playCaption').textContent = '';
+
+        this.updatePlayBtn();
+        this.renderKeypad(); showPage('mel-practice');
+        this.switchTab('rhythm');
+        setTimeout(() => this.updateUI(), 150);
+      };
+
+      document.getElementById('mel-playBtn').onclick = () => {
+        ensureAudio(); if(!pianoInst || this.isPlaying) return;
+        if(this.mode === 'test' && this.testSession.replaysLeft <= 0) return;
+
+        this.hasPlayed = true;
+        if (this.mode === 'test') this.testSession.replaysLeft--;
+
+        document.getElementById('mel-playCaption').textContent = '🔊 播放中...';
+        this.playSequence(this.questionSeq, this.questionPitch, () => document.getElementById('mel-playCaption').textContent = '✅ 播放完畢，請作答！');
+      };
+
+      document.getElementById('mel-backspaceBtn').onclick = () => {
+        if(!this.hasPlayed) return;
+        if(this.activeTab === 'rhythm') {
+          let t = this.activeSlotIdx;
+          if(t === -1) { for(let i = this.userSeq.length - 1; i >= 0; i--) { if(this.userSeq[i] !== 'placeholder') { t = i; break; } } }
+          else { if(this.userSeq[t] === 'placeholder' && t > 0) { t--; while(t > 0 && this.userSeq[t] === 'placeholder') t--; } }
+          if(t >= 0 && this.userSeq[t] !== 'placeholder') {
+            let b = ALL_BLOCKS[this.userSeq[t]].beats; this.clearTieAround(t); this.userSeq.splice(t, 1);
+            for(let k=0; k<b; k++) this.userSeq.splice(t, 0, 'placeholder');
+            this.activeSlotIdx = t; this.rebuildUserPitchArray(); this.updateUI();
+          }
+        } else {
+          if (this.activeNoteIdx === -1) {
+             let prevIdx = this.userPitch.length - 1;
+             while (prevIdx >= 0 && this.isNoteTiedToPrevious(prevIdx)) prevIdx--;
+             if (prevIdx >= 0) this.activeNoteIdx = prevIdx;
+             this.updateUI();
+          } else if(this.userPitch[this.activeNoteIdx]) {
+             let defOct = this.clef === 'treble' ? 4 : 3; let defStep = this.clef === 'treble' ? 'A' : 'C';
+             this.userPitch[this.activeNoteIdx] = { step: defStep, oct: defOct, acc: 'n' };
+             let propagateIdx = this.activeNoteIdx;
+             while(this.isNoteTiedToNext(propagateIdx)) {
+                if(propagateIdx + 1 < this.userPitch.length) {
+                   this.userPitch[propagateIdx + 1] = { step: defStep, oct: defOct, acc: 'n' };
+                }
+                propagateIdx++;
+             }
+             let prevIdx = this.activeNoteIdx - 1;
+             while (prevIdx >= 0 && this.isNoteTiedToPrevious(prevIdx)) prevIdx--;
+             if(prevIdx >= 0) this.activeNoteIdx = prevIdx;
+
+             this.lastEditedNoteIdx = null;
+             this.updateUI();
+          }
+        }
+      };
+
+      document.getElementById('mel-tieBtn').onclick = () => { this.toggleTie(); };
+
+      document.getElementById('mel-submitBtn').onclick = () => {
+        if(!this.hasPlayed) return;
+        // 未填提醒：仍可提交，但跳出確認（未填計為錯誤）
+        let emptyCount = this.userSeq.filter(x => x === 'placeholder').length;
+        if(emptyCount > 0){
+          if(!window.confirm(`還有 ${emptyCount} 拍節奏未填寫。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
+        }
+        window.melStopAll();
+        let isCorrect = true;
+        // 逐小節攤平時值比對（記譜寫法不同但時值相同一律算對），再逐音比對音高
+        if(!compareBars(this.userSeq, this.questionSeq, this.userTie, this.questionTie,
+                        this.beatsPerBar, this.barsCount).every(Boolean)) { isCorrect = false; }
+        else {
+          let totalNotes = this.getTotalNoteCount(this.userSeq);
+          for(let i = 0; i < totalNotes; i++) {
+            if(getPitchFromObj(this.userPitch[i]) !== getPitchFromObj(this.questionPitch[i])) { isCorrect = false; break; }
+          }
+        }
+        this.score.t++; if(isCorrect) this.score.c++;
+        document.getElementById('mel-scoreNum').textContent = `${this.score.c}/${this.score.t}`;
+        this.showAnswerPage(isCorrect);
+      };
+
+      // 解答頁播放與下一題
+      document.getElementById('mel-ansPlayUser').onclick = () => { if(this._ansItem) playStatic(this._ansItem.userSeq, this._ansItem.userPitch, this._ansItem, this._ansItem.userTie); };
+      document.getElementById('mel-ansPlayCorrect').onclick = () => { if(this._ansItem) playStatic(this._ansItem.correctSeq, this._ansItem.correctPitch, this._ansItem, this._ansItem.correctTie); };
+      document.getElementById('mel-ansExport').onclick = () => {
+        window.__expBtn = null;
+        const it = this._ansItem; if(!it) return;
+        ExportMenu.open({ subtitle: '這一題的正解',
+          onAudio: () => doExportAudio(it.correctSeq, it.correctPitch, it, it.correctTie),
+          onSheet: () => doExportSheet(it.correctSeq, it.correctPitch, it, it.correctTie) });
+      };
+      document.getElementById('mel-ansNextBtn').onclick = () => {
+        ensureAudio(); window.melStopAll();
+        this.userSeq = Array(this.totalBeats).fill('placeholder');
+        this.userTie = Array(this.totalBeats).fill(false);
+        this.tieMin = 1; this.tieMax = this.barsCount;   // 練習：至少 1 次、上限＝小節數
+        this.userPitch = []; this._pitchSeqSnapshot = null;
+        this.hasPlayed = false; this.activeSlotIdx = 0; this.activeNoteIdx = 0; this.lastEditedNoteIdx = null;
+        this.generateQuestion();
+        this.rebuildUserPitchArray();
+        if (this.mode === 'test') { this.testSession.replaysLeft = this.testSession.totalPlays; }
+        document.getElementById('mel-playCaption').textContent = '';
+        this.updatePlayBtn();
+        this.renderKeypad();
+        this.switchTab('rhythm');
+        showPage('mel-practice');
+        setTimeout(() => this.updateUI(), 150);
+      };
+
+      document.getElementById('mel-clearReviewBtn').onclick = () => {
+        if(window.REVIEW_STORE.count('melody') === 0) return;
+        if(window.confirm('確定要清空單旋律曲調的錯題本嗎？此動作無法復原。')){ window.REVIEW_STORE.clear('melody'); this.renderReviewPage(); this.refreshReviewCount(); }
+      };
+
+      window.addEventListener('resize', () => { if(document.getElementById('pageMelPractice').classList.contains('active')) this.updateUI(); });
+    }
+  };
+
+  window.melModule = melModule;
+
+  melModule.initSettings(); melModule.setupEvents(); melModule.syncTieSwitch(); melModule.refreshReviewCount(); loadPiano();
+
+  /* 「🎵 標準音 A」按鈕：隨時可按，播放 A4（440Hz）2 秒，不影響題目播放次數 */
+  (function(){
+    var btn = document.getElementById('tuningABtn'); if(!btn) return;
+    // 考試模式已於第一次播放前自動給標準音，不需要這顆按鈕
+    if(window.EXAM && window.EXAM.isExamMode()){ btn.style.display = 'none'; return; }
+    btn.onclick = function(){
+      try{
+        ensureAudio();
+        if(!pianoInst) return;
+        var ctx = ensureAudio();
+        pianoInst.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
+        var t = btn.textContent; btn.textContent = '🎵 A 響起…';
+        setTimeout(function(){ btn.textContent = t; }, 2000);
+      }catch(e){}
+    };
+  })();
+
+  if(bootPaperReview(melModule)){ /* 考卷回顧 */ }
+  else if(window.EXAM && window.EXAM.isExamMode()){ melModule.examBootstrap(); }
+  // 由 index 錯題本總覽「跳回複習」進入時，直接開啟錯題本頁
+  if(location.hash === '#review') showPage('mel-review');
+})();
+</script>
+
+<script>
+  if('serviceWorker' in navigator){ window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js').catch(()=>{}); }); }
+</script>
+<!-- 玩法說明彈窗 -->
+<div class="help-modal" id="mel-helpModal" onclick="if(event.target===this) closeHelp('mel-helpModal')">
+  <div class="help-box">
+    <button class="help-close" onclick="closeHelp('mel-helpModal')" aria-label="關閉">×</button>
+    <h2>單旋律曲調 — 玩法說明</h2>
+    <p class="help-lead">把聽到的單旋律「節奏＋音高」完整寫出來（隨機無調性出題，用臨時記號作答）。</p>
+    <h3>設定</h3>
+    <p>可選譜號（<b>高音／低音</b>）、拍號、小節數、速度與要出現的節奏型；測驗模式可限制重播次數（可自訂）。</p>
+    <h3>作答</h3>
+    <p>播放後用兩個分頁作答——「<b>編輯節奏</b>」點拍位再點節奏鍵盤填；「<b>編輯音高</b>」點一個音符 → 按音名（C～B、含高 Do）填入並自動跳下一個音。<b>要加升降記號時，點到那個音後直接按 ♯／♭／♮，就會套用到該音、並自動跳到下一個</b>（剛打完的音也能直接按記號修改）；八度用「高低八度」事後微調。填完提交 → 解答頁紅色標錯、與正解對照，可聆聽你的作答／正解。</p>
+    <div class="help-common">
+      <h3>共通規則（六個練習都適用）</h3>
+      <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>
+      <p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>
+      <p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>
+      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>
+    </div>
+    <p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
+    <div class="help-foot"><a class="help-video" href="https://youtu.be/fwHc6VuFatg?t=468" target="_blank" rel="noopener">▶ 看完整操作教學</a><button onclick="closeHelp('mel-helpModal')">我知道了</button></div>
+  </div>
+</div>
+<script>
+function openHelp(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); _syncHelpLock(); }
+function closeHelp(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); _syncHelpLock(); }
+/* 彈窗開啟時鎖住背景捲動，避免手指滑到下層頁面 */
+function _syncHelpLock(){
+  var open = document.querySelectorAll('.help-modal.open').length > 0;
+  document.body.style.overflow = open ? 'hidden' : '';
+  document.body.style.touchAction = open ? 'none' : '';
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document.querySelectorAll('.help-modal.open').forEach(function(m){ m.classList.remove('open'); }); } });
+</script>
+<script>
+(function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+</script>
+<script>
+/* 考試作答中與考卷回顧模式：不顯示「錯題本」相關按鈕 */
+(function(){
+  try{
+    var p = new URLSearchParams(location.search);
+    if((window.EXAM && EXAM.isExamMode()) || p.get('paper')){
+      Array.prototype.forEach.call(document.querySelectorAll('.js-review-links'), function(el){ el.style.display = 'none'; });
+    }
+  }catch(e){}
+})();
+</script>
+<script>
+/* 作答時關閉手機的「左滑返回」：在瀏覽歷史放一個記號，
+   使用者一觸發返回就把它補回去，等於什麼都沒發生。
+   只在作答頁生效，離開作答頁自動解除；畫面上的返回按鈕不受影響。 */
+(function(){
+  var ANSWER_PAGE = 'pageMelPractice';
+  var armed = false;
+  function isAnswering(){
+    var el = document.getElementById(ANSWER_PAGE);
+    return !!(el && el.classList.contains('active'));
+  }
+  function arm(){ if(armed) return; armed = true; try{ history.pushState({ answerGuard: 1 }, ''); }catch(e){} }
+  window.addEventListener('popstate', function(){
+    if(isAnswering()){ try{ history.pushState({ answerGuard: 1 }, ''); }catch(e){} }
+    else { armed = false; }
+  });
+  try{
+    var obs = new MutationObserver(function(){
+      var on = isAnswering();
+      if(on) arm(); else armed = false;
+      // 作答頁時整頁不把手勢往外傳（部分瀏覽器靠這個就能擋掉返回手勢）
+      try{
+        document.documentElement.style.overscrollBehaviorX = on ? 'none' : '';
+        document.body.style.overscrollBehaviorX = on ? 'none' : '';
+      }catch(e){}
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.page-view'), function(el){
+      obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+  }catch(e){}
+  if(isAnswering()) arm();
+
+  /* 攔截邊緣返回手勢。
+     touchmove 在 Safari 進入捲動狀態後會變成「不可取消」，攔不住；
+     touchstart 永遠可以取消，所以改在按下的當下就決定。
+     為了不吃掉左緣的操作，會先看手指按到什麼：
+     按到按鈕、輸入元件或音符熱區就放行，只有按在空白處才攔。 */
+  var EDGE = 24;
+  document.addEventListener('touchstart', function(e){
+    if(!isAnswering() || !e.touches || e.touches.length !== 1) return;
+    if(e.touches[0].clientX > EDGE) return;
+    if(e.cancelable) e.preventDefault();              // 左緣一律攔，返回手勢不會啟動
+  }, { passive: false });
+})();
+</script>
+<script>
+/* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */
+(function(){
+  function setPlayback(){ try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} }
+  setPlayback();
+  var SILENT="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+  var done=false;
+  function unlock(){ if(done) return; done=true; setPlayback();
+    try{ var a=new Audio(SILENT); a.setAttribute("playsinline",""); a.volume=0.02; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){}
+    document.removeEventListener("touchend",unlock,true); document.removeEventListener("click",unlock,true);
+  }
+  document.addEventListener("touchend",unlock,true);
+  document.addEventListener("click",unlock,true);
+})();
+</script>
+</body>
+</html>

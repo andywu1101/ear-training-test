@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>音樂聽力練習 App - 主目錄</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="聽力訓練">
+<meta name="theme-color" content="#33415c">
+<script>
+/* Android／桌機 Chromium 的安裝事件可能在 DOMContentLoaded 之前就觸發，
+   所以監聽必須放在最前面，晚了就接不到。事件物件只能用一次。 */
+window.__a2hsPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  window.__a2hsPrompt = e;
+  if (typeof window.__a2hsRefresh === 'function') window.__a2hsRefresh();
+});
+window.addEventListener('appinstalled', function(){
+  window.__a2hsPrompt = null;
+  if (typeof window.__a2hsRefresh === 'function') window.__a2hsRefresh();
+});
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
+    --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
+    --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body{ margin:0; background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height:100vh; padding: 20px 16px 64px; }
+  .wrap{ max-width: 680px; margin: 0 auto; }
+
+  .page-view { display: none; animation: fadeIn 0.22s ease-out; }
+  .page-view.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* 目錄頁背景：固定不動的淡音符點綴，捲動時卡片會從上面滑過。
+     縱向位置用 --app-vh 而非 %：手機瀏覽器的工具列收合會改變視窗高度，
+     用百分比的話音符會在載入後跳一下位置。橫向用 % 沒有這個問題。 */
+  .menu-notes{ position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+  .menu-note{ position: absolute; font-family: var(--font-display); color: var(--accent);
+              opacity: 0.07; line-height: 1; user-select: none; }
+  #pageMenu > *:not(.menu-notes){ position: relative; z-index: 1; }
+  #pageMenu h1{ margin-top: 6px; }
+
+  h1{ font-family: var(--font-display); font-weight: 600; font-size: 30px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .subtitle{ color: var(--ink-soft); font-size: 14px; margin: 0 0 22px; line-height: 1.6; }
+  /* 加入主畫面那個連結，樣式與下一行的「請觀看完整使用教學」一致 */
+  .subtitle a{ color:var(--accent); font-weight:700; text-decoration:none; border-bottom:1px solid var(--accent-line); padding-bottom:1px; }
+  .subtitle a:hover, .subtitle a:active{ border-color:var(--accent); }
+
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 10px; }
+  .menu-card {
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
+    padding: 22px; cursor: default; transition: all 0.2s ease; display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; overflow: hidden; touch-action: manipulation; text-decoration: none; color: inherit;
+  }
+  .menu-card.active-feature {
+    cursor: pointer; border-color: var(--accent-line); box-shadow: 0 4px 16px rgba(51,65,92,0.06);
+  }
+  .menu-card.active-feature:hover, .menu-card.active-feature:active {
+    transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 8px 20px rgba(51,65,92,0.12);
+  }
+  .menu-card.disabled-feature { opacity: 0.55; }
+  .menu-card-num { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+  .menu-card-title { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--ink); margin: 0 0 8px; }
+  .menu-card-desc { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin: 0; }
+  /* 練習卡的說明：電腦版直接顯示描述文字；手機版空間不夠，改由右下角的 ▸ 開啟 */
+  .menu-info-btn{
+    display: none;                       /* 電腦版不顯示，有描述文字就夠了 */
+    position:absolute; right:6px; bottom:4px; width:34px; height:34px;
+    border:none; background:transparent; color:var(--ink-soft);
+    font-size:15px; line-height:1; cursor:pointer; touch-action:manipulation; padding:0;
+    align-items:center; justify-content:center;
+  }
+  .menu-info-btn:active{ color:var(--accent); }
+
+  /* 手機：練習卡改成兩欄，一個畫面看完八個項目 */
+  @media (max-width: 600px){
+    .menu-grid{ grid-template-columns: 1fr 1fr; gap: 14px; }
+    /* 下面三張（模擬測驗、贊助、錯題本總覽）維持單欄整排 */
+    .menu-grid > .menu-card:not(.practice-card){ grid-column: 1 / -1; }
+    .practice-card{ padding: 18px 12px 22px; }
+    .practice-card .menu-card-desc{ display: none; }      /* 說明改用 ▸ 開啟 */
+    .practice-card .menu-badge{ display: none; }          /* 整張卡都可以點，徽章省下來給標題 */
+    .practice-card .menu-card-num{ font-size: 11px; margin-bottom: 5px; }
+    .practice-card .menu-card-title{ font-size: 17px; margin: 0; }
+    .practice-card .menu-info-btn{ display: inline-flex; }
+  }
+  .menu-badge { position: absolute; top: 18px; right: 18px; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; font-family: var(--font-mono); }
+  .badge-ready { background: var(--accent); color: var(--panel); }
+  .badge-review { background: var(--wrong); color: var(--panel); }
+  .badge-soon { background: var(--hairline); color: var(--ink-soft); }
+  /* New! 標籤放卡片右上角；電腦版右上角有「開始練習」徽章，往左讓開並與它切齊
+     （top、字級、內距都要和 .menu-badge 一致，否則兩顆會一高一低） */
+  .menu-new { position: absolute; top: 18px; right: 96px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 4px 10px; border-radius: 999px; background: var(--wrong); color: #fff; }
+  @media (max-width: 600px){ .menu-new { top: 12px; right: 12px; } }
+  .footer-note{ margin-top: 14px; font-size: 13.5px; color: var(--ink-soft); text-align:center; line-height:1.7; }
+  .footer-link{ color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
+  .footer-link:hover{ text-decoration: underline; }
+  /* 問題回報按鈕與版本號（選單最底部） */
+  .report-wrap{ margin-top: 36px; text-align:center; }
+  .report-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:13.5px; padding:10px 22px; border-radius:999px; background:transparent; color:var(--ink-soft); border:1px solid var(--panel-border); text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
+  .report-btn:hover, .report-btn:active{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+  .app-version{ margin-top: 10px; text-align:center; }
+  .ver-btn{ font-family:var(--font-mono); font-size: 11px; color: var(--ink-soft); background:none; border:none; opacity:1; cursor:pointer; padding:6px 8px; touch-action:manipulation; }
+  .ver-btn:hover, .ver-btn:active{ color:var(--accent); opacity:1; text-decoration:underline; }
+  /* 更新日誌 */
+  .log-list{ text-align:left; max-height:60vh; overflow-y:auto; padding:4px 2px; -webkit-overflow-scrolling:touch; }
+  .log-item{ padding:12px 2px; border-top:1px dashed var(--hairline); }
+  .log-item:first-child{ border-top:none; }
+  .log-ver{ font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--accent); margin-bottom:5px; }
+  .log-item ul{ margin:0; padding-left:18px; }
+  .log-item li{ font-size:13.5px; line-height:1.75; color:var(--ink); }
+  /* 重點項目用紅字。⚠ 選擇器要寫成 .log-item li.log-hl——
+     只寫 .log-hl（一層）會被上面的 .log-item li（兩層）蓋掉。 */
+  .log-item li.log-hl{ color: var(--wrong); }
+  .log-current{ font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--accent); text-align:center; margin:16px 0 4px; }
+
+  /* 錯題本總覽卡片（整合入口） */
+  .review-hub-card{ grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: var(--panel); cursor:pointer; }
+  .review-hub-card .menu-card-num{ color: #c9d2e6; }
+  .review-hub-card .menu-card-title{ color: var(--panel); }
+  .review-hub-card .menu-card-desc{ color: #d7dae0; }
+  .review-hub-card:hover, .review-hub-card:active{ transform: translateY(-2px); box-shadow: 0 8px 20px rgba(38,36,32,0.18); }
+
+  /* 總覽頁 */
+  .nav-back-btn{ display:inline-flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); padding:10px 18px; border-radius:999px; cursor:pointer; margin-bottom:20px; box-shadow:0 2px 4px rgba(38,36,32,0.04); }
+  .nav-back-btn:hover, .nav-back-btn:active{ border-color:var(--accent); background:var(--accent); color:var(--panel); }
+  .hub-total{ font-family:var(--font-mono); font-size:13px; color:var(--ink-soft); margin-bottom:18px; }
+  .hub-group{ background:var(--panel); border:1px solid var(--panel-border); border-radius:var(--radius); padding:18px; margin-bottom:16px; }
+  .hub-group-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .hub-group-title{ font-family:var(--font-display); font-size:18px; font-weight:600; }
+  .hub-count{ font-family:var(--font-mono); font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--wrong-soft); color:var(--wrong); border:1px solid rgba(166,73,59,0.3); }
+  .hub-count.zero{ background:var(--accent-soft); color:var(--accent); border-color:var(--accent-line); }
+  .hub-jump{ font-size:12.5px; font-weight:700; padding:8px 14px; border-radius:999px; border:1px solid var(--accent-line); color:var(--accent); background:#fff; text-decoration:none; cursor:pointer; }
+  .hub-jump:hover{ background:var(--accent); color:var(--panel); border-color:var(--accent); }
+  .hub-empty{ font-size:13px; color:var(--ink-soft); }
+  .hub-item{ font-size:13px; line-height:1.6; padding:8px 0; border-top:1px dashed var(--hairline); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .hub-item:first-child{ border-top:none; }
+  .hub-item .qa .wrong-ans{ color:var(--wrong); font-weight:600; }
+  .hub-item .qa .right-ans{ color:var(--correct); font-weight:600; }
+  .hub-item .qtime{ font-family:var(--font-mono); font-size:11px; color:var(--ink-soft); white-space:nowrap; }
+  .hub-more{ font-size:12px; color:var(--ink-soft); margin-top:8px; }
+  .hub-clear-all{ font-family:var(--font-body); font-size:12px; font-weight:600; color:#8a6d20; background:#fff8e6; border:1px solid #ffd885; padding:8px 14px; border-radius:999px; cursor:pointer; margin-left:8px; }
+
+  /* ===== 封面頁 ===== */
+  .cover{ min-height: calc(100vh - 84px); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; position:relative; overflow:hidden; padding: 32px 8px; }
+  .cover-notes{ position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .cover-note{ position:absolute; font-family: var(--font-display); color: var(--accent); opacity:0.10; user-select:none; line-height:1; }
+  .cover-card{ position:relative; z-index:1; max-width: 540px; }
+  .cover-clef{ font-family: var(--font-display); font-size: 92px; color: var(--accent); opacity:0.9; line-height:1; margin-bottom: 2px; }
+  .cover-title{ font-family: var(--font-display); font-weight:600; font-size: 46px; margin: 0 0 6px; letter-spacing:-0.01em; }
+  .cover-sub{ font-family: var(--font-mono); font-size: 13px; letter-spacing:0.22em; color: var(--ink-soft); text-transform: uppercase; margin-bottom: 26px; }
+  .cover-msg{ font-size: 17px; line-height: 1.95; color: var(--ink); text-align:center; background: var(--panel); border:1px solid var(--panel-border); border-radius: var(--radius); padding: 22px 24px; margin: 0 auto 28px; box-shadow: 0 4px 16px rgba(51,65,92,0.06); }
+  .cover-start{ font-family: var(--font-body); font-weight:700; font-size: 18px; padding: 16px 44px; border-radius: 999px; background: var(--accent); color: var(--panel); border:none; cursor:pointer; box-shadow: 0 6px 20px rgba(51,65,92,0.25); transition: all .15s ease; display:inline-flex; align-items:center; gap:10px; touch-action: manipulation; }
+  .cover-start:hover, .cover-start:active{ filter:brightness(1.12); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(51,65,92,0.32); }
+  .cover-foot{ margin-top: 20px; font-size: 13.5px; color: var(--ink-soft); }
+  /* 封面作者列與小額贊助 */
+  .cover-author{ margin-top: 16px; font-size: 13.5px; color: var(--ink-soft); }
+  .cover-donate-wrap{ margin-top: 10px; }
+  /* 封面：網站介紹影片（外框樣式，與贊助鈕同尺寸但不搶焦點） */
+  .cover-intro-wrap{ margin-top: 10px; }
+  .intro-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:11px 26px; border-radius:999px; background:transparent; color:var(--accent); border:1px solid var(--accent-line); cursor:pointer; text-decoration:none; transition:all .15s ease; touch-action:manipulation; }
+  .intro-btn:hover, .intro-btn:active{ background:var(--accent); color:var(--panel); border-color:var(--accent); transform:translateY(-1px); }
+  /* 選單：標題下方的介紹短片連結 */
+  .intro-line{ font-size:13.5px; color:var(--ink-soft); margin:-14px 0 20px; }
+  .intro-line a{ color:var(--accent); font-weight:700; text-decoration:none; border-bottom:1px solid var(--accent-line); padding-bottom:1px; }
+  .intro-line a:hover, .intro-line a:active{ border-color:var(--accent); }
+  .donate-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:11px 26px; border-radius:999px; background:var(--wrong); color:var(--panel); border:none; cursor:pointer; box-shadow:0 4px 14px rgba(166,73,59,0.28); transition:all .15s ease; touch-action:manipulation; }
+  .donate-btn:hover, .donate-btn:active{ filter:brightness(1.08); transform:translateY(-1px); box-shadow:0 6px 18px rgba(166,73,59,0.34); }
+  /* 選單左上角回封面鈕 */
+  .cover-back-btn{ display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); padding:8px 14px; border-radius:999px; cursor:pointer; margin-bottom:16px; touch-action:manipulation; }
+  .cover-back-btn:hover, .cover-back-btn:active{ border-color:var(--accent); background:var(--accent); color:var(--panel); }
+  /* 選單裡的贊助卡（全寬、較矮、暖赤陶色） */
+  .donate-card{ grid-column: 1 / -1; background: var(--wrong-soft); border-color: rgba(166,73,59,0.35); cursor:pointer; padding:16px 22px; }
+  .donate-card:hover, .donate-card:active{ transform: translateY(-2px); border-color: var(--wrong); box-shadow: 0 8px 20px rgba(166,73,59,0.14); }
+  .donate-card .menu-card-title{ color: var(--wrong); margin:0 0 4px; font-size:18px; }
+  .donate-card .menu-card-desc{ color: var(--ink-soft); }
+  /* 贊助佔位彈窗 */
+  /* 設定：卡片要跨滿整排（桌機版是靠各自的 class 指定，不是靠 :not(.practice-card)） */
+  .settings-card{ grid-column: 1 / -1; padding:16px 22px; }
+  .settings-card .menu-card-title{ margin:0 0 4px; font-size:18px; }
+  /* 設定頁 */
+  .set-title{ font-family:var(--font-display); font-size:17px; font-weight:600; margin:0 0 14px; }
+  .opt-list{ display:flex; flex-direction:column; gap:10px; }
+  .opt-item{ display:flex; align-items:flex-start; gap:11px; width:100%; text-align:left;
+        font:inherit; padding:13px 14px; border-radius:12px; cursor:pointer;
+        border:1px solid var(--panel-border); background:var(--paper); color:var(--ink); }
+  .opt-item:active{ background:#eae7dc; }
+  .opt-item.on{ border-color:var(--accent); background:rgba(51,65,92,0.05); }
+  .opt-radio{ flex:0 0 18px; width:18px; height:18px; border-radius:50%; margin-top:2px;
+        border:1.5px solid var(--accent-line); position:relative; }
+  .opt-item.on .opt-radio{ border-color:var(--accent); }
+  .opt-item.on .opt-radio::after{ content:''; position:absolute; inset:3.5px;
+        border-radius:50%; background:var(--accent); }
+  .opt-body{ flex:1 1 auto; }
+  .opt-name{ display:block; font-size:14.5px; }
+  .opt-item.on .opt-name{ font-weight:600; color:var(--accent); }
+  .opt-sub{ display:block; font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.6; }
+  .set-toast{ font-size:12.5px; color:var(--correct); margin:12px 0 0; min-height:19px; }
+  .set-credit{ font-size:11.5px; color:var(--ink-soft); line-height:1.7; margin:10px 0 0;
+        padding-top:10px; border-top:1px solid var(--hairline); }
+  /* 導入及導出紀錄 */
+  .bk-stat{ background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
+            padding:11px 12px; margin:0 0 18px; font-size:13.5px; text-align:left; }
+  .bk-stat .row{ display:flex; justify-content:space-between; padding:3px 2px; }
+  .bk-stat .row span:first-child{ color:var(--ink-soft); }
+  .bk-stat .row span:last-child{ font-family:var(--font-mono); font-weight:600; }
+  .bk-stat .empty{ color:var(--ink-soft); }
+  .bk-row{ display:flex; gap:10px; justify-content:center; margin:0 0 16px; }
+  .bk-row .bk-btn{ flex:1 1 0; max-width:160px; padding:11px 8px; font:inherit; font-size:14px;
+                   border-radius:11px; border:1px solid var(--accent); background:var(--accent); color:#fff;
+                   cursor:pointer; white-space:nowrap; }
+  .bk-row .bk-btn.ghost{ background:transparent; color:var(--accent); }
+  .bk-row .bk-btn[disabled]{ opacity:0.38; cursor:not-allowed; }
+  .bk-warn{ background:#fdf3f1; border:1px solid #e8cdc6; color:var(--wrong); border-radius:10px;
+            padding:10px 12px; font-size:13px; margin:0 0 14px; text-align:left; line-height:1.65; }
+  .bk-cmp{ width:100%; border-collapse:collapse; font-size:13.5px; margin:0 0 6px; }
+  .bk-cmp th{ font-size:12px; color:var(--ink-soft); font-weight:500; padding:4px 6px; text-align:right; }
+  .bk-cmp th:first-child{ text-align:left; }
+  .bk-cmp td{ padding:5px 6px; text-align:right; font-family:var(--font-mono); }
+  .bk-cmp td:first-child{ text-align:left; font-family:inherit; color:var(--ink-soft); }
+  .bk-cmp .to{ color:var(--accent); font-weight:700; }
+  .bk-note{ font-size:12.5px; color:var(--ink-soft); text-align:left; background:var(--panel);
+            border:1px solid var(--panel-border); border-radius:9px; padding:9px 11px; margin:0 0 14px; line-height:1.7; }
+  /* 加入主畫面的說明浮層 */
+  .a2hs-ico{ display:inline-block; vertical-align:-0.18em; }
+  .a2hs-steps{ margin:0; padding:0; list-style:none; text-align:left; }
+  .a2hs-steps li{ display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--hairline); font-size:14.5px; color:var(--ink); line-height:1.65; }
+  .a2hs-steps li:last-child{ border-bottom:none; }
+  .a2hs-num{ flex:0 0 20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-family:var(--font-mono); font-size:11px; display:flex; align-items:center; justify-content:center; margin-top:2px; }
+  .a2hs-done{ font-size:15px; margin:14px 0 4px; }
+  .a2hs-copy{ display:block; width:100%; margin-top:10px; padding:9px 12px; font:inherit; font-size:13.5px;
+              background:var(--accent); color:#fff; border:none; border-radius:9px; cursor:pointer;
+              word-break:break-all; line-height:1.5; }
+  .a2hs-copy:active{ opacity:0.85; }
+  .a2hs-hint{ font-size:13px; color:var(--ink-soft); background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:10px 12px; margin:0 0 16px; text-align:left; line-height:1.7; }
+  .donate-modal{ display:none; position:fixed; inset:0; z-index:1200; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; }
+  /* 用 margin:auto 置中：內容高過螢幕時卡片上緣才不會溢出捲動範圍被裁掉（圓角消失） */
+  .donate-modal.open{ display:flex; align-items:flex-start; justify-content:center; }
+  .donate-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; overflow:hidden; margin:auto; max-width:400px; width:100%; padding:30px 26px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.28); }
+  .donate-box .dico{ font-size:40px; line-height:1; }
+  .donate-box h3{ font-family:var(--font-display); font-size:23px; font-weight:600; margin:10px 0 8px; }
+  .donate-box p{ font-size:15px; color:var(--ink-soft); line-height:1.8; margin:0 0 18px; }
+  .donate-box .ok-btn{ font-family:var(--font-body); font-weight:700; font-size:15px; padding:11px 30px; border-radius:999px; background:var(--accent); color:var(--panel); border:none; cursor:pointer; touch-action:manipulation; }
+  .donate-links{ display:flex; flex-direction:column; gap:10px; margin:6px 0 14px; }
+  .donate-go, .donate-home{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family:var(--font-body); font-weight:700; font-size:15px; padding:13px 20px; border-radius:999px; text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
+  .donate-go{ background:var(--wrong); color:var(--panel); box-shadow:0 4px 14px rgba(166,73,59,0.28); }
+  .donate-go:hover, .donate-go:active{ filter:brightness(1.08); transform:translateY(-1px); }
+  .donate-home{ background:transparent; color:var(--ink); border:1px solid var(--panel-border); }
+  .donate-home:hover, .donate-home:active{ border-color:var(--accent); background:var(--accent-soft); }
+  .donate-dismiss{ font-family:var(--font-body); font-size:15.5px; color:var(--ink-soft); background:transparent; border:none; cursor:pointer; text-decoration:underline; touch-action:manipulation; }
+  .cover-author a{ color:var(--ink-soft); text-decoration:none; border-bottom:1px dashed var(--accent-line); padding-bottom:1px; transition:all .15s ease; }
+  .cover-author a:hover, .cover-author a:active{ color:var(--accent); border-color:var(--accent); }
+  /* 封面作者列（改為開啟彈窗） */
+  .author-link{ font:inherit; color:var(--ink-soft); background:none; border:none; border-bottom:1px dashed var(--accent-line); padding:0 0 1px; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
+  .author-link:hover, .author-link:active{ color:var(--accent); border-color:var(--accent); }
+  /* 彈窗項目（作者主頁 / 停用項） */
+  .author-item, .donate-item{ display:flex; align-items:center; justify-content:center; gap:9px; font-family:var(--font-body); font-weight:700; font-size:15.5px; padding:13px 18px; border-radius:14px; text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink); }
+  .author-item:hover, .author-item:active{ border-color:var(--accent); background:var(--accent-soft); }
+  .author-item .ai-ico{ display:inline-flex; align-items:center; }
+  /* 作者卡片的邀約文案：字級略小、行高放寬，手機上會折成 2–3 行 */
+  .author-invite{ font-size:14px; line-height:1.9; color:var(--ink-soft); margin:2px 4px 14px; text-align:center; }
+  .donate-item.disabled{ color:var(--ink-soft); background:var(--panel); border-style:dashed; opacity:0.6; cursor:not-allowed; }
+  /* 街口支付 QR 卡（整張可點） */
+  .jkopay-card{ display:block; text-decoration:none; border:1px solid var(--panel-border); border-radius:16px; overflow:hidden; background:#fff; cursor:pointer; transition:all .15s ease; }
+  .jkopay-card:hover, .jkopay-card:active{ border-color:var(--accent); box-shadow:0 6px 18px rgba(51,65,92,0.14); transform:translateY(-1px); }
+  .jkopay-card img{ display:block; width:100%; max-width:270px; margin:14px auto 6px; }
+  .jkopay-label{ display:block; font-family:var(--font-body); font-weight:700; font-size:15px; color:var(--panel); background:var(--accent); padding:11px; text-align:center; }
+  /* 可複製街口帳號 */
+  .jkopay-acct{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:14px; color:var(--ink-soft); margin:10px 0 2px; }
+  .jkopay-acct b{ color:var(--ink); font-family:var(--font-mono); letter-spacing:0.03em; }
+  .copy-btn{ font-family:var(--font-body); font-size:13px; font-weight:700; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:999px; padding:3px 12px; cursor:pointer; touch-action:manipulation; }
+  .copy-btn:hover, .copy-btn:active{ background:var(--accent); color:var(--panel); }
+  /* 付款說明、表單連結 */
+  .pay-note{ font-size:14px; color:var(--ink); line-height:1.8; margin:10px 2px 6px; text-align:center; }
+  .pay-note b{ color:var(--ink); }
+  .form-link{ display:block; font-size:14px; font-weight:700; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:12px; padding:11px 12px; text-align:center; text-decoration:none; margin-top:4px; }
+  .form-link:hover, .form-link:active{ background:var(--accent); color:var(--panel); }
+  /* 銀行轉帳 */
+  .bank-row{ display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 14px; font-size:15.5px; }
+  .bank-row .bk{ font-size:13px; color:var(--ink-soft); flex-shrink:0; width:34px; text-align:left; }
+  .bank-row b{ flex:1; font-family:var(--font-mono); letter-spacing:0.02em; text-align:left; }
+  /* 贊助者名單 */
+  .sponsor-list{ position: relative; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; padding:14px 10px 40px; border:1px dashed var(--panel-border); border-radius:12px; }
+  /* 固定行高與高度：避免中英文因字型行高不同而上下錯位 */
+  .sponsor-list span{ display:inline-flex; align-items:center; justify-content:center; min-height:34px; line-height:1; font-size:15px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:999px; padding:0 14px; }
+  /* 金色樂友：金色漸層文字＋一道反光由左掃到右，每 2 秒一次。
+     ⚠ 選擇器必須寫成 .sponsor-list span.sponsor-gold —— 名牌的 .sponsor-list span
+     規則帶有 background:var(--panel)，若只寫 .sponsor-gold 會被它蓋掉漸層，
+     而文字又是 transparent，結果就是整個名字消失（但仍框選得到）。
+     系統開啟「減少動態效果」時只保留靜態金色，不做動畫。 */
+  .sponsor-list span.sponsor-gold{
+    font-weight: 800;
+    color: #b8860b;
+    border-color: #e6c757;
+    background: linear-gradient(100deg,
+      #b8860b 0%, #d4af37 32%, #fff3b0 46%, #ffffff 50%, #fff3b0 54%, #d4af37 68%, #b8860b 100%);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: sponsorShine 2s ease-in-out infinite;
+  }
+  @keyframes sponsorShine{
+    0%, 55% { background-position: 130% 0; }
+    100%    { background-position: -30% 0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .sponsor-list span.sponsor-gold{ animation: none; background-position: 50% 0; }
+  }
+  /* 一般贊助者與金色樂友之間的換行元素：在 flex 容器裡佔滿整列，後面的名牌就會換到下一行。
+     不畫線，只留一點間距做區隔。 */
+  .sponsor-sep{ flex:0 0 100%; height:0; margin:5px 0 0; }
+  /* 名單框右下角的說明按鈕（金色小圓框） */
+  .sponsor-info-btn{
+    position: absolute; right: 6px; bottom: 6px;
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1px solid #d4af37; background: #fffdf5; color: #b8860b;
+    font-family: var(--font-display); font-size: 14px; font-weight: 600; font-style: italic;
+    line-height: 1; padding: 0; cursor: pointer; touch-action: manipulation;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sponsor-info-btn:hover, .sponsor-info-btn:active{ background:#d4af37; color:#fff; }
+  @media (max-width:480px){ .cover-title{ font-size:34px; } .cover-clef{ font-size:76px; } .cover-msg{ font-size:15px; padding:18px 18px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- 封面頁 -->
+  <div id="pageCover" class="page-view active">
+    <div class="cover">
+      <div class="cover-notes" aria-hidden="true">
+        <span class="cover-note" style="top:8%; left:9%; font-size:72px;">♪</span>
+        <span class="cover-note" style="top:18%; right:11%; font-size:56px;">♫</span>
+        <span class="cover-note" style="top:52%; left:6%; font-size:48px;">♩</span>
+        <span class="cover-note" style="bottom:14%; left:16%; font-size:64px;">𝄞</span>
+        <span class="cover-note" style="bottom:9%; right:14%; font-size:50px;">♬</span>
+        <span class="cover-note" style="top:40%; right:8%; font-size:40px;">♪</span>
+      </div>
+      <div class="cover-card">
+        <div class="cover-clef">𝄞</div>
+        <h1 class="cover-title">音樂聽力練習</h1>
+        <div class="cover-sub">Ear Training</div>
+        <p class="cover-msg">這個工具永久免費，你可以自由使用，<br>也歡迎推薦給同學和老師。<br>如果它對你的教學或練習有幫助，<br>歡迎小額贊助支持後續開發與維護。</p>
+        <button class="cover-start" onclick="showMenu()">開始練習 →</button>
+        <div class="cover-foot">為音樂班、音樂系的學生與老師而做 🎵</div>
+        <div class="cover-author"><button type="button" class="author-link" onclick="showAuthor()">作者：伍祐恆 Heng-Heng Wu ▸</button></div>
+        <div class="cover-donate-wrap"><button class="donate-btn" onclick="showDonate()">❤ 小額贊助</button></div>
+        <div class="cover-intro-wrap"><a class="intro-btn" href="https://youtu.be/fF4-J2NGAnw" target="_blank" rel="noopener">▶ 網站介紹與說明</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主目錄 -->
+  <div id="pageMenu" class="page-view">
+    <button class="cover-back-btn" onclick="showCover()">← 封面</button>
+    <div class="menu-notes" aria-hidden="true">
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 4); right:6%; font-size:104px;">♫</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 13); left:-3%; font-size:132px;">♪</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 22); right:26%; font-size:62px;">♩</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 31); left:12%; font-size:78px;">♬</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 40); right:-4%; font-size:150px;">𝄞</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 49); left:2%; font-size:92px;">♪</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 58); right:14%; font-size:70px;">♫</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 67); left:-2%; font-size:120px;">♩</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 74); right:4%; font-size:96px;">♬</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 83); left:16%; font-size:64px;">♪</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 90); right:22%; font-size:110px;">𝄞</span>
+      <span class="menu-note" style="top:calc(var(--app-vh, 1vh) * 95); left:1%; font-size:82px;">♫</span>
+    </div>
+
+    <h1>音樂聽力練習</h1>
+    <p class="subtitle" id="menuSubtitle" style="visibility:hidden;">歡迎使用聽力訓練系統，請從下方目錄選擇今天要練習的項目：</p>
+    <p class="intro-line">首次使用？<a href="https://youtu.be/fwHc6VuFatg" target="_blank" rel="noopener">▸ 請觀看完整使用教學</a></p>
+
+    <div class="menu-grid">
+      <a href="interval-trainer.html" class="menu-card active-feature practice-card">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">01</div>
+          <h3 class="menu-card-title">音程練習</h3>
+          <p class="menu-card-desc">判斷聽到的音程度數，並從選項中選出正確的音程名稱。</p>
+        </div>
+        <button type="button" class="menu-info-btn" aria-label="說明" onclick="event.preventDefault();event.stopPropagation();showCardInfo(this)" data-title="音程練習" data-desc="判斷聽到的音程度數，並從選項中選出正確的音程名稱。">▸</button>
+      </a>
+
+      <a href="chord-trainer.html" class="menu-card active-feature practice-card">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">02</div>
+          <h3 class="menu-card-title">和絃辨認</h3>
+          <p class="menu-card-desc">判斷聽到的和絃性質與轉位，從選項中選出正確的和絃性質名稱。</p>
+        </div>
+        <button type="button" class="menu-info-btn" aria-label="說明" onclick="event.preventDefault();event.stopPropagation();showCardInfo(this)" data-title="和絃辨認" data-desc="判斷聽到的和絃性質與轉位，從選項中選出正確的和絃性質名稱。">▸</button>
+      </a>
+
+      <a href="rhythm-trainer.html" class="menu-card active-feature practice-card">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">03</div>
+          <h3 class="menu-card-title">節奏練習</h3>
+          <p class="menu-card-desc">根據聽到的節奏，將正確的節奏型填入譜例中。</p>
+        </div>
+        <button type="button" class="menu-info-btn" aria-label="說明" onclick="event.preventDefault();event.stopPropagation();showCardInfo(this)" data-title="節奏練習" data-desc="根據聽到的節奏，將正確的節奏型填入譜例中。">▸</button>
+      </a>
+
+      <a href="melody-trainer.html" class="menu-card active-feature practice-card">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">04</div>
+          <h3 class="menu-card-title">單旋律曲調</h3>
+          <p class="menu-card-desc">根據聆聽到的旋律與節奏填入譜例。</p>
+        </div>
+        <button type="button" class="menu-info-btn" aria-label="說明" onclick="event.preventDefault();event.stopPropagation();showCardInfo(this)" data-title="單旋律曲調" data-desc="根據聆聽到的旋律與節奏填入譜例。">▸</button>
+      </a>
+
+      <a href="two-part-trainer.html" class="menu-card active-feature practice-card">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">05</div>
+          <h3 class="menu-card-title">兩聲部曲調</h3>
+          <p class="menu-card-desc">高音與低音同時演奏，將聆聽到的旋律與節奏填入大譜表譜例。</p>
+        </div>
+        <button type="button" class="menu-info-btn" aria-label="說明" onclick="event.preventDefault();event.stopPropagation();showCardInfo(this)" data-title="兩聲部曲調" data-desc="高音與低音同時演奏，將聆聽到的旋律與節奏填入大譜表譜例。">▸</button>
+      </a>
+
+      <a href="four-part-trainer.html" class="menu-card active-feature practice-card">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">06</div>
+          <h3 class="menu-card-title">四部和聲進行</h3>
+          <p class="menu-card-desc">聆聽四部和聲進行，將正確的調性、低音與級數填入譜例。</p>
+        </div>
+        <button type="button" class="menu-info-btn" aria-label="說明" onclick="event.preventDefault();event.stopPropagation();showCardInfo(this)" data-title="四部和聲進行" data-desc="聆聽四部和聲進行，將正確的調性、低音與級數填入譜例。">▸</button>
+      </a>
+
+      <a href="pitch-error-trainer.html" class="menu-card active-feature practice-card">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">07</div>
+          <h3 class="menu-card-title">音高辨認 (找錯音)</h3>
+          <p class="menu-card-desc">根據題目的譜例，從演奏片段中找出譜例上不相符的音高。</p>
+        </div>
+        <button type="button" class="menu-info-btn" aria-label="說明" onclick="event.preventDefault();event.stopPropagation();showCardInfo(this)" data-title="音高辨認 (找錯音)" data-desc="根據題目的譜例，從演奏片段中找出譜例上不相符的音高。">▸</button>
+      </a>
+
+      <a href="pitch-stack-trainer.html" class="menu-card active-feature practice-card">
+        <span class="menu-badge badge-ready">開始練習</span>
+        <div>
+          <div class="menu-card-num">08</div>
+          <h3 class="menu-card-title">音堆練習</h3>
+          <p class="menu-card-desc">播放隨機的音堆，將所有的正確音高填入譜例中。</p>
+        </div>
+        <button type="button" class="menu-info-btn" aria-label="說明" onclick="event.preventDefault();event.stopPropagation();showCardInfo(this)" data-title="音堆練習" data-desc="播放隨機的音堆，將所有的正確音高填入譜例中。">▸</button>
+      </a>
+
+      <!-- 模擬測驗（全寬、置於贊助卡上方） -->
+      <a href="exam.html" class="menu-card active-feature" style="grid-column:1 / -1; border-color:var(--accent-line);">
+        <span class="menu-badge badge-ready" id="examCardBadge" style="display:none;"></span>
+        <div>
+          <div class="menu-card-num">★ 模擬測驗</div>
+          <h3 class="menu-card-title">📝 模擬測驗</h3>
+          <p class="menu-card-desc">六大項綜合、滿分 100 分的模擬考卷，分大學檔與高中檔，一次交卷計分並記錄長期進步曲線。<span id="examCardStat"></span></p>
+        </div>
+      </a>
+
+      <!-- 歡迎小額贊助（全寬、較矮） -->
+      <div class="menu-card donate-card" onclick="showDonate()">
+        <div>
+          <h3 class="menu-card-title">❤ 歡迎小額贊助</h3>
+          <p class="menu-card-desc">這個工具永久免費。如果它對你的教學或練習有幫助，歡迎小額贊助支持後續開發與維護。</p>
+        </div>
+      </div>
+
+      <!-- 整合錯題本入口 -->
+      <div class="menu-card review-hub-card" onclick="showHubChoose()">
+        <span class="menu-badge badge-review" id="hubBadge">0 題</span>
+        <div>
+          <div class="menu-card-num">★ 錯題本</div>
+          <h3 class="menu-card-title">錯題本總覽</h3>
+          <p class="menu-card-desc">整合所有練習答錯的題目，一次檢視各項目的錯題數量與最近紀錄，並可跳回該練習複習。</p>
+        </div>
+      </div>
+
+      <!-- 設定 -->
+      <div class="menu-card active-feature settings-card" onclick="showSettings()">
+        <div>
+          <h3 class="menu-card-title">⚙️ 設定</h3>
+          <p class="menu-card-desc">功能調整</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
+    <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
+    <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.96　·　更新日誌 ▸</button></p>
+  </div>
+
+  <!-- 錯題本總覽 -->
+  <!-- 錯題本入口：練習 / 模擬考試 -->
+  <div id="pageHubChoose" class="page-view">
+    <button class="nav-back-btn" onclick="showMenu()">← 回選單</button>
+    <h1>錯題本</h1>
+    <p class="subtitle">要複習平常練習累積的錯題，還是回顧考過的模擬考卷？</p>
+    <div class="menu-grid">
+      <div class="menu-card active-feature" onclick="showHub()">
+        <span class="menu-badge badge-review" id="hubChooseBadge">0 題</span>
+        <div>
+          <div class="menu-card-num">📘</div>
+          <h3 class="menu-card-title">錯題本目錄</h3>
+          <p class="menu-card-desc">七項練習答錯的題目，可重播、對照正解，並跳回該練習繼續複習。</p>
+        </div>
+      </div>
+      <div class="menu-card active-feature" onclick="location.href='exam.html#papers'">
+        <span class="menu-badge badge-ready" id="hubPaperBadge" style="display:none;"></span>
+        <div>
+          <div class="menu-card-num">📚</div>
+          <h3 class="menu-card-title">模擬考錯題本目錄</h3>
+          <p class="menu-card-desc">一張一張考卷回顧，逐大項看題目與你的作答，可重播、對照正解，沒有播放次數限制。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pageSettings" class="page-view">
+    <button class="nav-back-btn" onclick="showMenu()">← 回選單</button>
+    <h1>設定</h1>
+    <p class="subtitle">這些設定只會套用在這台裝置上，不會隨著練習紀錄一起導出。</p>
+
+    <div class="hub-group">
+      <h3 class="set-title">鋼琴音源</h3>
+      <div class="opt-list" id="pianoKitList">
+        <button type="button" class="opt-item" data-kit="salamander" onclick="setPianoKit('salamander')">
+          <span class="opt-radio"></span>
+          <span class="opt-body">
+            <span class="opt-name">Yamaha C5（高音質）</span>
+            <span class="opt-sub">真實鋼琴錄音，檔案較大</span>
+          </span>
+        </button>
+        <button type="button" class="opt-item" data-kit="musyng" onclick="setPianoKit('musyng')">
+          <span class="opt-radio"></span>
+          <span class="opt-body">
+            <span class="opt-name">標準音色（原本的）</span>
+            <span class="opt-sub">載入較快，適合網路較慢時</span>
+          </span>
+        </button>
+      </div>
+      <p class="set-toast" id="pianoKitToast"></p>
+      <p class="set-credit">高音質音色取樣自 Yamaha C5，來源為 Alexander Holm 錄製的
+        Salamander Grand Piano（已釋出為公有領域）。</p>
+    </div>
+  </div>
+
+  <div id="pageHub" class="page-view">
+    <button class="nav-back-btn" onclick="showHubChoose()">← 返回</button>
+    <h1>錯題本目錄</h1>
+    <p class="subtitle">這裡整合各項練習累積的錯題（儲存在本機瀏覽器）。點「跳回複習」會直接開啟該練習的錯題本。</p>
+    <div class="hub-total" id="hubTotal"></div>
+    <div id="hubGroups"></div>
+
+    <div class="report-wrap" style="margin-top:22px;"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
+  </div>
+</div>
+
+<!-- 導入及導出紀錄 -->
+<div class="donate-modal" id="backupModal" onclick="if(event.target===this) closeBackup()">
+  <div class="donate-box">
+    <div class="dico">💾</div>
+    <h3>導入及導出紀錄</h3>
+    <p style="margin-bottom:14px;">練習紀錄只存在這台裝置上，無法跨設備共用存檔。將紀錄導出後，日後可在任何裝置導入以還原練習紀錄。</p>
+    <div class="bk-stat" id="bkStat"></div>
+    <div class="bk-row">
+      <button type="button" class="bk-btn" id="bkExportBtn" onclick="doExport()">📤 導出紀錄</button>
+      <button type="button" class="bk-btn ghost" onclick="pickImportFile()">📥 導入紀錄</button>
+    </div>
+    <input type="file" id="bkFileInput" style="display:none;" onchange="onImportFile(event)">
+    <button class="donate-dismiss" onclick="closeBackup()">關閉</button>
+  </div>
+</div>
+
+<!-- 導入前的覆蓋確認 -->
+<div class="donate-modal" id="bkConfirmModal" onclick="if(event.target===this) closeBkConfirm()">
+  <div class="donate-box">
+    <div class="dico">⚠️</div>
+    <h3>導入將覆蓋現有紀錄</h3>
+    <div class="bk-warn">這台裝置上的所有紀錄會被取代，<b>無法復原</b>。</div>
+    <table class="bk-cmp" id="bkCmp"></table>
+    <div class="bk-note" id="bkMeta"></div>
+    <div class="bk-row">
+      <button type="button" class="bk-btn ghost" onclick="closeBkConfirm()">取消</button>
+      <button type="button" class="bk-btn" onclick="doImportConfirmed()">確定覆蓋</button>
+    </div>
+  </div>
+</div>
+
+<!-- 導入完成 -->
+<div class="donate-modal" id="bkDoneModal" onclick="if(event.target===this) closeBkDone()">
+  <div class="donate-box">
+    <div class="dico">✅</div>
+    <h3>導入完成</h3>
+    <p id="bkDoneText" style="margin-bottom:16px;"></p>
+    <div class="bk-row">
+      <button type="button" class="bk-btn ghost" onclick="closeBkDone(); showMenu();">回選單</button>
+      <button type="button" class="bk-btn" onclick="closeBkDone(); showHub();">錯題本總覽</button>
+    </div>
+  </div>
+</div>
+
+<!-- 導入或導出失敗 -->
+<div class="donate-modal" id="bkErrModal" onclick="if(event.target===this) closeBkErr()">
+  <div class="donate-box">
+    <div class="dico" id="bkErrIcon">📄</div>
+    <h3 id="bkErrTitle">無法讀取這個檔案</h3>
+    <p id="bkErrText" style="margin-bottom:16px;"></p>
+    <div class="bk-row">
+      <button type="button" class="bk-btn" onclick="closeBkErr()">知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 前往贊助彈窗（Portaly / 街口支付 / 銀行轉帳 / 贊助者名單 / 作者主頁入口） -->
+<div class="donate-modal" id="donateModal" onclick="if(event.target===this) closeDonate()">
+  <div class="donate-box">
+    <div class="dico">❤</div>
+    <h3>支持這個工具</h3>
+    <p>這個工具永久免費。你的支持會用於後續的開發與維護，感謝你 🙏</p>
+    <!-- 管道清單（日後要加新管道，在這裡多一顆按鈕即可） -->
+    <div class="donate-links" id="donateChannels">
+      <a class="author-item" href="https://portaly.cc/heng-heng.music/support" target="_blank" rel="noopener"><span class="ai-ico">❤</span> Portaly 小額贊助</a>
+      <button type="button" class="author-item" onclick="showPanel('Jko')"><span class="ai-ico">📱</span> 街口支付贊助</button>
+      <button type="button" class="author-item" onclick="showPanel('Bank')"><span class="ai-ico">🏦</span> 銀行轉帳贊助</button>
+      <button type="button" class="author-item" id="sponsorEntryBtn" style="display:none;" onclick="showPanel('Sponsors')"><span class="ai-ico">💛</span> 贊助者名單</button>
+    </div>
+
+    <!-- 街口支付明細（點上面按鈕才展開） -->
+    <div class="donate-links" id="donateJko" style="display:none;">
+      <a class="jkopay-card" href="https://service.jkopay.com/r/transfer?j=Transfer:902103863" target="_blank" rel="noopener">
+        <img src="jkopay-qr.png" alt="街口支付 QR 碼，Heng-Heng Music，帳號 902103863">
+        <span class="jkopay-label">開啟街口支付</span>
+      </a>
+      <div class="jkopay-acct">街口帳號 <b>902103863</b><button class="copy-btn" type="button" onclick="copyText(event,'902103863')">複製</button></div>
+      <p class="pay-note">此 QR 為 <b>TWQR 共通碼</b>，可用街口支付，或<b>任一家銀行的網銀 App</b> 掃描付款。</p>
+      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">請填寫贊助者表單，讓我將您放上贊助者名單 ❤</a>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+
+    <!-- 銀行轉帳明細 -->
+    <div class="donate-links" id="donateBank" style="display:none;">
+      <div class="bank-row"><span class="bk">銀行</span><b>中國信託（822）</b><button class="copy-btn" type="button" onclick="copyText(event,'822')">複製代號</button></div>
+      <div class="bank-row"><span class="bk">帳號</span><b>163540424795</b><button class="copy-btn" type="button" onclick="copyText(event,'163540424795')">複製</button></div>
+      <div class="bank-row"><span class="bk">戶名</span><b>伍○恆</b></div>
+      <p class="pay-note">轉帳僅需銀行代號與帳號；戶名供核對用。</p>
+      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">請填寫贊助者表單，讓我將您放上贊助者名單 ❤</a>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+
+    <!-- 贊助者名單（名單有人時才會出現入口） -->
+    <div class="donate-links" id="donateSponsors" style="display:none;">
+      <div id="sponsorList" class="sponsor-list">
+        <button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>
+      </div>
+      <p class="pay-note">每一位同意公開的贊助者，都會列在贊助者名單中。<span style="color:var(--wrong);">此外可獲得專屬版本，將題目導出為音檔與譜例，方便備課、製作講義與離線複習。</span></p>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+    <button type="button" class="author-item" style="width:100%; margin-bottom:12px;" onclick="closeDonate(); showAuthor();"><span class="ai-ico">🔗</span> 作者主頁</button>
+    <button class="donate-dismiss" onclick="closeDonate()">關閉</button>
+  </div>
+</div>
+
+<!-- 更新日誌彈窗 -->
+<div class="donate-modal" id="logModal" onclick="if(event.target===this) closeChangelog()">
+  <div class="donate-box">
+    <div class="dico">📝</div>
+    <h3>更新日誌</h3>
+    <p>由舊到新，最新的更新在最下方。</p>
+    <div class="log-list" id="logList"></div>
+    <p class="log-current" id="logCurrent"></p>
+    <button class="donate-dismiss" onclick="closeChangelog()">關閉</button>
+  </div>
+</div>
+
+<!-- 作者主頁彈窗（Portaly 主頁 / YouTube 頻道，可擴充） -->
+<div class="donate-modal" id="a2hsModal" onclick="if(event.target===this) closeA2HS()">
+  <div class="donate-box">
+    <div class="dico" style="line-height:1;"><svg class="a2hs-ico" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg></div>
+    <h3>加入主畫面</h3>
+    <p style="margin-bottom:14px;">加入之後可從主畫面快速開啟，且不會受到網址列的干擾，畫面更完整，載入也更快速。</p>
+
+    <div id="a2hsSafariHint" class="a2hs-hint" style="display:none;">
+      你現在是用 LINE 或其他 App 的內建瀏覽器開啟，這種瀏覽器<b>沒有</b>「加入主畫面」的功能。<br>
+      請先找到「⋯」或「⋮」選單（可能在右上角或右下角），點選<b>「在瀏覽器中開啟」</b>。<br>
+      若打開後不是 <span id="a2hsBrowserName">Safari</span>，請按下面的按鈕複製網址，再自己貼到 <span id="a2hsBrowserName2">Safari</span> 的網址列。
+      <button type="button" id="a2hsCopyBtn" class="a2hs-copy" onclick="copySiteUrl()">📋 複製網址</button>
+    </div>
+
+    <ol class="a2hs-steps" id="a2hsStepsIOS">
+      <li><span class="a2hs-num">1</span><span>從網址列找到分享圖示 <svg class="a2hs-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg> 並點擊（可能在網址列上，或更多「⋯」裡）</span></li>
+      <li><span class="a2hs-num">2</span><span>找到並點擊「加入主畫面」</span></li>
+      <li><span class="a2hs-num">3</span><span>點擊「加入」按鈕</span></li>
+    </ol>
+    <ol class="a2hs-steps" id="a2hsStepsAndroid" style="display:none;">
+      <li><span class="a2hs-num">1</span><span>從網址列找到選單「⋮」</span></li>
+      <li><span class="a2hs-num">2</span><span>找到「安裝應用程式」或「加到主畫面」（不同版本用詞不同）</span></li>
+      <li><span class="a2hs-num">3</span><span>點「安裝」或「新增」</span></li>
+    </ol>
+    <p class="a2hs-done">大功告成 🎉</p>
+    <p style="margin:0 0 18px;"><a class="footer-link" href="https://youtu.be/fF4-J2NGAnw?t=27" target="_blank" rel="noopener">▸ 看影片教學</a></p>
+    <button class="donate-dismiss" onclick="closeA2HS()">關閉</button>
+  </div>
+</div>
+
+<div class="donate-modal" id="goldInfoModal" onclick="if(event.target===this) closeGoldInfo()">
+  <div class="donate-box">
+    <div class="dico">✨</div>
+    <h3>金色樂友</h3>
+    <p>累積贊助滿 5,000 元的朋友，名字會以金色顯示。</p>
+    <p>這個 App 完全免費、沒有廣告，能持續維護與增加新的練習項目，靠的是各位的支持。</p>
+    <p>無論金額多少，每一份贊助我都由衷感謝 🙏</p>
+    <button class="donate-dismiss" onclick="closeGoldInfo()">關閉</button>
+  </div>
+</div>
+
+<div class="donate-modal" id="cardInfoModal" onclick="if(event.target===this) closeCardInfo()">
+  <div class="donate-box">
+    <div class="dico">🎵</div>
+    <h3 id="cardInfoTitle">項目說明</h3>
+    <p id="cardInfoDesc"></p>
+    <button class="donate-dismiss" onclick="closeCardInfo()">關閉</button>
+  </div>
+</div>
+
+<div class="donate-modal" id="authorModal" onclick="if(event.target===this) closeAuthor()">
+  <div class="donate-box">
+    <div class="dico">🎼</div>
+    <h3>作者主頁</h3>
+    <p>伍祐恆 Heng-Heng Wu</p>
+    <p class="author-invite">如果想精進鋼琴演奏、樂理、視唱、聽寫能力，歡迎來找我上課，可以加 LINE 私訊喔！</p>
+    <div class="donate-links">
+      <a class="author-item" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#06C755" d="M12 2.6c-5.5 0-10 3.6-10 8.1 0 3.9 3.6 7.2 8.4 7.9.33.07.78.22.89.5.1.26.07.66.03.92 0 0-.12.72-.14.87-.05.26-.21 1 .88.55 1.1-.46 5.9-3.48 8.05-5.96 1.48-1.63 2.19-3.28 2.19-5.11 0-4.5-4.5-8.1-10-8.1z"/></svg></span> 祐恆的 LINE</a>
+      <a class="author-item" href="https://portaly.cc/heng-heng.music" target="_blank" rel="noopener"><span class="ai-ico">🔗</span> Portaly 主頁</a>
+      <a class="author-item" href="https://www.youtube.com/@HengHengWu" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#FF0000" d="M23 7.6a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.5A3 3 0 0 0 1 7.6 31.3 31.3 0 0 0 .5 12 31.3 31.3 0 0 0 1 16.4a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 23.5 12 31.3 31.3 0 0 0 23 7.6z"/><path fill="#fff" d="M9.75 15.5l6-3.5-6-3.5z"/></svg></span> YouTube 頻道</a>
+    </div>
+    <button class="donate-dismiss" onclick="closeAuthor()">關閉</button>
+  </div>
+</div>
+
+<script>
+/* 視窗實際高度寫進 --app-vh：手機工具列收合時 100vh 會變，用這個值才不會讓固定定位的元素跳動 */
+(function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+</script>
+<script>
+/* 從練習頁返回時帶 #menu：直接顯示選單、跳過封面（封面只在首次啟動出現）。此段趁早執行，避免閃到封面。 */
+/* 錯題本相關的錨點要等下面的渲染函式定義好才能處理，這裡先記下來、順便把封面收起來避免閃爍 */
+if (location.hash === '#hub-practice' || location.hash === '#hub') {
+  window.__initHash = location.hash;
+  var _c1 = document.getElementById('pageCover'); if(_c1) _c1.classList.remove('active');
+} else if (location.hash === '#menu') {
+  var _c = document.getElementById('pageCover'); var _m = document.getElementById('pageMenu');
+  if (_c) _c.classList.remove('active'); if (_m) _m.classList.add('active');
+}
+</script>
+<script src="exam-common.js"></script>
+<script>
+/* ===== 統一錯題本儲存（與各練習頁共用同一組 localStorage key） ===== */
+window.REVIEW_STORE = {
+  PREFIX: 'earTrainer.review.',
+  TYPES: ['interval','chord','rhythm','melody','twopart','fourpart','pitcherr','pitchstack'],
+  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行', pitcherr:'音高辨認（找錯音）', pitchstack:'音堆練習' },
+  TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html', pitcherr:'pitch-error-trainer.html', pitchstack:'pitch-stack-trainer.html' },
+  load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
+  clear(type){ try { localStorage.setItem(this.PREFIX+type, '[]'); } catch(e){} },
+  count(type){ return this.load(type).length; },
+  /* 實際題數：連續聽寫一筆裡面含多題（v.95 起），要一起算進來。
+     舊資料沒有 source 欄位，一筆就是一題。 */
+  questionCount(type){
+    return this.load(type).reduce(function(n, it){
+      return n + ((it && it.source === 'dictation') ? ((it.questions || []).length || 0) : 1);
+    }, 0);
+  },
+  total(){ return this.TYPES.reduce((a,t)=>a+this.questionCount(t), 0); }
+};
+
+/* ===== 導入及導出紀錄（v.91） =====
+   練習紀錄全部存在 localStorage，一台裝置一份。這裡把它們打包成一個檔案，
+   讓使用者可以保管、在別台裝置還原。
+
+   ⚠ iOS 的關鍵限制：在「加到主畫面」的 standalone 模式下，
+   傳統的 <a download> 下載會被「靜默忽略」——不報錯、沒反應、檔案不存在，
+   使用者會以為備份好了。所以一律優先走 navigator.share()（系統分享面板），
+   iOS 上沒有分享能力時寧可明白擋下，也不要假裝成功。 */
+
+var BK_FORMAT = 'ear-training-backup';
+var BK_APP_VER = 'v.91';
+var BK_EXAM_KEYS = {
+  history: 'earTrainer.exam.history',
+  papers:  'earTrainer.exam.papers',
+  schema:  'earTrainer.exam.schema'
+};
+/* 進行中的考試（session）與已看過的更新日誌刻意不備份：
+   前者搬到別台會出現奇怪的狀態，後者搬過去會讓新裝置不顯示更新說明。 */
+
+function bkReadJSON(key, dflt){
+  try{ var v = localStorage.getItem(key); return v == null ? dflt : JSON.parse(v); }
+  catch(e){ return dflt; }
+}
+
+/* 統計這台裝置目前有多少紀錄 */
+function bkStats(data){
+  var S = window.REVIEW_STORE;
+  var review = 0, papers = 0, history = 0;
+  try{
+    if(data){
+      S.TYPES.forEach(function(t){ review += ((data.review || {})[t] || []).length; });
+      papers = (data.papers || []).length;
+      history = (data.history || []).length;
+    } else {
+      review = S.total();
+      papers = bkReadJSON(BK_EXAM_KEYS.papers, []).length;
+      history = bkReadJSON(BK_EXAM_KEYS.history, []).length;
+    }
+  }catch(e){}
+  return { review: review, papers: papers, history: history,
+           empty: (review + papers + history) === 0 };
+}
+
+function bkRenderStat(){
+  var el = document.getElementById('bkStat'); if(!el) return;
+  var st = bkStats(null);
+  if(st.empty){
+    el.innerHTML = '<div class="row"><span class="empty">這台裝置目前沒有任何紀錄</span></div>';
+  } else {
+    el.innerHTML =
+      '<div class="row"><span>錯題本</span><span>' + st.review + ' 筆</span></div>' +
+      '<div class="row"><span>歷史成績</span><span>' + st.history + ' 次</span></div>' +
+      '<div class="row"><span>完整考卷</span><span>' + st.papers + ' 份</span></div>';
+  }
+  var btn = document.getElementById('bkExportBtn');
+  if(btn){ btn.disabled = st.empty; }
+}
+
+
+/* ===== 設定：鋼琴音色 =====
+   實際的播放由各練習頁的 piano-engine.js 負責，這裡只負責記住選擇。
+   選單頁本身也會發聲（封面的示範音），所以切換後一併重新載入自己的音色。 */
+var PIANO_LS = 'earTrainer.settings.piano';
+function pianoKit(){
+  try{ var v = localStorage.getItem(PIANO_LS);
+       return (v === 'musyng' || v === 'salamander') ? v : 'salamander'; }
+  catch(e){ return 'salamander'; }
+}
+function renderPianoKit(){
+  var kit = pianoKit();
+  document.querySelectorAll('#pianoKitList .opt-item').forEach(function(b){
+    b.classList.toggle('on', b.dataset.kit === kit);
+  });
+}
+var pianoToastTimer = null;
+function setPianoKit(kit){
+  var before = pianoKit();
+  try{ localStorage.setItem(PIANO_LS, kit); }catch(e){}
+  renderPianoKit();
+  /* 選單頁本身不載入音色，各練習頁是進入時才載入音色，
+     所以這裡存好就好——但切換當下沒有任何聲音變化，要給使用者一個回饋。 */
+  var t = document.getElementById('pianoKitToast');
+  if(t){
+    t.textContent = (before === kit)
+      ? '目前使用：' + (kit === 'salamander' ? 'Yamaha C5' : '標準音色')
+      : '✓ 已切換為' + (kit === 'salamander' ? ' Yamaha C5' : '標準音色') + '，下次進入練習時生效';
+    clearTimeout(pianoToastTimer);
+    pianoToastTimer = setTimeout(function(){ if(t) t.textContent = ''; }, 4000);
+  }
+}
+function showSettings(){ renderPianoKit();
+  var t = document.getElementById('pianoKitToast'); if(t) t.textContent = '';
+  showPageId('pageSettings'); }
+
+function showBackup(){
+  bkRenderStat();
+  var m = document.getElementById('backupModal');
+  if(m) m.classList.add('open');
+  syncBodyLock();
+}
+function closeBackup(){
+  var m = document.getElementById('backupModal');
+  if(m) m.classList.remove('open');
+  syncBodyLock();
+}
+
+function bkShowErr(title, text, icon){
+  document.getElementById('bkErrTitle').textContent = title;
+  document.getElementById('bkErrText').innerHTML = text;
+  document.getElementById('bkErrIcon').textContent = icon || '📄';
+  document.getElementById('bkErrModal').classList.add('open');
+  syncBodyLock();
+}
+function closeBkErr(){
+  document.getElementById('bkErrModal').classList.remove('open');
+  syncBodyLock();
+}
+
+/* ---------- 導出 ---------- */
+
+function bkCollect(){
+  var S = window.REVIEW_STORE;
+  var review = {};
+  S.TYPES.forEach(function(t){ review[t] = S.load(t); });
+  return {
+    format: BK_FORMAT,
+    appVer: BK_APP_VER,
+    schema: bkReadJSON(BK_EXAM_KEYS.schema, null),
+    exportedAt: Date.now(),
+    data: {
+      review: review,
+      history: bkReadJSON(BK_EXAM_KEYS.history, []),
+      papers:  bkReadJSON(BK_EXAM_KEYS.papers, [])
+    }
+  };
+}
+
+/* 檔名帶日期與時間，同一天導出多次才不會變成同一個檔名 */
+function bkFileName(){
+  var d = new Date();
+  var p = function(n){ return String(n).padStart(2, '0'); };
+  return '聽力練習備份_' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate())
+       + '-' + p(d.getHours()) + p(d.getMinutes()) + '.json';
+}
+
+function doExport(){
+  var btn = document.getElementById('bkExportBtn');
+  if(btn && btn.disabled) return;
+  var text, file;
+  try{
+    text = JSON.stringify(bkCollect());
+    file = new File([text], bkFileName(), { type: 'application/json' });
+  }catch(e){
+    bkShowErr('導出失敗', '準備檔案時發生問題，請稍後再試。', '⚠️');
+    return;
+  }
+
+  var ua = '';
+  try{ ua = navigator.userAgent || ''; }catch(e){}
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && (function(){ try{ return (navigator.maxTouchPoints||0) > 1; }catch(e){ return false; } })());
+  var isAndroid = /Android/.test(ua);
+  var isMobile = isIOS || isAndroid;
+
+  /* 一般下載：桌機最可靠的方式 */
+  function bkDownload(){
+    try{
+      var blob = new Blob([text], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = bkFileName();
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      closeBackup();
+      return true;
+    }catch(e){ return false; }
+  }
+
+  /* 手機才走系統分享面板：iOS 在主畫面模式下這是唯一可行的方式。
+     ⚠ 桌機不要走分享——桌機瀏覽器常常直接拒絕（丟 AbortError／NotAllowedError），
+     看起來就像「按了沒反應」，而桌機的一般下載本來就正常。 */
+  if(isMobile && navigator.canShare && navigator.canShare({ files: [file] })){
+    navigator.share({ files: [file], title: '聽力練習備份' })
+      .then(function(){ closeBackup(); })
+      .catch(function(err){
+        var name = err && err.name;
+        if(name === 'AbortError') return;          // 使用者自己取消，不要跳錯誤嚇他
+        if(!isIOS && bkDownload()) return;         // Android 還可以退回下載
+        if(isIOS){
+          bkShowErr('導出失敗', '無法開啟分享面板，請稍後再試。', '⚠️');
+        } else {
+          bkShowErr('導出失敗', '無法產生檔案，請改用其他瀏覽器再試。', '⚠️');
+        }
+      });
+    return;
+  }
+
+  /* iOS 沒有分享能力時寧可明白擋下，不要退回會靜默失敗的下載 */
+  if(isIOS){
+    bkShowErr('這個版本無法直接儲存',
+      '你的 iOS 版本無法從網頁直接儲存檔案。<br>請更新 iOS，或改用 Safari 開啟本網站後再導出。', '⚠️');
+    return;
+  }
+
+  /* 桌機與沒有分享能力的 Android：一般下載 */
+  if(!bkDownload()){
+    bkShowErr('導出失敗', '無法產生檔案，請改用其他瀏覽器再試。', '⚠️');
+  }
+}
+
+/* ---------- 導入 ---------- */
+
+var bkPending = null;   // 通過檢查、等待使用者確認覆蓋的資料
+
+function pickImportFile(){
+  var input = document.getElementById('bkFileInput');
+  if(!input) return;
+  input.value = '';        // 讓同一個檔案可以重複選
+  input.click();
+}
+
+function onImportFile(ev){
+  var f = ev && ev.target && ev.target.files && ev.target.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onerror = function(){ bkShowErr('無法讀取這個檔案', '檔案讀取失敗，可能已經損毀。'); };
+  reader.onload = function(){
+    var obj = null;
+    try{ obj = JSON.parse(String(reader.result)); }
+    catch(e){
+      bkShowErr('無法讀取這個檔案', '這不是聽力練習的備份檔，<br>請確認選擇的檔案是否正確。');
+      return;
+    }
+    bkPrepareImport(obj);
+  };
+  reader.readAsText(f);
+}
+
+/* 版本字串 'v.91' → 91，用來比較新舊 */
+function bkVerNum(v){
+  try{ var m = String(v || '').match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
+  catch(e){ return 0; }
+}
+
+function bkPrepareImport(obj){
+  if(!obj || obj.format !== BK_FORMAT || !obj.data){
+    bkShowErr('無法讀取這個檔案', '這不是聽力練習的備份檔，<br>請確認選擇的檔案是否正確。');
+    return;
+  }
+  /* 比目前的 App 新就擋下來，舊的照常導入（缺的欄位比照現有相容機制以預設值呈現） */
+  if(bkVerNum(obj.appVer) > bkVerNum(BK_APP_VER)){
+    bkShowErr('備份檔版本較新',
+      '這份備份是較新版本建立的。<br>請連上網路重新整理頁面更新後再試。', '⬆️');
+    return;
+  }
+
+  bkPending = obj;
+  var now = bkStats(null), next = bkStats(obj.data);
+
+  document.getElementById('bkCmp').innerHTML =
+    '<tr><th>　</th><th>目前這台</th><th>即將導入</th></tr>' +
+    '<tr><td>錯題本</td><td>' + now.review + ' 筆</td><td class="to">' + next.review + ' 筆</td></tr>' +
+    '<tr><td>歷史成績</td><td>' + now.history + ' 次</td><td class="to">' + next.history + ' 次</td></tr>' +
+    '<tr><td>完整考卷</td><td>' + now.papers + ' 份</td><td class="to">' + next.papers + ' 份</td></tr>';
+
+  var meta = '備份時間：' + bkFmtDate(obj.exportedAt);
+  if(bkVerNum(obj.appVer) < bkVerNum(BK_APP_VER)){
+    meta += '<br>這份備份建立於 ' + escapeHtml(obj.appVer || '較舊版本') +
+            '，較新功能的資料會以預設值呈現。';
+  }
+  document.getElementById('bkMeta').innerHTML = meta;
+
+  closeBackup();
+  document.getElementById('bkConfirmModal').classList.add('open');
+  syncBodyLock();
+}
+
+function bkFmtDate(ts){
+  try{
+    var d = new Date(ts); var p = function(n){ return String(n).padStart(2,'0'); };
+    return d.getFullYear() + '/' + p(d.getMonth()+1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }catch(e){ return '（未知）'; }
+}
+
+function closeBkConfirm(){
+  bkPending = null;
+  document.getElementById('bkConfirmModal').classList.remove('open');
+  syncBodyLock();
+}
+
+/* 覆蓋寫入。先在記憶體裡把要寫的東西全部備妥、驗證過，再一次寫入，
+   任何一步失敗就把原本的資料寫回去，避免留下一半新一半舊的狀態。 */
+function doImportConfirmed(){
+  var obj = bkPending; if(!obj) return;
+  var S = window.REVIEW_STORE;
+  var writes = [];
+  try{
+    S.TYPES.forEach(function(t){
+      var arr = (obj.data.review || {})[t];
+      writes.push([S.PREFIX + t, JSON.stringify(Array.isArray(arr) ? arr : [])]);
+    });
+    writes.push([BK_EXAM_KEYS.history, JSON.stringify(obj.data.history || [])]);
+    writes.push([BK_EXAM_KEYS.papers,  JSON.stringify(obj.data.papers  || [])]);
+    if(obj.schema != null) writes.push([BK_EXAM_KEYS.schema, JSON.stringify(obj.schema)]);
+  }catch(e){
+    closeBkConfirm();
+    bkShowErr('導入失敗', '備份檔的內容不完整，無法導入。', '⚠️');
+    return;
+  }
+
+  var backup = writes.map(function(w){ return [w[0], localStorage.getItem(w[0])]; });
+  try{
+    writes.forEach(function(w){ localStorage.setItem(w[0], w[1]); });
+  }catch(e){
+    /* 寫到一半失敗（多半是空間不足）就整批還原 */
+    backup.forEach(function(b){
+      try{ if(b[1] == null) localStorage.removeItem(b[0]); else localStorage.setItem(b[0], b[1]); }catch(e2){}
+    });
+    closeBkConfirm();
+    bkShowErr('導入失敗', '這台裝置的儲存空間不足，<br>紀錄已經還原成原本的狀態。', '⚠️');
+    return;
+  }
+
+  var st = bkStats(obj.data);
+  bkPending = null;
+  document.getElementById('bkConfirmModal').classList.remove('open');
+  document.getElementById('bkDoneText').textContent =
+    '已還原 ' + st.review + ' 筆錯題本、' + st.history + ' 次成績、' + st.papers + ' 份考卷。';
+  document.getElementById('bkDoneModal').classList.add('open');
+  syncBodyLock();
+  try{ updateHubBadge(); }catch(e){}
+}
+
+function closeBkDone(){
+  document.getElementById('bkDoneModal').classList.remove('open');
+  syncBodyLock();
+}
+
+function fmtTime(ts){
+  if(!ts) return '';
+  try{
+    const d = new Date(ts); const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    const hh = String(d.getHours()).padStart(2,'0'); const mm = String(d.getMinutes()).padStart(2,'0');
+    if(sameDay) return `今天 ${hh}:${mm}`;
+    return `${d.getMonth()+1}/${d.getDate()} ${hh}:${mm}`;
+  }catch(e){ return ''; }
+}
+
+function escapeHtml(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function showPageId(id){
+  document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function showMenu(){ showPageId('pageMenu'); updateHubBadge(); maybeAutoChangelog(); }
+
+/* 版本更新後，第一次從封面進入選單時自動跳出一次更新日誌。
+   比對的是「日誌清單裡的最新版本」而不是 App 版號 ——
+   這樣沒有列入日誌的小修版就不會打擾使用者。 */
+var CHANGELOG_SEEN_KEY = 'earTrainer.changelogSeen';
+function maybeAutoChangelog(){
+  if(!window.CHANGELOG || !CHANGELOG.length) return;
+  var latest = CHANGELOG[CHANGELOG.length - 1].v;
+  var seen = null;
+  try { seen = localStorage.getItem(CHANGELOG_SEEN_KEY); } catch(e){}
+  if(seen === latest) return;
+  // 等待期間不接受操作，避免使用者剛好點到卡片、彈窗蓋在下一頁上面
+  document.body.style.pointerEvents = 'none';
+  setTimeout(function(){
+    document.body.style.pointerEvents = '';
+    try { localStorage.setItem(CHANGELOG_SEEN_KEY, latest); } catch(e){}
+    showChangelog();
+  }, 400);
+}
+function showHub(){ renderHub(); showPageId('pageHub'); }
+function showHubChoose(){
+  showPageId('pageHubChoose');
+  var b = document.getElementById('hubChooseBadge');
+  if(b) b.textContent = window.REVIEW_STORE.total() + ' 題';
+  var pb = document.getElementById('hubPaperBadge');
+  if(pb){
+    var n = 0;
+    try { n = (JSON.parse(localStorage.getItem('earTrainer.exam.papers') || '[]') || []).length; } catch(e){}
+    if(n){ pb.textContent = n + ' 份'; pb.style.display = ''; } else { pb.style.display = 'none'; }
+  }
+}
+function showCover(){ showPageId('pageCover'); }
+/* ===================================================================
+ *  贊助者名單：要新增名字，複製下面一行、改成對方希望顯示的名稱即可。
+ *  （名單為空時，贊助彈窗不會出現「贊助者名單」按鈕）
+ *  例：  { name: '王小明' },
+ * =================================================================== */
+var SPONSORS = [
+  { name: 'Chu' },
+  { name: '葉○佳' },
+  { name: '陳○芳', gold: true },
+  { name: 'PEI YI' },
+  { name: '董○秀' },
+  { name: 'Tong' },
+  { name: '漫曼' },
+  { name: 'A. J.' },
+  { name: '尤○慧', gold: true },   // gold: true ＝金色樂友（累積贊助滿 5,000 元）
+  { name: '愛樂者', gold: true },
+  { name: '張○杰' },
+  // { name: '王小明' },   ← 要新增就複製這一行、拿掉前面的「//」、把名字改掉
+];
+
+/* 贊助彈窗的分頁切換：'' = 管道清單、'Jko' = 街口、'Bank' = 銀行、'Sponsors' = 名單 */
+/* ===================================================================
+ *  更新日誌：由舊到新排列（最新在最下方）。新增一版就在陣列末端加一筆。
+ * =================================================================== */
+window.CHANGELOG = [
+  { v: 'v.23', items: ['修正音程「複音程」模式下，完全一度與完全八度判定錯誤的問題'] },
+  { v: 'v.31', items: ['新增「模擬測驗」：六大項綜合、滿分 100 分，含成績單與長期進步曲線'] },
+  { v: 'v.41', items: ['贊助管道新增銀行轉帳與 TWQR 說明', '新增贊助者名單'] },
+  { v: 'v.46', items: ['優化升降記號的操作：點選某個音後按記號，會套用在該音且作答框不再跳格'] },
+  { v: 'v.47', items: ['修正回頭修改某一拍的節奏後，後面音高整串位移的問題'] },
+  { v: 'v.48', items: ['修正切換「編輯節奏／編輯音高」時，作答框跑到別拍的問題'] },
+  { v: 'v.49', items: ['修正音符符桿方向（第三線以上朝下），符尾不再超出譜表', '電腦版版面放寬，譜例與作答區更舒適'] },
+  { v: 'v.55', items: ['支援完全離線使用：沒有網路也能畫譜、發聲與作答', '載入速度提升'] },
+  { v: 'v.56', items: ['修正和絃轉位時的代號標示（例如 Cmaj7/E）', '四部和聲加上修飾目標的提示框'] },
+  { v: 'v.59', items: ['新增「回報問題或建議」入口', '選單底部顯示版本號'] },
+  { v: 'v.62', items: ['模擬測驗新增「高中檔（模擬音樂班甄選）」，與大學檔分開記錄進步曲線'] },
+  { v: 'v.66', items: ['修正譜例在作答後會上下滑動、造成誤觸的問題'] },
+  { v: 'v.69', items: ['譜例最後一小節改為終止線', '大譜表的小節線與終止線改為貫穿上下譜表'] },
+  { v: 'v.70', items: ['新增「更新日誌」，可查看歷次更新內容', '修正贊助彈窗在手機上捲動時上緣圓角被裁切的問題'] },
+  { v: 'v.71', items: ['修正彈窗開啟時會捲動到背景頁面的問題'] },
+  { v: 'v.74', items: ['新增「音高辨認（找錯音）」預告，功能即將推出'] },
+  { v: 'v.75', items: ['錯題本每個練習最多保留最近 50 筆，避免長期累積影響儲存'] },
+  { v: 'v.77', items: ['Portaly 小額贊助正式開放'] },
+  { v: 'v.78', items: ['選單頁教學連結更新為完整操作教學影片', '節奏、單旋律、兩聲部的解答頁與錯題本，現在兩張譜例會左右同步捲動', '取消錯題本的「重新作答訂正」，改為完整保留原始錯誤以利檢討'] }
+,
+  { v: 'v.80', items: ['新增「07 音高辨認（找錯音）」：聆聽正確的演奏，對照譜例找出印錯的音', '單旋律、兩聲部、四部和聲輸入音符時，會自動選擇離前一個音最近的八度，不再跨到遠處的八度；音高鍵盤的「高 Do」因此取消', '切換題目、進入解答頁與錯題本時，譜例一律從第一小節開始顯示'] },
+  { v: 'v.81', items: ['修正四部和聲輸入低音時，前一個音的升降記號會誤套用到下一個音的問題', '修正跳著輸入音符、或音高接近可用音域邊界時，自動選擇的八度可能不是最近的問題'] }
+,
+  { v: 'v.82', items: ['模擬測驗「大學檔」新增第一大題「音高的辨認」（2 題，各 5 個錯音，共 10 分）', '大學檔配分調整：節奏 20→15 分、兩聲部 20→15 分，其餘不變，總分維持 100 分', '考卷結構調整，未完成的考試會自動重置；已完成的歷史成績不受影響'] }
+,
+  { v: 'v.83', items: ['新增「模擬考錯題本」：交卷後會完整保留考卷（最多 20 份），可一張一張回顧複習', '優化錯題本，現在有兩個入口：錯題本目錄（練習）、模擬考錯題本目錄', '各練習的解答頁新增「本項錯題本」與「錯題本目錄」按鈕', '優化模擬考分數顯示，看起來更加直觀'] },
+  { v: 'v.84', items: ['錯題本改為由舊到新排列，進入時自動顯示最新一筆，並新增「返回設定頁」', '譜例寬度改為依音符密度自動調整，解答頁上下兩張譜等寬，捲軸同步時拍子對得齊', '統一各解答頁的按鈕排列與音符框選範圍', '修正模擬考錯題本中，音程與和絃會顯示到不相關內容的問題', '修正「錯題本目錄」點進去顯示空白、以及找錯音解答頁在手機無法上下捲動的問題', '作答時關閉手機的左滑返回手勢，避免捲動譜例時誤觸而離開頁面', '修正找錯音設定頁拖動播放速度時，上方數字不會跟著變的問題'] },
+  { v: 'v.85', items: ['全新推出「08 音堆練習」：聆聽同時彈出的音堆，將每一個正確音高寫到五線譜上', '特別優化音堆練習的播放音量，現在和聲的音高會聽得更清楚，低音不會再將高音蓋過去'] },
+  { v: 'v.86', items: ['主目錄介面優化：現在八個練習項目一目了然', '透過手機操作時，各練習項目的說明改由卡片右下角的 ▸ 開啟，版面更清爽', '修正音堆練習中，中央 C 等加線與音符沒有對齊的問題'] },
+  { v: 'v.87', items: ['修正四部和聲在手機瀏覽器中，譜例下方的級數作答格可能被遮住、看不到自己填了什麼的問題', '四部和聲的三顆播放按鈕改為同一列，作答區空間更充裕', '贊助者名單新增「金色樂友」標示，累積贊助滿 5,000 元的朋友會以金色顯示'] },
+  { v: 'v.88', items: ['修正四部和聲的半減七和絃記號標示異常，導致與正確答案不符的問題。例：小調 ii 與大調 vii 的半減七和絃（含轉位）可能會被誤標為減七（°），正確應為半減七（ø）', '優化四部和聲級數鍵盤的性質記號輸入（°、ø、+），先按轉位或先按性質都能正確填寫該級數'] },
+  { v: 'v.89', items: ['節奏練習、單旋律曲調、兩聲部曲調三個項目新增「連結線」功能：在設定頁開啟後，題目必定會出現至少一次連結線，作答時選中一拍後，再按「⌒」就能連到下一拍，再按一次取消', '優化作答鍵盤，將「🗑️ 清空」改為「⌒ 連結線」', '同步更新模擬測驗「大學檔」的節奏、單旋律、兩聲部各段落一定會出現連結線（每段 1～2 條），考卷因結構調整，未完成的考試會自動重置，已完成的歷史成績與已保存的考卷不受影響', '優化節奏型按鈕的音符間距，四分音符加兩個十六分音符的節奏型（例如 ♩⌒♬）現在看得更清楚', '修正各練習的解答頁左上角改為「返回設定頁」，提交後不會再回到作答頁'] },
+  { v: 'v.90', items: ['優化版面，並更新各設備加入主畫面的文案與功能'] },
+  { v: 'v.91', items: ['優化各裝置的中文字體顯示，Android 與 Windows 上的閱讀體驗更美觀', '新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] },
+  { v: 'v.92', items: ['優化音程練習與和絃辨認的譜例顯示：解決出現臨時升降記號時，上下兩行音符未對齊的問題，並將音符改為置中，閱讀更清楚', '優化各練習的音量平衡，高音域的音符聽起來更清晰；四部和聲的低音聲部略為提高，更容易辨識', '兩聲部曲調的解答頁新增單獨聆聽高音、低音聲部的按鈕'] },
+  { v: 'v.93', items: ['新增「高音質鋼琴音色」：改用 Yamaha C5 Grand Piano，音色更清晰、延音更自然', '新增「設定」頁面（選單頁最下方），可自由切換高音質音色與原本的標準音色；預設為高音質，若網路較慢或想要較快載入，可切換回原本的音色'] },
+  { v: 'v.96', items: ['音程練習與和絃辨認的「連續聽寫」提交後，會逐題顯示譜例與正解，可直接重播對照', '音程練習與和絃辨認的錯題本改為分類顯示：「單題作答」與「連續聽寫」分開，連續聽寫再依每一次的日期分組；錯題本總覽的題數改為計算實際題目數量', '錯題本新增播放速度拉桿（節奏、單旋律、兩聲部、四部和聲、音高辨認五項），整頁共用一個速度，設定會自動記住', '四部和聲的譜例優化：全音符置中並與級數對齊、調名加上冒號', '!!贊助者可獲得專屬版本，將題目導出為音檔與譜例，方便備課、製作講義與離線複習'] }
+];
+
+function showChangelog(){
+  var box = document.getElementById('logList');
+  if(box){
+    box.innerHTML = CHANGELOG.map(function(g){
+      return '<div class="log-item"><div class="log-ver">' + escapeHtml(g.v) + '</div><ul>' +
+             g.items.map(function(t){
+               /* 開頭加 !! 代表重點項目，用紅字顯示。
+                  仍然走 escapeHtml，不直接開放 HTML。 */
+               var hl = (typeof t === 'string' && t.indexOf('!!') === 0);
+               var txt = hl ? t.slice(2) : t;
+               return '<li' + (hl ? ' class="log-hl"' : '') + '>' + escapeHtml(txt) + '</li>';
+             }).join('') + '</ul></div>';
+    }).join('');
+  }
+  // 目前版本獨立顯示，與清單內容無關（版號未列入清單時也不會出錯）
+  var curEl = document.getElementById('logCurrent');
+  if(curEl){
+    var txt = (document.getElementById('appVersion')||{}).textContent || '';
+    var m = txt.match(/v\.?\d+/);
+    curEl.textContent = m ? ('目前版本 ' + m[0]) : '';
+  }
+  var m2 = document.getElementById('logModal');
+  if(m2){ m2.classList.add('open'); syncBodyLock(); if(box) setTimeout(function(){ box.scrollTop = box.scrollHeight; }, 30); }
+}
+function closeChangelog(){ var m=document.getElementById('logModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
+
+/* 彈窗開啟時鎖住背景捲動，避免手指滑到下層頁面 */
+
+/* ===== 加入主畫面的提示（第一行 subtitle） =====
+   iOS 沒有任何 API 可以用程式安裝，只能開浮層教使用者自己按；
+   Android／桌機 Chromium 才有 beforeinstallprompt 可以真的一鍵安裝。
+   判斷一律偏保守：認不出來就顯示原本的歡迎詞，寧可少提示也不要教錯。 */
+var A2HS_DEFAULT = '歡迎使用聽力訓練系統，請從下方目錄選擇今天要練習的項目：';
+
+function a2hsEnv(){
+  var ua = navigator.userAgent || '';
+  var maxTouch = navigator.maxTouchPoints || 0;
+  /* iPadOS 的 Safari 會偽裝成 Mac，必須靠 maxTouchPoints 才分得出來 */
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && maxTouch > 1);
+  /* 已經加入主畫面：iOS 看 navigator.standalone，其餘看 display-mode */
+  var standalone = (window.navigator.standalone === true) ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  /* 其他 App 的內建瀏覽器（LINE、IG、FB…）沒有「加入主畫面」，要先請他用 Safari 開 */
+  var inApp = /\bLine\/|Instagram|FBAN|FBAV|FB_IAB|MicroMessenger|Twitter/i.test(ua);
+  /* iOS 上的 Chrome / Firefox / Edge：一律導向 Safari，避免教錯 */
+  var iosOtherBrowser = isIOS && /CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+  var isAndroid = /Android/.test(ua);
+  return { isIOS: isIOS, isAndroid: isAndroid, standalone: standalone,
+           needSafari: inApp || iosOtherBrowser };
+}
+
+function a2hsRefresh(){
+  var el = document.getElementById('menuSubtitle');
+  if(!el) return;
+  /* 這一行預設是隱藏的（避免文字閃動），所以不管判斷有沒有出錯，
+     最後都一定要把它顯示出來，否則整行會消失。 */
+  try{
+    var env = a2hsEnv();
+    var html = A2HS_DEFAULT;
+
+    /* iOS 與 Android 都無條件顯示（只要不是從主畫面開啟）。
+       文字統一，差別在點下去之後：Android 有安裝事件就直接跳系統對話框，
+       沒有事件（已安裝、三個月冷卻、廠商瀏覽器不支援）就退回浮層說明。 */
+    if(!env.standalone && (env.isIOS || env.isAndroid)){
+      html = '歡迎使用聽力訓練系統，<a href="#" onclick="tryInstall();return false;">▸ 三秒完成加入</a>主畫面，以獲得原生 App 的體驗。';
+    }
+    el.innerHTML = html;
+  }catch(e){
+    el.innerHTML = A2HS_DEFAULT;     // 判斷失敗就退回原本的歡迎詞
+  }
+  el.style.visibility = 'visible';
+}
+window.__a2hsRefresh = a2hsRefresh;
+
+/* 內建瀏覽器把網址搬到 Safari 很麻煩，提供一鍵複製。
+   用乾淨的首頁網址（去掉 ?query 與 #hash），避免把 debug 參數也帶過去。 */
+function copySiteUrl(){
+  var btn = document.getElementById('a2hsCopyBtn');
+  var url = location.origin + location.pathname;
+  var done = function(){ if(btn){ btn.textContent = '✓ 已複製，請貼到 Safari 的網址列';
+                                  setTimeout(function(){ btn.textContent = '📋 複製網址'; }, 2600); } };
+  var failed = function(){ if(btn) btn.textContent = url; };   // 複製不了就把網址秀出來讓他長按
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(done, failed);
+    } else { failed(); }
+  }catch(e){ failed(); }
+}
+
+function showA2HS(){
+  var env = a2hsEnv();
+  var ios = document.getElementById('a2hsStepsIOS');
+  var and = document.getElementById('a2hsStepsAndroid');
+  if(ios) ios.style.display = env.isAndroid ? 'none' : '';
+  if(and) and.style.display = env.isAndroid ? '' : 'none';
+  var bn = env.isAndroid ? 'Chrome' : 'Safari';
+  var n1 = document.getElementById('a2hsBrowserName'); if(n1) n1.textContent = bn;
+  var n2 = document.getElementById('a2hsBrowserName2'); if(n2) n2.textContent = bn;
+  var hint = document.getElementById('a2hsSafariHint');
+  if(hint) hint.style.display = env.needSafari ? 'block' : 'none';
+  var m = document.getElementById('a2hsModal');
+  if(m) m.classList.add('open');
+  syncBodyLock();
+}
+function closeA2HS(){
+  var m = document.getElementById('a2hsModal');
+  if(m) m.classList.remove('open');
+  syncBodyLock();
+}
+
+/* 點擊「三秒完成加入」的統一入口。
+   ⚠ Chrome 規定 prompt() 只能在使用者手勢中呼叫，所以無法在載入時自動跳出；
+   而 mini-infobar 是瀏覽器自己的 UI，我們既不能觸發也擋不掉（被關掉後約三個月不再出現）。 */
+function tryInstall(){
+  var e = window.__a2hsPrompt;
+  if(!e){ showA2HS(); return; }          // 沒有安裝事件就退回說明浮層
+  window.__a2hsPrompt = null;            // 事件物件只能用一次
+  try{
+    e.prompt();
+    if(e.userChoice && e.userChoice.then) e.userChoice.then(function(){ a2hsRefresh(); });
+    else a2hsRefresh();
+  }catch(err){ showA2HS(); }
+}
+
+/* 除錯用：網址加上 ?debug=ua 會把判斷結果印在提示列，方便回報問題 */
+(function(){
+  try{
+    if(location.search.indexOf('debug=ua') < 0) return;
+    var env = a2hsEnv();
+    var box = document.createElement('pre');
+    box.style.cssText = 'font-size:11px;white-space:pre-wrap;word-break:break-all;background:var(--panel);border:1px solid var(--panel-border);border-radius:10px;padding:10px;margin:0 0 14px;color:var(--ink-soft);';
+    box.textContent = 'iOS=' + env.isIOS + '  Android=' + env.isAndroid +
+      '\nstandalone=' + env.standalone + '  needSafari=' + env.needSafari +
+      '\ninstallPrompt=' + (!!window.__a2hsPrompt) + '  maxTouchPoints=' + (navigator.maxTouchPoints||0) +
+      '\n' + navigator.userAgent;
+    var sub = document.getElementById('menuSubtitle');
+    if(sub && sub.parentNode) sub.parentNode.insertBefore(box, sub.nextSibling);
+  }catch(e){}
+})();
+
+a2hsRefresh();
+
+function syncBodyLock(){
+  var open = document.querySelectorAll('.donate-modal.open').length > 0;
+  document.body.style.overflow = open ? 'hidden' : '';
+  document.body.style.touchAction = open ? 'none' : '';
+}
+
+function showPanel(which){
+  var ids = ['Jko','Bank','Sponsors'];
+  var ch = document.getElementById('donateChannels');
+  if(ch) ch.style.display = which ? 'none' : 'flex';
+  ids.forEach(function(k){
+    var el = document.getElementById('donate'+k);
+    if(el) el.style.display = (which === k) ? 'flex' : 'none';
+  });
+  if(which === 'Sponsors') renderSponsors();
+}
+function renderSponsors(){
+  var box = document.getElementById('sponsorList'); if(!box) return;
+  var tag = function(s){
+    return '<span'+(s.gold ? ' class="sponsor-gold"' : '')+'>'+escapeHtml(s.name)+'</span>';
+  };
+  /* 一般贊助者排在上面、金色樂友排在下面，中間用一條虛線隔開。
+     兩組任一為空時就不畫分隔線，避免出現孤立的線。 */
+  var normal = [], gold = [];
+  SPONSORS.forEach(function(s){ (s.gold ? gold : normal).push(s); });
+  var html = normal.map(tag).join('');
+  if(normal.length && gold.length) html += '<div class="sponsor-sep"></div>';
+  html += gold.map(tag).join('');
+  /* (i) 說明按鈕跟著一起重畫，否則會被 innerHTML 蓋掉 */
+  box.innerHTML = html
+    + '<button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>';
+}
+function showDonate(){ showPanel(''); var m=document.getElementById('donateModal'); if(m) m.classList.add('open'); syncBodyLock(); }
+function closeDonate(){ var m=document.getElementById('donateModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
+function showAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.add('open'); syncBodyLock(); }
+/* 目錄卡片的說明彈窗：卡片本身是連結，(i) 按鈕已在 onclick 攔掉預設行為 */
+function showGoldInfo(){ var m=document.getElementById('goldInfoModal'); if(m) m.classList.add('open'); syncBodyLock(); }
+function closeGoldInfo(){ var m=document.getElementById('goldInfoModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
+function showCardInfo(btn){
+  document.getElementById('cardInfoTitle').textContent = btn.getAttribute('data-title') || '項目說明';
+  document.getElementById('cardInfoDesc').textContent  = btn.getAttribute('data-desc') || '';
+  var m = document.getElementById('cardInfoModal'); if(m) m.classList.add('open'); syncBodyLock();
+}
+function closeCardInfo(){
+  var m = document.getElementById('cardInfoModal'); if(m) m.classList.remove('open'); syncBodyLock();
+}
+function closeAuthor(){ var m=document.getElementById('authorModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
+function _fallbackCopy(t){ try{ var ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(_){} }
+function copyText(e, text){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  var num=text; var btn = e && e.target;
+  function done(){ if(btn){ var t=btn.textContent; btn.textContent='已複製'; setTimeout(function(){ btn.textContent=t; }, 1400); } }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(num).then(done, function(){ _fallbackCopy(num); done(); }); }
+    else { _fallbackCopy(num); done(); }
+  }catch(_){ _fallbackCopy(num); done(); }
+}
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDonate(); closeAuthor(); closeChangelog(); closeCardInfo(); closeGoldInfo(); } });
+/* 贊助者名單：有人才顯示入口按鈕 */
+(function(){
+  try{
+    var b = document.getElementById('sponsorEntryBtn');
+    if(b && window.SPONSORS && SPONSORS.length) b.style.display = '';
+  }catch(e){}
+})();
+
+/* 模擬測驗卡片：顯示最佳／最近分數 */
+(function(){
+  try{
+    if(!window.EXAM) return;
+    var h = window.EXAM.loadHistory(); if(!h.length) return;
+    var last = h[h.length-1];
+    var pid = last.preset || (last.mode === 'standard-hs' ? 'highschool' : 'standard');
+    var name = ((window.EXAM.PRESETS||{})[pid]||{}).short || '';
+    var same = h.filter(function(r){ return (r.preset || (r.mode==='standard-hs'?'highschool':'standard')) === pid; });
+    var best = Math.max.apply(null, same.map(function(r){ return r.total; }));
+    var stat = document.getElementById('examCardStat');
+    if(stat) stat.textContent = ' ｜ 最近 '+last.total+' 分（'+name+'）';
+    var b = document.getElementById('examCardBadge'); if(b){ b.textContent = '最佳 '+best+' 分'; b.style.display=''; }
+  }catch(e){}
+})();
+
+function updateHubBadge(){
+  const el = document.getElementById('hubBadge');
+  if(el) el.textContent = window.REVIEW_STORE.total() + ' 題';
+}
+
+function renderHub(){
+  const S = window.REVIEW_STORE;
+  document.getElementById('hubTotal').textContent = `目前共收錄 ${S.total()} 題錯題`;
+  const wrap = document.getElementById('hubGroups'); wrap.innerHTML = '';
+
+  S.TYPES.forEach(type => {
+    const items = S.load(type);
+    const group = document.createElement('div'); group.className = 'hub-group';
+    const head = document.createElement('div'); head.className = 'hub-group-head';
+
+    const titleWrap = document.createElement('div');
+    /* 題數要用 questionCount——連續聽寫一筆裡面含多題（v.95 起） */
+    const qCount = S.questionCount(type);
+    titleWrap.innerHTML = `<span class="hub-group-title">${S.TYPE_LABEL[type]}</span> <span class="hub-count ${qCount===0?'zero':''}">${qCount} 題</span>`;
+
+    const btnWrap = document.createElement('div');
+    const jump = document.createElement('a'); jump.className = 'hub-jump';
+    jump.href = S.TYPE_PAGE[type] + '#review'; jump.textContent = '跳回複習 →';
+    btnWrap.appendChild(jump);
+    if(items.length > 0){
+      const clr = document.createElement('button'); clr.className = 'hub-clear-all'; clr.textContent = '清空';
+      clr.onclick = () => { if(window.confirm(`確定要清空「${S.TYPE_LABEL[type]}」的錯題本嗎？`)){ S.clear(type); renderHub(); updateHubBadge(); } };
+      btnWrap.appendChild(clr);
+    }
+
+    head.appendChild(titleWrap); head.appendChild(btnWrap); group.appendChild(head);
+
+    if(items.length === 0){
+      const e = document.createElement('div'); e.className = 'hub-empty'; e.textContent = '尚未收錄錯題 🎵';
+      group.appendChild(e);
+    } else {
+      const recent = items.slice().reverse().slice(0, 5);
+      recent.forEach(it => {
+        const row = document.createElement('div'); row.className = 'hub-item';
+        let qa;
+        if(it.source === 'dictation'){
+          /* 連續聽寫是「整次一筆」，摘要顯示錯幾題（v.95 起） */
+          qa = `🎧 連續聽寫　錯 <span class="wrong-ans">${it.wrong || (it.questions||[]).length}</span> 題　／ 共 ${it.total || '—'} 題`;
+        } else if(it.yourText){
+          qa = `你的答案：<span class="wrong-ans">${escapeHtml(it.yourText)}</span>　正解：<span class="right-ans">${escapeHtml(it.correctText || '')}</span>`;
+        } else {
+          qa = `${escapeHtml(it.label || it.correctText || '一題錯題')}`;
+        }
+        row.innerHTML = `<span class="qa">${qa}</span><span class="qtime">${fmtTime(it.ts)}</span>`;
+        group.appendChild(row);
+      });
+      if(items.length > recent.length){
+        const more = document.createElement('div'); more.className = 'hub-more';
+        more.textContent = `⋯ 還有 ${items.length - recent.length} 筆，點「跳回複習」查看完整譜例與重播`;
+        group.appendChild(more);
+      }
+    }
+    wrap.appendChild(group);
+  });
+}
+
+updateHubBadge();
+
+/* 依進入時的錨點切到對應的錯題本頁面（放在最後，確保 renderHub 等函式都已定義） */
+if(window.__initHash === '#hub-practice') showHub();
+else if(window.__initHash === '#hub') showHubChoose();
+
+// PWA Service Worker 註冊與自動更新邏輯
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) { refreshing = true; window.location.reload(); }
+    });
+  });
+}
+</script>
+<script>
+/* iOS 靜音鍵下也能播放（像 YouTube）：AudioSession API 為主，無聲音檔解鎖為後備；Android 會自動略過、無副作用。 */
+(function(){
+  function setPlayback(){ try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} }
+  setPlayback();
+  var SILENT="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+  var done=false;
+  function unlock(){ if(done) return; done=true; setPlayback();
+    try{ var a=new Audio(SILENT); a.setAttribute("playsinline",""); a.volume=0.02; var p=a.play(); if(p&&p.catch) p.catch(function(){}); }catch(e){}
+    document.removeEventListener("touchend",unlock,true); document.removeEventListener("click",unlock,true);
+  }
+  document.addEventListener("touchend",unlock,true);
+  document.addEventListener("click",unlock,true);
+})();
+</script>
+</body>
+</html>
