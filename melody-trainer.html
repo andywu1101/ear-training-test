@@ -17,6 +17,8 @@
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
 <script src="audio-export.js"></script>
+<script src="sheet-export.js"></script>
+<script src="export-menu.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -60,6 +62,7 @@
   .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
 
   .pattern-grid-header { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; }
+  .exp-mini{ padding-left:10px; padding-right:10px; min-width:44px; }
   .select-all-btn { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--panel-border); background: var(--panel); font-weight: bold; cursor: pointer; }
   .pattern-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 24px; }
   .pattern-item { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; border: 2px solid var(--panel-border); border-radius: 10px; padding: 4px; cursor: pointer; transition: 0.1s; height: 60px; overflow: hidden; }
@@ -394,7 +397,7 @@
     <div class="unified-action-row" style="margin-bottom:14px;">
       <button class="action-btn" id="mel-ansPlayUser" style="color:var(--wrong); border-color:var(--wrong);">🔊 聽你的作答</button>
       <button class="play-btn" id="mel-ansPlayCorrect">🔁 聽正解</button>
-      <button class="action-btn exp-btn" id="mel-ansExport" title="導出正解音檔">⬇️</button>
+      <button class="action-btn exp-btn" id="mel-ansExport" title="導出正解">⬇️</button>
     </div>
     <div class="review-label">你的作答（紅色為錯誤音符）：</div>
     <div class="review-staff"><div id="mel-ansUser"></div></div>
@@ -453,7 +456,14 @@ window.REVIEW_STORE = {
   MAX_ITEMS: 50,   // 每類錯題本最多保留最新 50 筆，避免長期累積塞滿瀏覽器儲存空間
   add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); while(a.length > this.MAX_ITEMS) a.shift(); this.save(type,a); return a; },
   clear(type){ this.save(type, []); },
-  count(type){ return this.load(type).length; }
+  count(type){ return this.load(type).length; },
+  /* 實際題數：連續聽寫一筆裡面含多題（v.95 起），要把它們一起算進來，
+     否則總覽顯示的「題數」會比實際少很多。舊資料沒有 source 欄位，一筆就是一題。 */
+  questionCount(type){
+    return this.load(type).reduce(function(n, it){
+      return n + ((it && it.source === 'dictation') ? ((it.questions || []).length || 0) : 1);
+    }, 0);
+  }
 };
 
 function forceResetCache() {
@@ -1224,8 +1234,36 @@ function showPage(pageId) {
     return ev;
   }
 
+  /* 譜例導出：另外畫一份乾淨的譜 */
+  let __shotSeq = 0;
+  function offscreenStaff(draw){
+    const id = '__shot' + (++__shotSeq);
+    const holder = document.createElement('div');
+    holder.id = id;
+    holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:900px;';
+    document.body.appendChild(holder);
+    try{ draw(id); }catch(e){}
+    return { holder: holder, svg: holder.querySelector('svg') };
+  }
+
+  async function doExportSheet(seq, pitchArray, item, tieAcross){
+    const btn = window.__expBtn || document.getElementById('mel-ansExport');
+    if(btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    const made = offscreenStaff(id => renderStaticStaff(id, seq, pitchArray, null, null, item, tieAcross, null));
+    try{
+      if(!made.svg) throw new Error('沒有譜例');
+      await SheetExport.exportSheets([{ svg: made.svg }], '單旋律', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    finally{ made.holder.remove(); }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
   async function doExportAudio(seq, pitchArray, item, tieAcross){
-    const btn = document.getElementById('mel-ansExport');
+    const btn = window.__expBtn || document.getElementById('mel-ansExport');
     const ev = buildExportEvents(seq, pitchArray, item, tieAcross);
     if(!ev || btn.disabled) return;
     btn.disabled = true; const old = btn.textContent;
@@ -1743,7 +1781,12 @@ function showPage(pageId) {
       }, 60);
       document.getElementById('mel-ansPlayUser').onclick = function(){ playStatic(uSeq, uPit, item, uTie); };
       document.getElementById('mel-ansPlayCorrect').onclick = function(){ playStatic(qSeq, qPit, item, qTie); };
-      document.getElementById('mel-ansExport').onclick = function(){ doExportAudio(qSeq, qPit, item, qTie); };
+      document.getElementById('mel-ansExport').onclick = function(){
+        window.__expBtn = null;
+        ExportMenu.open({ subtitle: '這一題的正解',
+          onAudio: function(){ doExportAudio(qSeq, qPit, item, qTie); },
+          onSheet: function(){ doExportSheet(qSeq, qPit, item, qTie); } });
+      };
       return true;
     },
 
@@ -1999,6 +2042,7 @@ function showPage(pageId) {
             <div style="display:flex; gap:8px;">
               <button class="select-all-btn mel-rev-user" style="color:var(--wrong); border-color:var(--wrong); background:var(--wrong-soft);">🔊 聽你的作答</button>
               <button class="select-all-btn mel-rev-correct">🔁 聽正解</button>
+              <button class="select-all-btn exp-mini mel-rev-export" title="導出正解">⬇️</button>
             </div>
           </div>
           <div class="review-label">你的作答（紅色為錯誤音符）：</div>
@@ -2009,6 +2053,12 @@ function showPage(pageId) {
         list.appendChild(box);
         box.querySelector('.mel-rev-user').onclick = () => playStatic(item.userSeq, item.userPitch, withReviewBpm(item), item.userTie);
         box.querySelector('.mel-rev-correct').onclick = () => playStatic(item.correctSeq, item.correctPitch, withReviewBpm(item), item.correctTie);
+        box.querySelector('.mel-rev-export').onclick = (ev) => {
+          window.__expBtn = ev.currentTarget;
+          ExportMenu.open({ subtitle: '這一題的正解',
+            onAudio: () => doExportAudio(item.correctSeq, item.correctPitch, withReviewBpm(item), item.correctTie),
+            onSheet: () => doExportSheet(item.correctSeq, item.correctPitch, withReviewBpm(item), item.correctTie) });
+        };
         setTimeout(() => {
           renderStaticStaff(`mel-rev-user-${uid}`, item.userSeq, item.userPitch, item.correctSeq, item.correctPitch, item, item.userTie, item.correctTie);
           renderStaticStaff(`mel-rev-correct-${uid}`, item.correctSeq, item.correctPitch, null, null, item, item.correctTie, null);
@@ -2171,7 +2221,13 @@ function showPage(pageId) {
       // 解答頁播放與下一題
       document.getElementById('mel-ansPlayUser').onclick = () => { if(this._ansItem) playStatic(this._ansItem.userSeq, this._ansItem.userPitch, this._ansItem, this._ansItem.userTie); };
       document.getElementById('mel-ansPlayCorrect').onclick = () => { if(this._ansItem) playStatic(this._ansItem.correctSeq, this._ansItem.correctPitch, this._ansItem, this._ansItem.correctTie); };
-      document.getElementById('mel-ansExport').onclick = () => { const it=this._ansItem; if(it) doExportAudio(it.correctSeq, it.correctPitch, it, it.correctTie); };
+      document.getElementById('mel-ansExport').onclick = () => {
+        window.__expBtn = null;
+        const it = this._ansItem; if(!it) return;
+        ExportMenu.open({ subtitle: '這一題的正解',
+          onAudio: () => doExportAudio(it.correctSeq, it.correctPitch, it, it.correctTie),
+          onSheet: () => doExportSheet(it.correctSeq, it.correctPitch, it, it.correctTie) });
+      };
       document.getElementById('mel-ansNextBtn').onclick = () => {
         ensureAudio(); window.melStopAll();
         this.userSeq = Array(this.totalBeats).fill('placeholder');

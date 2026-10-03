@@ -119,6 +119,9 @@ window.addEventListener('appinstalled', function(){
   .log-ver{ font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--accent); margin-bottom:5px; }
   .log-item ul{ margin:0; padding-left:18px; }
   .log-item li{ font-size:13.5px; line-height:1.75; color:var(--ink); }
+  /* 重點項目用紅字。⚠ 選擇器要寫成 .log-item li.log-hl——
+     只寫 .log-hl（一層）會被上面的 .log-item li（兩層）蓋掉。 */
+  .log-item li.log-hl{ color: var(--wrong); }
   .log-current{ font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--accent); text-align:center; margin:16px 0 4px; }
 
   /* 錯題本總覽卡片（整合入口） */
@@ -499,7 +502,7 @@ window.addEventListener('appinstalled', function(){
     <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
     <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.94　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.96　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -665,7 +668,7 @@ window.addEventListener('appinstalled', function(){
       <div id="sponsorList" class="sponsor-list">
         <button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>
       </div>
-      <p class="pay-note">每一位同意公開的贊助者，都會列在贊助者名單中，感謝你的支持 🙏</p>
+      <p class="pay-note">每一位同意公開的贊助者，都會列在贊助者名單中。<span style="color:var(--wrong);">此外可獲得專屬版本，將題目導出為音檔與譜例，方便備課、製作講義與離線複習。</span></p>
       <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
     </div>
     <button type="button" class="author-item" style="width:100%; margin-bottom:12px;" onclick="closeDonate(); showAuthor();"><span class="ai-ico">🔗</span> 作者主頁</button>
@@ -777,7 +780,14 @@ window.REVIEW_STORE = {
   load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
   clear(type){ try { localStorage.setItem(this.PREFIX+type, '[]'); } catch(e){} },
   count(type){ return this.load(type).length; },
-  total(){ return this.TYPES.reduce((a,t)=>a+this.count(t), 0); }
+  /* 實際題數：連續聽寫一筆裡面含多題（v.95 起），要一起算進來。
+     舊資料沒有 source 欄位，一筆就是一題。 */
+  questionCount(type){
+    return this.load(type).reduce(function(n, it){
+      return n + ((it && it.source === 'dictation') ? ((it.questions || []).length || 0) : 1);
+    }, 0);
+  },
+  total(){ return this.TYPES.reduce((a,t)=>a+this.questionCount(t), 0); }
 };
 
 /* ===== 導入及導出紀錄（v.91） =====
@@ -1230,7 +1240,7 @@ window.CHANGELOG = [
   { v: 'v.91', items: ['優化各裝置的中文字體顯示，Android 與 Windows 上的閱讀體驗更美觀', '新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] },
   { v: 'v.92', items: ['優化音程練習與和絃辨認的譜例顯示：解決出現臨時升降記號時，上下兩行音符未對齊的問題，並將音符改為置中，閱讀更清楚', '優化各練習的音量平衡，高音域的音符聽起來更清晰；四部和聲的低音聲部略為提高，更容易辨識', '兩聲部曲調的解答頁新增單獨聆聽高音、低音聲部的按鈕'] },
   { v: 'v.93', items: ['新增「高音質鋼琴音色」：改用 Yamaha C5 Grand Piano，音色更清晰、延音更自然', '新增「設定」頁面（選單頁最下方），可自由切換高音質音色與原本的標準音色；預設為高音質，若網路較慢或想要較快載入，可切換回原本的音色'] },
-  { v: 'v.94', items: ['解答頁新增「⬇️ 導出音檔」：可將正解存成 MP3 音檔，方便課堂播放或離線複習。內容包含標準音或預備拍，速度與音色依照你當下的設定', '錯題本新增播放速度拉桿（節奏、單旋律、兩聲部、四部和聲、音高辨認五項），整頁共用一個速度，設定會自動記住', '音程練習與和絃辨認的「連續聽寫」提交後，會逐題顯示譜例與正解，可直接重播對照，也能導出整段音檔'] }
+  { v: 'v.96', items: ['音程練習與和絃辨認的「連續聽寫」提交後，會逐題顯示譜例與正解，可直接重播對照', '音程練習與和絃辨認的錯題本改為分類顯示：「單題作答」與「連續聽寫」分開，連續聽寫再依每一次的日期分組；錯題本總覽的題數改為計算實際題目數量', '錯題本新增播放速度拉桿（節奏、單旋律、兩聲部、四部和聲、音高辨認五項），整頁共用一個速度，設定會自動記住', '四部和聲的譜例優化：全音符置中並與級數對齊、調名加上冒號', '!!贊助者可獲得專屬版本，將題目導出為音檔與譜例，方便備課、製作講義與離線複習'] }
 ];
 
 function showChangelog(){
@@ -1238,7 +1248,13 @@ function showChangelog(){
   if(box){
     box.innerHTML = CHANGELOG.map(function(g){
       return '<div class="log-item"><div class="log-ver">' + escapeHtml(g.v) + '</div><ul>' +
-             g.items.map(function(t){ return '<li>' + escapeHtml(t) + '</li>'; }).join('') + '</ul></div>';
+             g.items.map(function(t){
+               /* 開頭加 !! 代表重點項目，用紅字顯示。
+                  仍然走 escapeHtml，不直接開放 HTML。 */
+               var hl = (typeof t === 'string' && t.indexOf('!!') === 0);
+               var txt = hl ? t.slice(2) : t;
+               return '<li' + (hl ? ' class="log-hl"' : '') + '>' + escapeHtml(txt) + '</li>';
+             }).join('') + '</ul></div>';
     }).join('');
   }
   // 目前版本獨立顯示，與清單內容無關（版號未列入清單時也不會出錯）
@@ -1467,7 +1483,9 @@ function renderHub(){
     const head = document.createElement('div'); head.className = 'hub-group-head';
 
     const titleWrap = document.createElement('div');
-    titleWrap.innerHTML = `<span class="hub-group-title">${S.TYPE_LABEL[type]}</span> <span class="hub-count ${items.length===0?'zero':''}">${items.length} 題</span>`;
+    /* 題數要用 questionCount——連續聽寫一筆裡面含多題（v.95 起） */
+    const qCount = S.questionCount(type);
+    titleWrap.innerHTML = `<span class="hub-group-title">${S.TYPE_LABEL[type]}</span> <span class="hub-count ${qCount===0?'zero':''}">${qCount} 題</span>`;
 
     const btnWrap = document.createElement('div');
     const jump = document.createElement('a'); jump.className = 'hub-jump';
@@ -1489,7 +1507,10 @@ function renderHub(){
       recent.forEach(it => {
         const row = document.createElement('div'); row.className = 'hub-item';
         let qa;
-        if(it.yourText){
+        if(it.source === 'dictation'){
+          /* 連續聽寫是「整次一筆」，摘要顯示錯幾題（v.95 起） */
+          qa = `🎧 連續聽寫　錯 <span class="wrong-ans">${it.wrong || (it.questions||[]).length}</span> 題　／ 共 ${it.total || '—'} 題`;
+        } else if(it.yourText){
           qa = `你的答案：<span class="wrong-ans">${escapeHtml(it.yourText)}</span>　正解：<span class="right-ans">${escapeHtml(it.correctText || '')}</span>`;
         } else {
           qa = `${escapeHtml(it.label || it.correctText || '一題錯題')}`;
@@ -1499,7 +1520,7 @@ function renderHub(){
       });
       if(items.length > recent.length){
         const more = document.createElement('div'); more.className = 'hub-more';
-        more.textContent = `⋯ 還有 ${items.length - recent.length} 題，點「跳回複習」查看完整譜例與重播`;
+        more.textContent = `⋯ 還有 ${items.length - recent.length} 筆，點「跳回複習」查看完整譜例與重播`;
         group.appendChild(more);
       }
     }

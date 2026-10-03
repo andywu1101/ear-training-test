@@ -17,6 +17,8 @@
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
 <script src="audio-export.js"></script>
+<script src="sheet-export.js"></script>
+<script src="export-menu.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -163,6 +165,19 @@
   .review-section .hint{ color: var(--ink-soft); font-size: 13px; margin: 0 0 18px; }
   .review-empty{ color: var(--ink-soft); font-size: 14px; padding: 28px; text-align:center; border: 1px dashed var(--panel-border); border-radius: 12px; }
   .dict-detail{ margin-top:18px; text-align:left; }
+  /* 錯題本的分支選單（單題作答／連續聽寫 → 某一次） */
+  .rev-branch{ display:flex; flex-direction:column; gap:12px; }
+  .rev-card{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+        width:100%; text-align:left; font:inherit; cursor:pointer;
+        background:var(--panel); border:1px solid var(--panel-border); border-radius:14px; padding:16px 18px; }
+  .rev-card:active{ background:#eae7dc; }
+  .rev-card-title{ font-size:15px; font-weight:600; }
+  .rev-card-sub{ display:block; font-size:12px; color:var(--ink-soft); margin-top:3px; font-weight:400; }
+  .rev-card-count{ flex:0 0 auto; font-family:var(--font-mono); font-size:13px; color:var(--accent); }
+  .rev-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; }
+  .rev-head .rev-back{ font:inherit; font-size:13px; color:var(--accent); background:transparent;
+        border:1px solid var(--accent-line); border-radius:9px; padding:6px 12px; cursor:pointer; }
+  .rev-head .rev-title{ font-size:14px; color:var(--ink-soft); }
   .review-item{ display:flex; align-items:center; gap: 16px; padding: 16px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; margin-bottom: 12px; flex-wrap: wrap; }
   .review-staff-mini{ flex-shrink: 0; }
   .review-meta{ flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 6px; }
@@ -171,6 +186,7 @@
   .review-answers .right-ans{ color: var(--correct); font-weight: 600; }
   .review-actions{ display:flex; gap: 8px; align-items:center; flex-wrap: wrap; }
   .exp-btn{ flex:0 0 auto; min-width:52px; padding-left:10px; padding-right:10px; }
+  .exp-mini{ padding-left:10px; padding-right:10px; min-width:44px; }
   .icon-btn{ background: transparent; border: 1px solid var(--panel-border); color: var(--ink-soft); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 600; cursor:pointer; transition: all 0.15s; touch-action: manipulation; }
   .icon-btn:hover, .icon-btn:active{ border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
   .q-num-badge { display: inline-block; font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); padding: 3px 8px; border-radius: 6px; align-self: flex-start; }
@@ -351,7 +367,7 @@
         <div class="test-score-label">聽寫結束</div>
         <p>答錯的題目已收進「錯題本」（並標註題號）。下方可逐題對照正解。</p>
         <div id="int-dictDetail" class="dict-detail"></div>
-        <button class="test-again-btn" id="int-dictExport">⬇️ 導出整段音檔</button>
+        <button class="test-again-btn" id="int-dictExport">⬇️ 導出整段</button>
         <button class="test-again-btn" id="int-dictAgainBtn">🔁 再聽寫一次</button>
         <button class="test-back-btn js-review-links" onclick="showPage('int-review')">📕 本項錯題本</button>
         <button class="test-back-btn js-review-links" onclick="location.href='index.html#hub-practice'">📘 錯題本目錄</button>
@@ -387,7 +403,7 @@
       <div class="answer-actions">
         <button class="icon-btn" id="int-ansPlayHarm">🔊 播放和聲音程</button>
         <button class="icon-btn" id="int-ansPlayAsc">🔁 上行＋和聲</button>
-        <button class="icon-btn exp-btn" id="int-ansExport" title="導出正解音檔">⬇️</button>
+        <button class="icon-btn exp-btn" id="int-ansExport" title="導出正解">⬇️</button>
       </div>
       <button class="next-btn show" id="int-ansNextBtn" style="margin-top:16px;">下一題 →</button>
       <button class="nav-back-btn js-review-links" style="width:100%; margin:10px 0 0;" onclick="showPage('int-review')">📕 本項錯題本</button>
@@ -405,6 +421,8 @@
     <div class="review-section">
       <h2>錯題本</h2>
       <p class="hint">這裡收錄你答錯的音程，重整或關閉後仍會保留。點擊<b>「上行＋和聲」</b>會先後彈奏兩音再合奏，方便對照。</p>
+      <div id="int-revBranch" class="rev-branch"></div>
+      <div id="int-revHead" class="rev-head" style="display:none;"></div>
       <div id="int-reviewList"></div>
       <div class="js-review-links" style="margin-top:20px;">
         <button class="nav-back-btn" style="width:100%; margin:10px 0 0;" onclick="location.href='index.html#hub-practice'">📚 錯題本目錄</button>
@@ -431,7 +449,14 @@ window.REVIEW_STORE = {
   MAX_ITEMS: 50,   // 每類錯題本最多保留最新 50 筆，避免長期累積塞滿瀏覽器儲存空間
   add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); while(a.length > this.MAX_ITEMS) a.shift(); this.save(type,a); return a; },
   clear(type){ this.save(type, []); },
-  count(type){ return this.load(type).length; }
+  count(type){ return this.load(type).length; },
+  /* 實際題數：連續聽寫一筆裡面含多題（v.95 起），要把它們一起算進來，
+     否則總覽顯示的「題數」會比實際少很多。舊資料沒有 source 欄位，一筆就是一題。 */
+  questionCount(type){
+    return this.load(type).reduce(function(n, it){
+      return n + ((it && it.source === 'dictation') ? ((it.questions || []).length || 0) : 1);
+    }, 0);
+  }
 };
 
 function forceResetCache() {
@@ -458,7 +483,9 @@ function showPage(pageId) {
   if (pageId === 'int-settings') { document.getElementById('pageIntSettings').classList.add('active'); if(window.intModule) window.intModule.refreshReviewCount(); }
   else if (pageId === 'int-practice') document.getElementById('pageIntPractice').classList.add('active');
   else if (pageId === 'int-answer') document.getElementById('pageIntAnswer').classList.add('active');
-  else if (pageId === 'int-review') { document.getElementById('pageIntReview').classList.add('active'); if(window.intModule) window.intModule.renderRev(); }
+  else if (pageId === 'int-review') { document.getElementById('pageIntReview').classList.add('active');
+    /* 每次進錯題本都從第一層（分支選單）開始，不要停在上次看的內層 */
+    if(window.intModule){ if(window.intModule.resetRevView) window.intModule.resetRevView(); window.intModule.renderRev(); } }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 // 高音譜表裝飾：僅在「單題作答」的作答頁顯示，其餘頁面隱藏以節省版面
@@ -787,8 +814,58 @@ function updateStaffHeader(pageId){
     return ev;
   }
 
+  /* 譜例導出：另外畫一份乾淨的譜（畫面上的那份有外框與標籤，不適合直接轉檔）。
+     離屏容器要留在 DOM 裡才量得到尺寸，畫完就移除。 */
+  function offscreenStaff(root, intervals, steps, w, h){
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:' + w + 'px;';
+    document.body.appendChild(holder);
+    try{ renderGrandStaff(holder, root, intervals, steps, w, h); }catch(e){}
+    const svg = holder.querySelector('svg');
+    return { holder: holder, svg: svg };
+  }
+
+  async function doExportSheetSingle(root, intervals, steps, answer){
+    const btn = window.__expBtn || document.getElementById('int-ansExport');
+    if(btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    const made = offscreenStaff(root, intervals, steps, 280, 260);
+    try{
+      if(!made.svg) throw new Error('沒有譜例');
+      await SheetExport.exportSheets([{ svg: made.svg, answer: answer }], '音程', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    finally{ made.holder.remove(); }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
+  /* 連續聽寫：每列 5 題並排成一張圖 */
+  async function doExportSheetDict(questions, labels){
+    const btn = window.__expBtn || document.getElementById('int-dictExport');
+    if(btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    const made = [];
+    try{
+      questions.forEach(q => made.push(offscreenStaff(q.root, q.intervals, q.steps, 280, 260)));
+      const items = made.map((m, i) => ({
+        svg: m.svg, num: i + 1,
+        answer: labels ? (labels[questions[i].qualityKey] || questions[i].qualityKey) : ''
+      })).filter(x => x.svg);
+      if(!items.length) throw new Error('沒有譜例');
+      await SheetExport.exportSheets(items, '音程聽寫', {
+        perRow: 5,
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳ 產生中…' : (st === 'encode' ? '🖼️ 轉檔中…' : '⬇️ 導出'); }
+      });
+      btn.textContent = '✓ 完成';
+    }catch(e){ btn.textContent = '✗ 失敗'; }
+    finally{ made.forEach(m => m.holder.remove()); }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1800);
+  }
+
   async function doExportDict(questions){
-    const btn = document.getElementById('int-dictExport');
+    const btn = window.__expBtn || document.getElementById('int-dictExport');
     const ev = buildDictExportEvents(questions);
     if(!ev || btn.disabled) return;
     btn.disabled = true; const old = btn.textContent;
@@ -803,7 +880,7 @@ function updateStaffHeader(pageId){
   }
 
   async function doExportAudio(root, intervals){
-    const btn = document.getElementById('int-ansExport');
+    const btn = window.__expBtn || document.getElementById('int-ansExport');
     const ev = buildExportEvents(root, intervals);
     if(!ev){ return; }
     if(btn.disabled) return;
@@ -1033,26 +1110,162 @@ function updateStaffHeader(pageId){
     function refreshReviewCount(){
       const el = document.getElementById('int-reviewCount'); if(el) el.textContent = window.REVIEW_STORE.count('interval');
     }
+    /* ===== 錯題本的三層結構（v.95）=====
+       第一層：分支選單（單題作答／連續聽寫）
+       第二層：連續聽寫的各次紀錄（依日期）
+       第三層：某一次聽寫的錯題列表
+
+       單題與連續聽寫存在同一個陣列裡，用 source 欄位區分；
+       舊資料沒有這個欄位，一律當成單題（向下相容）。 */
+    let revView = { level: 0, runIndex: -1 };
+
+    function revSplit(){
+      const all = window.REVIEW_STORE.load('interval');
+      const singles = [], runs = [];
+      all.forEach((it, idx) => {
+        if(it && it.source === 'dictation') runs.push({ item: it, idx: idx });
+        else singles.push(it);
+      });
+      runs.sort((a, b) => (b.item.date || 0) - (a.item.date || 0));   // 新的在上面
+      return { singles: singles, runs: runs };
+    }
+
+    function revDateText(ts){
+      try{
+        const d = new Date(ts); const z = n => String(n).padStart(2, '0');
+        return (d.getMonth()+1) + '/' + d.getDate() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+      }catch(e){ return '（未知時間）'; }
+    }
+
+    function resetRevView(){ revView = { level: 0, runIndex: -1 }; }
+
     function renderRev(){
-      const list = document.getElementById('int-reviewList'); if(!list) return; list.innerHTML = '';
-      const items = window.REVIEW_STORE.load('interval');
+      const list = document.getElementById('int-reviewList');
+      const branch = document.getElementById('int-revBranch');
+      const head = document.getElementById('int-revHead');
+      const clr = document.getElementById('int-clearReviewBtn');
+      if(!list || !branch) return;
+      list.innerHTML = ''; branch.innerHTML = ''; head.innerHTML = '';
       refreshReviewCount();
-      if(items.length === 0){ list.innerHTML = '<div class="review-empty">🎉 目前沒有錯題，繼續保持你的好聽力！</div>'; return; }
-      scrollReviewToBottom('pageIntReview');
-      items.forEach(item => {
+
+      const data = revSplit();
+      const totalDict = data.runs.reduce((n, r) => n + (r.item.wrong || 0), 0);
+
+      /* ---- 第一層：分支選單 ---- */
+      if(revView.level === 0){
+        branch.style.display = ''; head.style.display = 'none';
+        if(clr) clr.style.display = 'none';
+        if(!data.singles.length && !data.runs.length){
+          branch.innerHTML = '<div class="review-empty">🎉 目前沒有錯題，繼續保持你的好聽力！</div>';
+          return;
+        }
+        const mk = (title, sub, count, onclick) => {
+          const b = document.createElement('button'); b.className = 'rev-card';
+          b.innerHTML = '<span class="rev-card-title">' + title +
+                        '<span class="rev-card-sub">' + sub + '</span></span>' +
+                        '<span class="rev-card-count">' + count + '</span>';
+          b.onclick = onclick; branch.appendChild(b);
+        };
+        mk('📝 單題作答', '一題一題練習時答錯的題目', data.singles.length + ' 題',
+           () => { revView = { level: 1, runIndex: -1 }; renderRev(); });
+        mk('🎧 連續聽寫', '依每一次聽寫分組', data.runs.length + ' 次　' + totalDict + ' 題',
+           () => { revView = { level: 2, runIndex: -1 }; renderRev(); });
+        return;
+      }
+
+      branch.style.display = 'none';
+      head.style.display = '';
+
+      /* ---- 第二層：連續聽寫的各次紀錄 ---- */
+      if(revView.level === 2){
+        head.innerHTML = '<button type="button" class="rev-back">← 返回</button>' +
+                         '<span class="rev-title">🎧 連續聽寫（' + data.runs.length + ' 次）</span>';
+        head.querySelector('.rev-back').onclick = () => { revView = { level: 0, runIndex: -1 }; renderRev(); };
+        if(clr){ clr.style.display = ''; clr.textContent = '🗑️ 清空所有聽寫紀錄'; }
+        if(!data.runs.length){
+          list.innerHTML = '<div class="review-empty">還沒有連續聽寫的錯題紀錄。</div>'; return;
+        }
+        data.runs.forEach((r, i) => {
+          const b = document.createElement('button'); b.className = 'rev-card';
+          b.innerHTML = '<span class="rev-card-title">' + revDateText(r.item.date) +
+                        '<span class="rev-card-sub">共 ' + (r.item.total || '—') + ' 題</span></span>' +
+                        '<span class="rev-card-count">錯 ' + (r.item.wrong || 0) + ' 題</span>';
+          b.onclick = () => { revView = { level: 3, runIndex: i }; renderRev(); };
+          /* 整次導出：這一次答錯的所有題目（音檔依序播、譜例並排） */
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'display:flex; gap:8px; align-items:stretch; margin-bottom:10px;';
+          b.style.marginBottom = '0'; b.style.flex = '1 1 auto';
+          const ex = document.createElement('button');
+          ex.className = 'rev-card exp-mini'; ex.textContent = '⬇️'; ex.title = '導出這一次的錯題';
+          ex.style.cssText = 'flex:0 0 auto; width:58px; justify-content:center; margin-bottom:0;';
+          ex.onclick = (e) => {
+            e.stopPropagation();
+            window.__expBtn = ex;
+            const qs = r.item.questions || [];
+            const lb = {}; Object.keys(QUALITIES).forEach(k => { lb[k] = QUALITIES[k].label; });
+            ExportMenu.open({ subtitle: '這一次答錯的 ' + qs.length + ' 題',
+              onAudio: () => doExportDict(qs),
+              onSheet: () => doExportSheetDict(qs, lb) });
+          };
+          wrap.appendChild(b); wrap.appendChild(ex);
+          list.appendChild(wrap);
+        });
+        return;
+      }
+
+      /* ---- 第一層的「單題作答」與第三層的「某一次聽寫」共用同一種列表 ---- */
+      let items, backTo, title;
+      if(revView.level === 1){
+        items = data.singles; backTo = 0; title = '📝 單題作答';
+        if(clr){ clr.style.display = ''; clr.textContent = '🗑️ 清空單題錯題'; }
+      } else {
+        const run = data.runs[revView.runIndex];
+        if(!run){ revView = { level: 2, runIndex: -1 }; renderRev(); return; }
+        items = run.item.questions || []; backTo = 2;
+        title = '🎧 ' + revDateText(run.item.date) + '（錯 ' + (run.item.wrong || 0) + ' 題）';
+        if(clr) clr.style.display = 'none';
+      }
+      head.innerHTML = '<button type="button" class="rev-back">← 返回</button>' +
+                       '<span class="rev-title">' + title + '</span>';
+      head.querySelector('.rev-back').onclick = () => { revView = { level: backTo, runIndex: -1 }; renderRev(); };
+
+      if(!items.length){
+        list.innerHTML = '<div class="review-empty">🎉 這裡沒有錯題。</div>'; return;
+      }
+      renderRevItems(items, list);
+    }
+
+    /* 逐題列表：單題與某一次聽寫共用 */
+    function renderRevItems(items, list){
+      items.forEach(it => {
         const row = document.createElement('div'); row.className = 'review-item';
         const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
-        renderGrandStaff(staffMini, item.root, item.intervals, item.steps, 210, 210);
-        const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.style.fontSize = '13.5px'; lbl.textContent = buildSymbol(item.qualityKey); staffMini.appendChild(lbl);
+        try{ renderGrandStaff(staffMini, it.root, it.intervals, it.steps, 210, 210); }catch(e){}
+        const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label';
+        lbl.style.fontSize = '13.5px'; lbl.textContent = buildSymbol(it.qualityKey); staffMini.appendChild(lbl);
         const meta = document.createElement('div'); meta.className = 'review-meta';
-        if(item.questionNum) meta.innerHTML += `<div class="q-num-badge">【第 ${item.questionNum} 題】</div>`;
-        const userLabel = item.userAnswerKey ? QUALITIES[item.userAnswerKey].label : '（未作答）';
-        meta.innerHTML += `<div class="review-answers">你的答案：<span class="wrong-ans">${userLabel}</span><br>正解答案：<span class="right-ans">${QUALITIES[item.qualityKey].label}</span></div>`;
+        if(it.questionNum) meta.innerHTML += '<div class="q-num-badge">【第 ' + it.questionNum + ' 題】</div>';
+        const userLabel = it.userAnswerKey ? QUALITIES[it.userAnswerKey].label : '（未作答）';
+        meta.innerHTML += '<div class="review-answers">你的答案：<span class="wrong-ans">' + userLabel +
+                          '</span><br>正解答案：<span class="right-ans">' + QUALITIES[it.qualityKey].label + '</span></div>';
         const actions = document.createElement('div'); actions.className = 'review-actions';
         const repBtn = document.createElement('button'); repBtn.className = 'icon-btn'; repBtn.textContent = '🔁 上行＋和聲';
-        repBtn.onclick = () => { window.stopAllPlayback(); playAscendingHarmonic(item.root, item.intervals); }; actions.appendChild(repBtn);
+        repBtn.onclick = () => { window.stopAllPlayback(); playAscendingHarmonic(it.root, it.intervals); };
+        actions.appendChild(repBtn);
+        /* 錯題本的導出：只導出正解 */
+        const expBtn = document.createElement('button'); expBtn.className = 'icon-btn exp-mini';
+        expBtn.textContent = '⬇️'; expBtn.title = '導出正解';
+        expBtn.onclick = () => {
+          window.__expBtn = expBtn;
+          const ansText = QUALITIES[it.qualityKey] ? QUALITIES[it.qualityKey].label : '';
+          ExportMenu.open({ subtitle: '這一題的正解',
+            onAudio: () => doExportAudio(it.root, it.intervals),
+            onSheet: () => doExportSheetSingle(it.root, it.intervals, it.steps, ansText) });
+        };
+        actions.appendChild(expBtn);
         row.appendChild(meta); row.appendChild(actions); list.appendChild(row);
       });
+      scrollReviewToBottom('pageIntReview');
     }
 
     function updateDictCaption(){
@@ -1153,7 +1366,16 @@ function updateStaffHeader(pageId){
         // 解答頁：重播與下一題
         document.getElementById('int-ansPlayHarm').onclick = () => { if(!pianoInstrument||!current) return; window.stopAllPlayback(); playBlock(current.root, current.intervals, 1); };
         document.getElementById('int-ansPlayAsc').onclick = () => { if(!current) return; window.stopAllPlayback(); playAscendingHarmonic(current.root, current.intervals); };
-        document.getElementById('int-ansExport').onclick = () => { if(current) doExportAudio(current.root, current.intervals); };
+        document.getElementById('int-ansExport').onclick = () => {
+          window.__expBtn = null;
+          if(!current) return;
+          const q = current, ansText = QUALITIES[q.qualityKey] ? QUALITIES[q.qualityKey].label : '';
+          ExportMenu.open({
+            subtitle: '這一題的正解',
+            onAudio: () => doExportAudio(q.root, q.intervals),
+            onSheet: () => doExportSheetSingle(q.root, q.intervals, q.steps, ansText)
+          });
+        };
         document.getElementById('int-ansNextBtn').onclick = () => {
           window.stopAllPlayback();
           if(mode === 'practice'){ qIndex++; newQ(); showPage('int-practice'); }
@@ -1200,17 +1422,40 @@ function updateStaffHeader(pageId){
             if(!window.confirm(`尚有 ${emptyCount} 格未填答。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
           }
           window.stopAllPlayback(); let cor = 0;
+          /* 連續聽寫：整次存成錯題本的「一筆」，裡面只收答錯的題目。
+             這樣 50 筆的上限就是 50 次聽寫，不會被單次的十題擠掉。 */
+          const wrongOfThisRun = [];
           dictSession.questions.forEach((q,i) => {
             const slot = document.getElementById(`int-slot-${i}`), tag = slot.querySelector('.dict-tag');
             const uk = tag ? tag.dataset.key : null; const isC = uk === q.qualityKey;
             slot.classList.add(isC ? 'correct' : 'wrong'); if(tag) tag.draggable = false;
-            if(isC) cor++; else addToRev(q, uk, i+1);
+            if(isC) cor++;
+            else wrongOfThisRun.push({ root: q.root, qualityKey: q.qualityKey, intervals: q.intervals,
+                                       steps: q.steps, userAnswerKey: uk || null, questionNum: i + 1 });
           });
+          if(wrongOfThisRun.length){
+            window.REVIEW_STORE.add('interval', {
+              source: 'dictation', date: Date.now(), levelId: curLevel.id,
+              total: dictSession.questions.length, wrong: wrongOfThisRun.length,
+              questions: wrongOfThisRun
+            });
+            refreshReviewCount();
+          }
           dictSession.submitted = true; document.getElementById('int-dictPanel').style.display='none'; document.getElementById('int-dictSummary').style.display='block'; document.getElementById('int-dictScore').textContent=`${cor} / ${dictSession.questions.length}`;
           (function(){ var lb = {}; Object.keys(QUALITIES).forEach(function(k){ lb[k] = QUALITIES[k].label; });
             renderDictDetail(dictSession.questions, lb); })();
         };
-        document.getElementById('int-dictExport').onclick = () => { if(dictSession) doExportDict(dictSession.questions); };
+        document.getElementById('int-dictExport').onclick = () => {
+          window.__expBtn = null;
+          if(!dictSession) return;
+          const qs = dictSession.questions;
+          const lb = {}; Object.keys(QUALITIES).forEach(k => { lb[k] = QUALITIES[k].label; });
+          ExportMenu.open({
+            subtitle: '這一次聽寫的 ' + qs.length + ' 題',
+            onAudio: () => doExportDict(qs),
+            onSheet: () => doExportSheetDict(qs, lb)
+          });
+        };
         document.getElementById('int-dictAgainBtn').onclick = () => {
           window.stopAllPlayback(); document.getElementById('int-dictSummary').style.display='none'; document.getElementById('int-dictPanel').style.display='block';
           const v = document.getElementById('int-dictReplaySelect').value; const max = mode==='test'?(v==='inf'?Infinity:parseInt(v,10)):Infinity;
@@ -1221,8 +1466,19 @@ function updateStaffHeader(pageId){
           renderDictBoard();
         };
         document.getElementById('int-clearReviewBtn').onclick = () => {
-          if(window.REVIEW_STORE.count('interval')===0) return;
-          if(window.confirm('確定要清空音程練習的錯題本嗎？此動作無法復原。')){ window.REVIEW_STORE.clear('interval'); renderRev(); refreshReviewCount(); }
+          /* 依目前所在的分支決定清什麼：單題那一層只清單題，
+             連續聽寫那一層只清聽寫紀錄（v.95）。 */
+          const all = window.REVIEW_STORE.load('interval');
+          if(!all.length) return;
+          const isDict = (revView.level === 2);
+          const keep = all.filter(it => isDict ? !(it && it.source === 'dictation') : (it && it.source === 'dictation'));
+          const removeCount = all.length - keep.length;
+          if(!removeCount) return;
+          const what = isDict ? ('所有連續聽寫紀錄（' + removeCount + ' 次）') : ('單題錯題（' + removeCount + ' 題）');
+          if(window.confirm('確定要清空' + what + '嗎？此動作無法復原。')){
+            window.REVIEW_STORE.save('interval', keep);
+            renderRev(); refreshReviewCount();
+          }
         };
       },
     /* 考卷回顧：逐題列出這一段的題目、你的答案與正解 */
@@ -1247,6 +1503,10 @@ function updateStaffHeader(pageId){
         const clr = document.getElementById('int-clearReviewBtn'); if(clr) clr.style.display = 'none';
 
         showPage('int-review');   // 先切頁：showPage 會重畫練習錯題本，之後再由下面覆寫
+        /* 考卷回顧走獨立路徑：把錯題本的分支選單與標題列藏起來，
+           直接在列表區顯示這一段的逐題內容（v.95）。 */
+        const branch = document.getElementById('int-revBranch'); if(branch) branch.style.display = 'none';
+        const rhead = document.getElementById('int-revHead'); if(rhead){ rhead.style.display = 'none'; rhead.innerHTML = ''; }
         const list = document.getElementById('int-reviewList');
         list.innerHTML = '';
         qs.forEach(function(q, i){
@@ -1390,6 +1650,7 @@ function updateStaffHeader(pageId){
       },
       updatePlayBtn: updatePlayBtn,
       renderRev: renderRev,
+      resetRevView: resetRevView,
       refreshReviewCount: refreshReviewCount
     };
   })();

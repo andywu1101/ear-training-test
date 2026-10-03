@@ -17,6 +17,8 @@
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
 <script src="audio-export.js"></script>
+<script src="sheet-export.js"></script>
+<script src="export-menu.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -83,6 +85,7 @@
 
 
   .unified-action-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .exp-mini{ padding-left:12px; padding-right:12px; min-width:48px; }
   .action-btn, .play-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s; }
   .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
   .exp-btn{ flex:0 0 auto; min-width:52px; padding-left:12px; padding-right:12px; }
@@ -318,7 +321,7 @@
       <button class="play-btn" id="ps-ansPlayCorrect">🎧 聽正確音堆</button>
       <button class="action-btn" id="ps-ansPlayArp">🔁 分解琶音</button>
       <button class="action-btn" id="ps-ansPlayMine" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽我寫的</button>
-      <button class="action-btn exp-btn" id="ps-ansExport" title="導出正解音檔">⬇️</button>
+      <button class="action-btn exp-btn" id="ps-ansExport" title="導出正解">⬇️</button>
       <button class="action-btn" id="ps-ansTuning" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
     </div>
 
@@ -428,7 +431,14 @@ window.REVIEW_STORE = {
   MAX_ITEMS: 50,
   add(type, item){ const a=this.load(type); item.id = item.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)); item.ts = Date.now(); a.push(item); while(a.length > this.MAX_ITEMS) a.shift(); this.save(type,a); return a; },
   clear(type){ this.save(type, []); },
-  count(type){ return this.load(type).length; }
+  count(type){ return this.load(type).length; },
+  /* 實際題數：連續聽寫一筆裡面含多題（v.95 起），要把它們一起算進來，
+     否則總覽顯示的「題數」會比實際少很多。舊資料沒有 source 欄位，一筆就是一題。 */
+  questionCount(type){
+    return this.load(type).reduce(function(n, it){
+      return n + ((it && it.source === 'dictation') ? ((it.questions || []).length || 0) : 1);
+    }, 0);
+  }
 };
 
 function escapeHtml(t){ return String(t).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
@@ -929,6 +939,69 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     return ev;
   }
 
+  /* 譜例導出：另外畫一份乾淨的音堆（畫面上那份有對錯顏色標記） */
+  let __shotSeq = 0;
+  function offscreenStaff(draw){
+    const id = '__shot' + (++__shotSeq);
+    const holder = document.createElement('div');
+    holder.id = id;
+    holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:420px; height:300px;';
+    document.body.appendChild(holder);
+    try{ draw(id); }catch(e){}
+    return { holder: holder, svg: holder.querySelector('svg') };
+  }
+
+  /* 錯題本：用那一筆的音高資料導出正解（音堆沒有速度設定，長度照 STACK_SUSTAIN） */
+  async function doExportReviewAudio(item, btn){
+    if(!item || !item.correct || !item.correct.length || btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    const TUNING_SEC = 2.0, GAP_SEC = 1.0;
+    const ev = [{ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }];
+    const t = TUNING_SEC + GAP_SEC, n = item.correct.length;
+    item.correct.forEach(m => ev.push({ midi: m, time: t, duration: STACK_SUSTAIN, gain: gainFor(m, n) }));
+    try{
+      await AudioExport.exportEvents(ev, '音堆', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
+        onProgress: function(pr){ btn.textContent = Math.round(pr * 100) + '%'; }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
+  async function doExportReviewSheet(item, btn){
+    if(!item || !item.correct || !item.correct.length || btn.disabled) return;
+    btn.disabled = true; const old = btn.textContent;
+    const made = offscreenStaff(id => drawStack(id, item.correct, item.clef || 'treble', {}));
+    try{
+      if(!made.svg) throw new Error('沒有譜例');
+      await SheetExport.exportSheets([{ svg: made.svg }], '音堆', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    finally{ made.holder.remove(); }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
+  async function doExportSheet(){
+    const btn = document.getElementById('ps-ansExport');
+    if(btn.disabled) return;
+    const M = window.psModule;
+    if(!M || !M.correct || !M.correct.length) return;
+    btn.disabled = true; const old = btn.textContent;
+    const made = offscreenStaff(id => drawStack(id, M.correct, M.clef, {}));
+    try{
+      if(!made.svg) throw new Error('沒有譜例');
+      await SheetExport.exportSheets([{ svg: made.svg }], '音堆', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+      });
+      btn.textContent = '✓';
+    }catch(e){ btn.textContent = '✗'; }
+    finally{ made.holder.remove(); }
+    setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+  }
+
   async function doExportAudio(){
     const btn = document.getElementById('ps-ansExport');
     const ev = buildExportEvents();
@@ -1269,6 +1342,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           '<button class="play-btn" data-rev-play="' + n + '">🎧 聽正確音堆</button>' +
           '<button class="action-btn" data-rev-arp="' + n + '">🔁 分解琶音</button>' +
           '<button class="action-btn" data-rev-mine="' + n + '" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽我寫的</button>' +
+          '<button class="action-btn exp-mini" data-rev-export="' + n + '" title="導出正解">⬇️</button>' +
           '</div>';
         host.appendChild(div);
         const rh = ((item.clef || 'treble') === 'grand') ? 300 : 190;
@@ -1289,6 +1363,13 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         playArpeggio((it.correct || []).map(midiOf).sort((a, c) => a - c));
       });
       host.querySelectorAll('[data-rev-mine]').forEach(b => b.onclick = () => {
+      /* 錯題本的導出：只導出正解（音檔與譜例） */
+      host.querySelectorAll('[data-rev-export]').forEach(b => b.onclick = () => {
+        const it = items[+b.dataset.revExport]; if(!it) return;
+        ExportMenu.open({ subtitle: '這一題的正解',
+          onAudio: () => doExportReviewAudio(it, b),
+          onSheet: () => doExportReviewSheet(it, b) });
+      });
         const it = list[Number(b.dataset.revMine)];
         window.psStopAll();
         playMidis((it.mine || []).map(midiOf));
@@ -1318,7 +1399,10 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
     document.getElementById('ps-ansNextBtn').onclick = () => { showPage('ps-practice'); psModule.newQuestion(); };
     document.getElementById('ps-ansPlayCorrect').onclick = () => { window.psStopAll(); playMidis(psModule.correctMidis); };
-    document.getElementById('ps-ansExport').onclick = doExportAudio;
+    document.getElementById('ps-ansExport').onclick = () => {
+      ExportMenu.open({ subtitle: '這一題的正解',
+        onAudio: doExportAudio, onSheet: doExportSheet });
+    };
     document.getElementById('ps-ansPlayArp').onclick = () => { window.psStopAll(); playArpeggio(psModule.correctMidis); };
     document.getElementById('ps-ansPlayMine').onclick = () => { window.psStopAll(); playMidis(psModule.user.map(midiOf)); };
     document.getElementById('ps-ansTuning').onclick = () => { ensureAudio(); playTuningA(); };

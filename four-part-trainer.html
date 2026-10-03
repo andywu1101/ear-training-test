@@ -20,6 +20,8 @@
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
 <script src="audio-export.js"></script>
+<script src="sheet-export.js"></script>
+<script src="export-menu.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -130,6 +132,7 @@
     white-space: nowrap; flex: 0 1 auto; min-width: 0;
   }
   .fpt-play-sticky .play-btn:disabled { box-shadow: none; }
+  .exp-mini{ padding-left:12px; padding-right:12px; min-width:48px; }
   .action-btn, .play-btn { font-size: 14px; font-weight: 600; padding: 12px 20px; border-radius: 999px; cursor: pointer; transition: all 0.2s; border: none; }
   .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
   .exp-btn{ flex:0 0 auto; min-width:52px; padding-left:12px; padding-right:12px; }
@@ -156,7 +159,8 @@
   .chord-slot.correct { border-style: solid; border-color: var(--correct); background: var(--correct-soft); }
   .chord-slot.wrong { border-style: solid; border-color: var(--wrong); background: var(--wrong-soft); }
   .slot-bar-num { font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft); margin-bottom: 4px; }
-  .slot-value { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--ink); min-height: 20px; }
+  /* 羅馬級數用 Times New Roman——和聲分析的慣用字體 */
+  .slot-value { font-family: 'Times New Roman', Times, serif; font-size: 17px; font-weight: 600; color: var(--ink); min-height: 20px; }
   
   /* 全直行感應區 (上五線譜、下作答格) */
   .hitbox-top { position: absolute; top: 0; height: 230px; cursor: pointer; z-index: 10; pointer-events: auto; }
@@ -423,7 +427,7 @@
     <div class="unified-action-row" style="margin-top:10px; margin-bottom:12px;">
       <button class="play-btn" id="btn-play-all-ans" disabled>🔊 聽完整正解</button>
       <button class="play-btn" id="btn-play-arp-ans" disabled>🎵 聽分解正解</button>
-      <button class="play-btn exp-btn" id="fpt-ansExport" title="導出正解音檔">⬇️</button>
+      <button class="play-btn exp-btn" id="fpt-ansExport" title="導出正解">⬇️</button>
     </div>
 
     <div class="review-label">你的作答 (紅色為錯誤)：</div>
@@ -2411,6 +2415,10 @@ window.addEventListener('resize', setVH); setVH();
         let refStave = sT || sB;
         let startX = refStave.getNoteStartX(); let endX = refStave.getX() + refStave.getWidth();
         let slotLeft = startX; let slotWidth = endX - startX;
+        /* 這一小節開始畫之前先記下已有幾個音符群組，
+           畫完就能挑出屬於本小節的那幾個，把它們平移到小節中央（見下方 centreBarNotes）。 */
+        const __svgEl = container.querySelector('svg');
+        const __before = __svgEl ? __svgEl.querySelectorAll('.vf-stavenote').length : 0;
 
         if (targetSvgId === 'fpt-staff-svg' && i === this.activeSlot) {
             activeBarCenterX = slotLeft + slotWidth / 2;
@@ -2422,14 +2430,20 @@ window.addEventListener('resize', setVH); setVH();
             ksDiv.style.position = 'absolute'; ksDiv.style.left = (refStave.getX()) + 'px'; 
             ksDiv.style.top = SLOT_TOP + 'px';
             ksDiv.style.width = Math.max(70, startX - refStave.getX() - 5) + 'px'; ksDiv.style.height = '64px';
+            if (opt.outKeyRect) { opt.outKeyRect.left = refStave.getX();
+              opt.outKeyRect.width = Math.max(70, startX - refStave.getX() - 5);
+              opt.outKeyRect.top = SLOT_TOP; }
             ksDiv.style.pointerEvents = 'auto';
             
             let optsHtml = '<option value="">調性?</option>';
             // 只列出本題調號對應的關係大調與關係小調（依實際調號，二選一）
             let keyPair = getRelativeKeyPair(keyObj);
-            keyPair.forEach(k => { optsHtml += `<option value="${k.name}">${k.name.replace(' ','')}</option>`; });
+            /* 冒號直接寫進選項文字（「F大調：」），選了就跟著出現，
+               不必在譜例上常駐一個會被級數框遮住的冒號。 */
+            keyPair.forEach(k => { optsHtml += `<option value="${k.name}">${k.name.replace(' ','')}：</option>`; });
             ksDiv.innerHTML = `<select id="fpt-keySelect-${targetSvgId}" class="select-box" style="width:100%; height:100%; font-size:12px; padding:0 4px; font-weight:700;">${optsHtml}</select>`;
             overlay.appendChild(ksDiv);
+
             
             setTimeout(() => {
                 let ks = document.getElementById(`fpt-keySelect-${targetSvgId}`);
@@ -2516,6 +2530,9 @@ window.addEventListener('resize', setVH); setVH();
         }
         
         slot.id = `${targetSvgId}-slot-${i}`;
+        /* 導出譜例時要在圖片上畫級數，但級數是 HTML overlay、不在 SVG 裡，
+           所以把每一小節的座標記下來給 exportSheet 用。 */
+        if (opt.outSlots) opt.outSlots.push({ left: slotLeft, width: slotWidth, top: SLOT_TOP });
         slot.style.position = 'absolute'; slot.style.left = slotLeft + 'px'; 
         slot.style.top = SLOT_TOP + 'px'; 
         slot.style.width = (slotWidth - 6) + 'px'; slot.style.height = '64px';
@@ -2613,6 +2630,106 @@ window.addEventListener('resize', setVH); setVH();
              VF.Formatter.FormatAndDraw(ctx, sB, [rB]);
           }
         }
+        /* 全音符置中：VexFlow 預設把音符靠左排，這裡把本小節剛畫好的音符
+           整個平移到小節中央，與下方的級數格對齊。
+           ⚠ 平移整個 .vf-stavenote 群組（不是只動符頭），臨時記號才會跟著走。 */
+        if (__svgEl) {
+          const groups = Array.prototype.slice.call(__svgEl.querySelectorAll('.vf-stavenote'), __before);
+          if (groups.length) {
+            /* ⚠ 兩件事要一起做，缺一個都會看起來沒對齊：
+               ① 上下兩行的「符頭」要在同一條垂直線上——高音有臨時記號、低音沒有時，
+                  VexFlow 會各自排版，兩行的符頭 x 就不一樣。
+               ② 對齊之後再整體置中到小節中央，才會與下方的級數對齊。
+               置中的依據一律是符頭，不是含臨時記號的外框（記號畫在符頭左邊）。
+               作法與 08 音堆、以及音程／和絃的大譜表相同。 */
+            const xsOf = function (g, sel) {
+              return Array.prototype.map.call(g.querySelectorAll(sel), function (pth) {
+                const m = (pth.getAttribute('d') || '').match(/M\s*(-?[0-9.]+)/);
+                return m ? parseFloat(m[1]) : null;
+              }).filter(function (v) { return v !== null; });
+            };
+            const yOf = function (g) {
+              const ys = Array.prototype.map.call(g.querySelectorAll('.vf-notehead path'), function (pth) {
+                const m = (pth.getAttribute('d') || '').match(/M[0-9.]+ (-?[0-9.]+)/);
+                return m ? parseFloat(m[1]) : null;
+              }).filter(function (v) { return v !== null; });
+              return ys.length ? ys.reduce(function (a, b) { return a + b; }, 0) / ys.length : 0;
+            };
+
+            const info = groups.map(function (g) {
+              const heads = xsOf(g, '.vf-notehead path');
+              const all = xsOf(g, 'path');
+              if (!heads.length || !all.length) return null;
+              return { g: g, y: yOf(g),
+                       head: Math.min.apply(null, heads),
+                       headMax: Math.max.apply(null, heads),
+                       left: Math.min.apply(null, all),
+                       right: Math.max.apply(null, all) };
+            }).filter(function (o) { return o; });
+
+            if (info.length) {
+              const HEAD_W = 13;                       // 全音符符頭的視覺寬度（實測）
+              /* ① 依符頭的垂直位置分成上下兩行（中間那條線取兩行譜表的中點） */
+              const midY = (TREBLE_TOP + BASS_TOP) / 2 + 40;
+              const rows = { top: [], bottom: [] };
+              info.forEach(function (o) { (o.y < midY ? rows.top : rows.bottom).push(o); });
+              const headOf = function (arr) {
+                return arr.length ? Math.min.apply(null, arr.map(function (o) { return o.head; })) : null;
+              };
+              const hTop = headOf(rows.top), hBot = headOf(rows.bottom);
+              let target = null;
+              if (hTop !== null && hBot !== null) target = Math.max(hTop, hBot);
+              info.forEach(function (o) {
+                const base = (o.y < midY) ? hTop : hBot;
+                o.align = (target !== null && base !== null) ? (target - base) : 0;
+              });
+
+              /* ② 對齊之後，以符頭的整體範圍置中到小節中央 */
+              let headMin = Infinity, headMax = -Infinity, boxMin = Infinity, boxMax = -Infinity;
+              info.forEach(function (o) {
+                headMin = Math.min(headMin, o.head + o.align);
+                headMax = Math.max(headMax, o.headMax + o.align);
+                boxMin = Math.min(boxMin, o.left + o.align);
+                boxMax = Math.max(boxMax, o.right + o.align);
+              });
+              const centre = (startX + endX) / 2;
+              let dx = centre - (headMin + headMax + HEAD_W) / 2;
+              /* 防撞用整體外框：臨時記號不可以疊到譜號或小節線 */
+              if (boxMin + dx < startX + 2) dx = startX + 2 - boxMin;
+              if (boxMax + HEAD_W + dx > endX - 4) dx = endX - 4 - boxMax - HEAD_W;
+
+              info.forEach(function (o) {
+                o.total = o.align + dx;
+                if (Math.abs(o.total) > 0.05) {
+                  o.g.setAttribute('transform', 'translate(' + o.total.toFixed(2) + ',0)');
+                }
+              });
+
+              /* ③ 加線不在音符群組裡，要依垂直位置判斷屬於哪一行，跟著同樣的位移走 */
+              Array.prototype.forEach.call(__svgEl.querySelectorAll('path'), function (pth) {
+                if (pth.closest && pth.closest('.vf-stavenote')) return;
+                if (pth.getAttribute('transform')) return;
+                const d = pth.getAttribute('d') || '';
+                const m = d.match(/^M\s*(-?[0-9.]+)\s+(-?[0-9.]+)\s*L\s*(-?[0-9.]+)\s+(-?[0-9.]+)\s*$/);
+                if (!m) return;
+                const y1 = parseFloat(m[2]), y2 = parseFloat(m[4]);
+                if (Math.abs(y1 - y2) > 0.5) return;
+                const x1 = parseFloat(m[1]), x2 = parseFloat(m[3]);
+                const len = x2 - x1;
+                if (len > 40 || len < 4) return;                 // 譜線很長、加線很短
+                if (x1 < startX - 2 || x2 > endX + 2) return;     // 只處理本小節範圍內的
+                let best = null, bestD = Infinity;
+                info.forEach(function (o) {
+                  const dd = Math.abs(o.y - y1);
+                  if (dd < bestD) { bestD = dd; best = o; }
+                });
+                if (best && Math.abs(best.total) > 0.05) {
+                  pth.setAttribute('transform', 'translate(' + best.total.toFixed(2) + ',0)');
+                }
+              });
+            }
+          }
+        }
         xPos += w;
       }
 
@@ -2647,6 +2764,130 @@ window.addEventListener('resize', setVH); setVH();
         t += measureDur;
       });
       return ev;
+    },
+
+    /* 譜例導出：另外畫一份乾淨的正解譜。
+       ⚠ 這一頁的 renderStaff 是把譜畫進既有的 <svg>（用 targetSvgId 指定），
+         所以離屏容器裡要先放一個 svg 元素給它用。 */
+    /* 錯題本的導出：用那一筆的題目資料，速度用錯題本的拉桿。
+       音檔與譜例都只導出正解。 */
+    exportReview: function(id, btn) {
+      var item = this.reviewItems.find(function(r){ return r.id === id; });
+      if (!item || !btn || btn.disabled) return;
+      var self = this;
+      ExportMenu.open({
+        subtitle: '這一題的正解',
+        onAudio: function(){ self._exportReviewAudio(item, btn); },
+        onSheet: function(){ self._exportReviewSheet(item, btn); }
+      });
+    },
+
+    _exportReviewAudio: function(item, btn) {
+      btn.disabled = true; var old = btn.textContent;
+      var TUNING_SEC = 2.0, GAP_SEC = 1.0;
+      var secPerBeat = 60 / reviewBpm();          /* 速度用錯題本的拉桿 */
+      var measureDur = 4 * secPerBeat;
+      var ev = [{ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }];
+      var t = TUNING_SEC + GAP_SEC;
+      (item.questionVoicings || []).forEach(function(v){
+        var s0 = v[0], a0 = v[1], tn = v[2], b0 = v[3];
+        ev.push({ midi: b0, time: Math.max(0, t - 0.010), duration: measureDur * 0.95, gain: BASS_GAIN });
+        ev.push({ midi: tn, time: t, duration: measureDur * 0.95, gain: 3.5 });
+        ev.push({ midi: a0, time: t, duration: measureDur * 0.95, gain: 3.5 });
+        ev.push({ midi: s0, time: t, duration: measureDur * 0.95, gain: 3.5 });
+        t += measureDur;
+      });
+      AudioExport.exportEvents(ev, '四部和聲', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
+        onProgress: function(pr){ btn.textContent = Math.round(pr * 100) + '%'; }
+      }).then(function(){ btn.textContent = '✓'; })
+        .catch(function(){ btn.textContent = '✗'; })
+        .then(function(){ setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600); });
+    },
+
+    _exportReviewSheet: function(item, btn) {
+      btn.disabled = true; var old = btn.textContent;
+      var id = '__fptShotRev';
+      var holder = document.createElement('div');
+      holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:1400px;';
+      holder.innerHTML = '<div id="' + id + '"></div>';
+      document.body.appendChild(holder);
+      var self = this, slots = [], keyRect = {};
+      try{
+        self.renderStaff({ targetSvgId: id, bars: item.bars, keyObj: item.keyObj,
+          userSeq: item.questionSeq, userBass: item.userBass, userKeyAns: item.keyObj.name,
+          isSubmitted: true, showAnswer: true, customVoicings: item.questionVoicings,
+          forceCorrectSlots: true, outSlots: slots, outKeyRect: keyRect });
+      }catch(e){}
+      var svg = holder.querySelector('svg');
+      var done = function(txt){
+        btn.textContent = txt; holder.remove();
+        setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+      };
+      if(!svg){ done('✗'); return; }
+      var overlays = [];
+      var isMin = item.keyObj && item.keyObj.isMin;
+      (item.questionSeq || []).forEach(function(sym, i){
+        var r = slots[i]; if(!r) return;
+        var txt = displayChord(sym, isMin); if(!txt) return;
+        overlays.push({ x: r.left + r.width / 2, y: r.top + 20, text: txt, size: 17,
+                        align: 'center', bold: true, font: "'Times New Roman', Times, serif" });
+      });
+      if(keyRect.width){
+        var keyName = (item.keyObj && item.keyObj.name) ? item.keyObj.name.replace(' ', '') : '';
+        if(keyName) overlays.push({ x: keyRect.left + keyRect.width / 2, y: keyRect.top + 20,
+                                    text: keyName + '：', size: 15, align: 'center', bold: true });
+      }
+      SheetExport.exportSheets([{ svg: svg, overlays: overlays, extraH: overlays.length ? 80 : 0 }], '四部和聲', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+      }).then(function(){ done('✓'); }).catch(function(){ done('✗'); });
+    },
+
+    exportSheet: function() {
+      var btn = document.getElementById('fpt-ansExport');
+      if(!btn || btn.disabled) return;
+      if(!this.questionVoicings || !this.questionVoicings.length) return;
+      btn.disabled = true; var old = btn.textContent;
+      /* ⚠ renderStaff 的 targetSvgId 指向的是一個 <div>，VexFlow 會在裡面自己建 <svg>。
+         這裡若直接給 <svg>，會變成 svg 包 svg，高度算不出來、譜例下半部會被裁掉。 */
+      var id = '__fptShot';
+      var holder = document.createElement('div');
+      holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:1400px;';
+      holder.innerHTML = '<div id="' + id + '"></div>';
+      document.body.appendChild(holder);
+      var self = this;
+      var slots = [], keyRect = {};
+      try{
+        self.renderStaff({ targetSvgId: id, bars: self.bars, keyObj: self.keyObj,
+          userSeq: self.questionSeq, userBass: self.userBass, userKeyAns: self.keyObj.name,
+          isSubmitted: true, showAnswer: true, customVoicings: self.questionVoicings, forceCorrectSlots: true,
+          outSlots: slots, outKeyRect: keyRect });
+      }catch(e){}
+      var svg = holder.querySelector('svg');
+      var done = function(txt){
+        btn.textContent = txt; holder.remove();
+        setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+      };
+      if(!svg){ done('✗'); return; }
+      /* 級數要對齊各自的小節、調名對齊調號——位置用 renderStaff 回報的座標，
+         和解答頁上看到的完全一樣。級數在 SVG 下緣之外，所以要多留一段高度。 */
+      var overlays = [];
+      var isMin = self.keyObj && self.keyObj.isMin;
+      (self.questionSeq || []).forEach(function(sym, i){
+        var r = slots[i]; if(!r) return;
+        var txt = displayChord(sym, isMin); if(!txt) return;
+        overlays.push({ x: r.left + r.width / 2, y: r.top + 20, text: txt, size: 18,
+                        align: 'center', bold: true, font: "'Times New Roman', Times, serif" });
+      });
+      if(keyRect.width){
+        var keyName = (self.keyObj && self.keyObj.name) ? self.keyObj.name.replace(' ', '') : '';
+        if(keyName) overlays.push({ x: keyRect.left + keyRect.width / 2, y: keyRect.top + 20,
+                                    text: keyName + '：', size: 15, align: 'center', bold: true });
+      }
+      var extraH = overlays.length ? 80 : 0;
+      SheetExport.exportSheets([{ svg: svg, overlays: overlays, extraH: extraH }], '四部和聲', {
+        onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+      }).then(function(){ done('✓'); }).catch(function(){ done('✗'); });
     },
 
     exportAudio: function() {
@@ -2906,6 +3147,7 @@ window.addEventListener('resize', setVH); setVH();
           <div style="display:flex; gap:8px; margin-bottom:8px;">
              <button class="action-btn" style="border-color:var(--correct); color:var(--correct);" onclick="window.fptModule.playReview(${id}, 'block')">🔊 聽完整正解</button>
              <button class="action-btn" style="border-color:var(--correct); color:var(--correct);" onclick="window.fptModule.playReview(${id}, 'arpeggio')">🎵 聽分解正解</button>
+             <button class="action-btn exp-mini" title="導出正解" onclick="window.fptModule.exportReview(${id}, this)">⬇️</button>
           </div>
           <div class="review-staff" id="rev-user-scroll-${id}">
             <div style="position:relative; width:max-content; min-width:100%; height:320px;">
@@ -2979,7 +3221,11 @@ window.addEventListener('resize', setVH); setVH();
       document.getElementById('btn-play-arp').onclick = () => { if(this.mode==='test'&&this.testSession)this.testSession.replaysLeft--; this.playProgression('arpeggio'); };
       // 解答頁的播放按鈕（不受測驗次數限制，可自由聆聽正解）
       document.getElementById('btn-play-all-ans').onclick = () => this.playProgression('block');
-      document.getElementById('fpt-ansExport').onclick = () => this.exportAudio();
+      document.getElementById('fpt-ansExport').onclick = () => {
+        const self = this;
+        ExportMenu.open({ subtitle: '這一題的正解',
+          onAudio: () => self.exportAudio(), onSheet: () => self.exportSheet() });
+      };
       document.getElementById('btn-play-arp-ans').onclick = () => this.playProgression('arpeggio');
 
       document.getElementById('btn-case-switch').onclick = (e) => {

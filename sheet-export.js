@@ -2,6 +2,6 @@
 (function (global) {
   'use strict';
   function nope() { return Promise.reject(new Error('export disabled')); }
-  global.AudioExport = { exportEvents: nope, encodeMp3: nope, deliver: nope,
-                         fileName: function () { return ''; } };
+  global.SheetExport = { exportSheets: nope, buildCanvas: nope, svgToImage: nope,
+                         fileName: function () { return ''; }, PER_ROW: 5 };
 })(window);

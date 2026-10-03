@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v94'; // v.94：導出正解音檔、錯題本速度拉桿
+const CACHE_NAME = 'ear-training-shell-v96'; // v.96：錯題本分層、譜例優化（導出為贊助者專屬）
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
@@ -24,7 +24,8 @@ const STATIC_ASSETS = [
   './soundfont-player.min.js',
   './piano-engine.js',
   './audio-export.js',
-  './lame.min.js',
+  './sheet-export.js',
+  './export-menu.js',
   './acoustic_grand_piano-mp3.js',
   './salamander-piano-mp3.js',
   './icon-192.png',
