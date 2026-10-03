@@ -283,12 +283,10 @@ window.addEventListener('appinstalled', function(){
   /* 付款說明、表單連結 */
   .pay-note{ font-size:14px; color:var(--ink); line-height:1.8; margin:10px 2px 6px; text-align:center; }
   .pay-note b{ color:var(--ink); }
-  .line-link{ display:flex; align-items:center; justify-content:center; gap:8px;
-        font-size:14px; font-weight:700; color:#06C755; background:rgba(6,199,85,0.08);
-        border:1px solid rgba(6,199,85,0.4); border-radius:12px; padding:11px 12px;
-        text-decoration:none; margin:10px 0 4px; }
-  .line-link:hover, .line-link:active{ background:rgba(6,199,85,0.16); }
-  .line-link .ai-ico{ display:inline-flex; }
+  .perk-hl{ color: var(--wrong); }
+  /* 可點的聯繫句：紅字＋底線，比一顆按鈕省空間，而且句子本身就說明了用途 */
+  .line-inline{ color: var(--wrong); text-decoration:underline;
+        text-underline-offset:3px; font-weight:600; white-space:nowrap; }
   .form-link{ display:block; font-size:14px; font-weight:700; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:12px; padding:11px 12px; text-align:center; text-decoration:none; margin-top:4px; }
   .form-link:hover, .form-link:active{ background:var(--accent); color:var(--panel); }
   /* 銀行轉帳 */
@@ -638,7 +636,10 @@ window.addEventListener('appinstalled', function(){
   <div class="donate-box">
     <div class="dico">❤</div>
     <h3>支持這個工具</h3>
-    <p>這個工具永久免費。你的支持會用於後續的開發與維護，感謝你 🙏</p>
+    <div id="donateIntro">
+      <p>這個工具永久免費，你的支持會用於後續開發與維護，感謝你 🙏</p>
+      <p>贊助者會列入名單，並可獲得專屬版本，<span class="perk-hl">將題目導出為音檔與譜例圖檔，方便備課與出題</span>。<a class="line-inline" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener">請透過 LINE 與我聯繫 ▸</a></p>
+    </div>
     <!-- 管道清單（日後要加新管道，在這裡多一顆按鈕即可） -->
     <div class="donate-links" id="donateChannels">
       <a class="author-item" href="https://portaly.cc/heng-heng.music/support" target="_blank" rel="noopener"><span class="ai-ico">❤</span> Portaly 小額贊助</a>
@@ -656,6 +657,7 @@ window.addEventListener('appinstalled', function(){
       <div class="jkopay-acct">街口帳號 <b>902103863</b><button class="copy-btn" type="button" onclick="copyText(event,'902103863')">複製</button></div>
       <p class="pay-note">此 QR 為 <b>TWQR 共通碼</b>，可用街口支付，或<b>任一家銀行的網銀 App</b> 掃描付款。</p>
       <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">請填寫贊助者表單，讓我將您放上贊助者名單 ❤</a>
+      <a class="author-item" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#06C755" d="M12 2.6c-5.5 0-10 3.6-10 8.1 0 3.9 3.6 7.2 8.4 7.9.33.07.78.22.89.5.1.26.07.66.03.92 0 0-.12.72-.14.87-.05.26-.21 1 .88.55 1.1-.46 5.9-3.48 8.05-5.96 1.48-1.63 2.19-3.28 2.19-5.11 0-4.5-4.5-8.1-10-8.1z"/></svg></span> 祐恆的 LINE</a>
       <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
     </div>
 
@@ -666,6 +668,7 @@ window.addEventListener('appinstalled', function(){
       <div class="bank-row"><span class="bk">戶名</span><b>伍○恆</b></div>
       <p class="pay-note">轉帳僅需銀行代號與帳號；戶名供核對用。</p>
       <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">請填寫贊助者表單，讓我將您放上贊助者名單 ❤</a>
+      <a class="author-item" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#06C755" d="M12 2.6c-5.5 0-10 3.6-10 8.1 0 3.9 3.6 7.2 8.4 7.9.33.07.78.22.89.5.1.26.07.66.03.92 0 0-.12.72-.14.87-.05.26-.21 1 .88.55 1.1-.46 5.9-3.48 8.05-5.96 1.48-1.63 2.19-3.28 2.19-5.11 0-4.5-4.5-8.1-10-8.1z"/></svg></span> 祐恆的 LINE</a>
       <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
     </div>
 
@@ -674,8 +677,7 @@ window.addEventListener('appinstalled', function(){
       <div id="sponsorList" class="sponsor-list">
         <button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>
       </div>
-      <p class="pay-note">每一位同意公開的贊助者，都會列在贊助者名單中。<span style="color:var(--wrong);">此外，可獲得專屬版本，將題目導出為音檔與譜例，方便備課、製作講義與離線複習。贊助後，請透過下方的 LINE 與我聯繫，我會提供專屬版本的 App 給您。</span></p>
-      <a class="line-link" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#06C755" d="M12 2.6c-5.5 0-10 3.6-10 8.1 0 3.9 3.6 7.2 8.4 7.9.33.07.78.22.89.5.1.26.07.66.03.92 0 0-.12.72-.14.87-.05.26-.21 1 .88.55 1.1-.46 5.9-3.48 8.05-5.96 1.48-1.63 2.19-3.28 2.19-5.11 0-4.5-4.5-8.1-10-8.1z"/></svg></span> 透過 LINE 與我聯繫</a>
+      <p class="pay-note">每一位同意公開的贊助者，都會列在贊助者名單中，感謝你的支持 🙏<br><a class="line-inline" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener">專屬版本請記得透過 LINE 與我聯繫索取 ▸</a></p>
       <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
     </div>
     <button type="button" class="author-item" style="width:100%; margin-bottom:12px;" onclick="closeDonate(); showAuthor();"><span class="ai-ico">🔗</span> 作者主頁</button>
@@ -1247,7 +1249,7 @@ window.CHANGELOG = [
   { v: 'v.91', items: ['優化各裝置的中文字體顯示，Android 與 Windows 上的閱讀體驗更美觀', '新增「導入及導出紀錄」功能：練習紀錄只存在單一裝置上，換手機或清除瀏覽器資料就會消失，現在可以導出成檔案保存，日後在任何裝置導入還原', '入口在選單頁最下方與錯題本總覽，導出後可透過 AirDrop、LINE 或雲端硬碟保管；導入時會覆蓋該裝置上的現有紀錄，操作前會顯示兩邊的數量供確認'] },
   { v: 'v.92', items: ['優化音程練習與和絃辨認的譜例顯示：解決出現臨時升降記號時，上下兩行音符未對齊的問題，並將音符改為置中，閱讀更清楚', '優化各練習的音量平衡，高音域的音符聽起來更清晰；四部和聲的低音聲部略為提高，更容易辨識', '兩聲部曲調的解答頁新增單獨聆聽高音、低音聲部的按鈕'] },
   { v: 'v.93', items: ['新增「高音質鋼琴音色」：改用 Yamaha C5 Grand Piano，音色更清晰、延音更自然', '新增「設定」頁面（選單頁最下方），可自由切換高音質音色與原本的標準音色；預設為高音質，若網路較慢或想要較快載入，可切換回原本的音色'] },
-  { v: 'v.96', items: ['音程練習與和絃辨認的「連續聽寫」提交後，會逐題顯示譜例與正解，可直接重播對照', '音程練習與和絃辨認的錯題本改為分類顯示：「單題作答」與「連續聽寫」分開，連續聽寫再依每一次的日期分組；錯題本總覽的題數改為計算實際題目數量', '錯題本新增播放速度拉桿（節奏、單旋律、兩聲部、四部和聲、音高辨認五項），整頁共用一個速度，設定會自動記住', '四部和聲的譜例優化：全音符置中並與級數對齊、調名加上冒號', '!!贊助者可獲得專屬版本，將題目導出為音檔與譜例，方便備課、製作講義與離線複習（贊助後請透過 LINE 與我聯繫）'] }
+  { v: 'v.96', items: ['音程練習與和絃辨認的「連續聽寫」提交後，會逐題顯示譜例與正解，可直接重播對照', '音程練習與和絃辨認的錯題本改為分類顯示：「單題作答」與「連續聽寫」分開，連續聽寫再依每一次的日期分組；錯題本總覽的題數改為計算實際題目數量', '錯題本新增播放速度拉桿（節奏、單旋律、兩聲部、四部和聲、音高辨認五項），整頁共用一個速度，設定會自動記住', '四部和聲的譜例優化：全音符置中並與級數對齊、調名加上冒號', '!!贊助者可獲得專屬版本，將題目導出為音檔與譜例圖檔，方便備課與出題（請透過贊助頁的 LINE 與我聯繫）'] }
 ];
 
 function showChangelog(){
@@ -1402,6 +1404,10 @@ function showPanel(which){
   var ids = ['Jko','Bank','Sponsors'];
   var ch = document.getElementById('donateChannels');
   if(ch) ch.style.display = which ? 'none' : 'flex';
+  /* 說明文字只在管道清單那一層出現；展開付款資訊或名單時收起來，
+     否則使用者在抄帳號時還要看一大段文字。 */
+  var intro = document.getElementById('donateIntro');
+  if(intro) intro.style.display = which ? 'none' : 'block';
   ids.forEach(function(k){
     var el = document.getElementById('donate'+k);
     if(el) el.style.display = (which === k) ? 'flex' : 'none';
