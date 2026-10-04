@@ -580,7 +580,9 @@ window.addEventListener('appinstalled', function(){
       </div>
       <p class="set-toast" id="pianoKitToast"></p>
       <p class="set-credit">高音質音色取樣自 Yamaha C5，來源為 Alexander Holm 錄製的
-        Salamander Grand Piano（已釋出為公有領域）。</p>
+        Salamander Grand Piano（已釋出為公有領域）。<br>
+        本網站使用 Cloudflare Web Analytics 統計造訪人數，不使用 cookie、不記錄個人資料。
+        練習紀錄一律只存在你的裝置上。</p>
     </div>
   </div>
 
@@ -1593,5 +1595,10 @@ if('serviceWorker' in navigator){
   document.addEventListener("click",unlock,true);
 })();
 </script>
+
+<!-- 造訪統計（Cloudflare Web Analytics）：只記錄造訪次數與頁面，
+     不使用 cookie、不記錄個人資料，也不碰使用者的練習紀錄。
+     Service Worker 只攔截同源與指定 CDN 的請求，這支外部 script 會直接放行。 -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "117f126a522645cc8e07654815a0e3c6"}'></script>
 </body>
 </html>
