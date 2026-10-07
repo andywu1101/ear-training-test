@@ -17,8 +17,8 @@
   var SOFT = '#75705f';
   var PER_ROW = 5;            // 並排時每一列幾題
   var PAD = 16;               // 外框留白
-  var NUM_H = 26;             // 題號那一行的高度
-  var ANS_H = 26;             // 答案那一行的高度
+  var NUM_H = 22;             // 題號那一行的高度
+  var ANS_H = 24;             // 答案那一行的高度
   var MAX_PIXELS = 40e6;      // Canvas 上限，避免手機記憶體爆掉
   var CREDIT_H = 22;          // 右下角來源標註的高度
   var CREDIT = '音樂聽力練習 · andywu1101.github.io/ear-training · Heng-Heng Wu';
@@ -38,11 +38,84 @@
       }
       clone.setAttribute('width', w); clone.setAttribute('height', h);
 
+      /* 量出 SVG 裡「實際有內容」的垂直範圍與符頭的水平中心。
+         VexFlow 畫大譜表時上方會空 70px 左右、下方 45px，
+         不裁掉的話題號與答案會離譜例很遠；而符頭不在 SVG 正中央
+         （有臨時記號時還會右移），答案要對齊它才不會看起來歪掉。 */
+      var box = (function () {
+        var minY = Infinity, maxY = -Infinity, hMin = Infinity, hMax = -Infinity;
+        try {
+          svgEl.querySelectorAll('path').forEach(function (pth) {
+            var d = pth.getAttribute('d') || '';
+            var re = /[ML]\s*(-?[0-9.]+)[ ,]+(-?[0-9.]+)/g, m;
+            while ((m = re.exec(d))) {
+              var y = parseFloat(m[2]);
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          });
+          svgEl.querySelectorAll('.vf-notehead path').forEach(function (pth) {
+            var m = (pth.getAttribute('d') || '').match(/M\s*(-?[0-9.]+)/);
+            if (!m) return;
+            var x = parseFloat(m[1]);
+            if (x < hMin) hMin = x;
+            if (x > hMax) hMax = x;
+          });
+        } catch (e) {}
+        return {
+          top: isFinite(minY) ? minY : 0,
+          bottom: isFinite(maxY) ? maxY : 0,
+          headCentre: isFinite(hMin) ? (hMin + hMax + 13) / 2 : null
+        };
+      })();
+
+      /* 導出專用：把符頭移到音符原本置中的位置。
+         App 的 alignAndCentreGrand 是以「含臨時記號的外框」置中（避免記號撞到譜號），
+         所以有記號的題目符頭會偏右。這裡只把那段偏移補回來——
+         dx = 外框中心 − 符頭中心，無記號時為 0（不動），不需要知道譜表的絕對位置。
+         ⚠ 只動這份 clone，不影響畫面上的譜例。 */
+      (function () {
+        try {
+          if (box.headCentre == null) return;
+          var HEAD_W = 13;
+          var bMin = Infinity, bMax = -Infinity;
+          clone.querySelectorAll('.vf-stavenote path').forEach(function (pth) {
+            var m = (pth.getAttribute('d') || '').match(/M\s*(-?[0-9.]+)/);
+            if (!m) return;
+            var x = parseFloat(m[1]);
+            if (x < bMin) bMin = x;
+            if (x > bMax) bMax = x;
+          });
+          if (!isFinite(bMin)) return;
+          var dx = (bMin + bMax + HEAD_W) / 2 - box.headCentre;
+          if (Math.abs(dx) < 0.05) return;
+
+          var shift = function (el) {
+            var cur = el.getAttribute('transform') || '';
+            var m = cur.match(/translate\(\s*(-?[0-9.]+)/);
+            el.setAttribute('transform', 'translate(' + ((m ? parseFloat(m[1]) : 0) + dx).toFixed(2) + ',0)');
+          };
+          clone.querySelectorAll('.vf-stavenote').forEach(shift);
+          /* 加線不在群組裡，要跟著走（短的水平線段） */
+          clone.querySelectorAll('path').forEach(function (pth) {
+            if (pth.closest && pth.closest('.vf-stavenote')) return;
+            var m = (pth.getAttribute('d') || '')
+              .match(/^M\s*(-?[0-9.]+)\s+(-?[0-9.]+)\s*L\s*(-?[0-9.]+)\s+(-?[0-9.]+)\s*$/);
+            if (!m) return;
+            if (Math.abs(parseFloat(m[2]) - parseFloat(m[4])) > 0.5) return;
+            var len = parseFloat(m[3]) - parseFloat(m[1]);
+            if (len > 40 || len < 4) return;
+            shift(pth);
+          });
+          box.headCentre += dx;        // 答案文字要跟著移到新的符頭位置
+        } catch (e) {}
+      })();
+
       var xml = new XMLSerializer().serializeToString(clone);
       var blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
       var url = URL.createObjectURL(blob);
       var img = new Image();
-      img.onload = function () { URL.revokeObjectURL(url); resolve({ img: img, w: w, h: h }); };
+      img.onload = function () { URL.revokeObjectURL(url); resolve({ img: img, w: w, h: h, box: box }); };
       img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('譜例轉檔失敗')); };
       img.src = url;
     });
@@ -50,6 +123,8 @@
 
   /* items: [{ svg, num, answer }]
      num 是題號（可省略），answer 是答案文字（沒有的頁面就不給）。 */
+  function rowsCount(items, perRow) { return Math.ceil(items.length / perRow); }
+
   async function buildCanvas(items, opts) {
     opts = opts || {};
     var perRow = opts.perRow || PER_ROW;
@@ -58,20 +133,44 @@
       shots.push(await svgToImage(items[i].svg));
     }
 
+    /* 裁掉 SVG 上下的空白，題號與答案才不會離譜例太遠。
+       上下各留 PEEK 的餘裕，避免切到加線或臨時記號的邊緣。
+       有 overlays 的頁面（四部和聲的級數畫在 SVG 下緣之外）不裁下緣。 */
+    var PEEK = 8;
+    var anyOverlay = items.some(function (it) { return it.overlays && it.overlays.length; });
+    /* ⚠ 所有格子必須用「同一個」裁切範圍。
+       逐格依自己的內容裁，各格裁掉的量不同，譜例在格子裡的垂直位置就會參差不齊。
+       取全部的最小上緣與最大下緣，換來的是每一排都對齊。 */
+    var allTop = Infinity, allBottom = -Infinity;
+    shots.forEach(function (sh) {
+      var b = sh.box || {};
+      if ((b.top != null) && b.top < allTop) allTop = b.top;
+      if ((b.bottom != null) && b.bottom > allBottom) allBottom = b.bottom;
+    });
+    var cutTop = (anyOverlay || !isFinite(allTop)) ? 0 : Math.max(0, Math.floor(allTop - PEEK));
+    shots.forEach(function (sh) {
+      sh.cutTop = cutTop;
+      var bottomEdge = (anyOverlay || !isFinite(allBottom))
+        ? sh.h : Math.min(sh.h, Math.ceil(allBottom + PEEK));
+      sh.cutH = Math.max(10, bottomEdge - cutTop);
+    });
+
     var cellW = Math.max.apply(null, shots.map(function (s) { return s.w; }));
-    var cellH = Math.max.apply(null, shots.map(function (s) { return s.h; }));
+    var cellH = Math.max.apply(null, shots.map(function (s) { return s.cutH; }));
     var hasNum = items.some(function (it) { return it.num != null; });
     var hasAns = items.some(function (it) { return it.answer; });
     /* overlays 是畫在譜例座標系上的標註（例如四部和聲的級數，
        它在 HTML overlay 裡、不在 SVG 中，而且位置在 SVG 下緣之外），
        所以要多留 extraH 的高度。 */
     var extraH = Math.max.apply(null, items.map(function (it) { return it.extraH || 0; }));
-    var blockH = cellH + extraH + (hasNum ? NUM_H : 0) + (hasAns ? ANS_H : 0);
+    var ROW_GAP = 40;           // 每排之間的間隔
+    var blockH = cellH + extraH + (hasNum ? NUM_H : 0) + (hasAns ? ANS_H : 0)
+               + ((rowsCount(items, perRow) > 1) ? ROW_GAP : 0);
 
     var cols = Math.min(perRow, items.length);
     var rows = Math.ceil(items.length / perRow);
     var W = PAD * 2 + cols * cellW;
-    var H = PAD * 2 + rows * blockH + CREDIT_H;
+    var H = PAD * 2 + rows * blockH + CREDIT_H - ((rows > 1) ? ROW_GAP : 0);
 
     /* 題目很多時自動降解析度，避免 Canvas 爆掉 */
     var scale = SCALE;
@@ -93,12 +192,12 @@
         ctx.fillStyle = INK;
         ctx.font = 'bold 15px -apple-system, "PingFang TC", "Noto Sans TC", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(it.num + '.', x + 4, y + 18);
+        ctx.fillText(it.num + '.', x + 4, y + NUM_H - 4);
       }
       var sy = y + (hasNum ? NUM_H : 0);
-      /* 譜例在格子裡置中（各頁的譜例寬度不一樣） */
+      /* 譜例在格子裡置中（各頁的譜例寬度不一樣），並裁掉上下的空白 */
       var ox = x + (cellW - s.w) / 2;
-      ctx.drawImage(s.img, ox, sy, s.w, s.h);
+      ctx.drawImage(s.img, 0, s.cutTop, s.w, s.cutH, ox, sy, s.w, s.cutH);
 
       /* 標註用的是譜例自己的座標系，平移到圖片上對應的位置即可 */
       if (it.overlays && it.overlays.length) {
@@ -107,22 +206,26 @@
           ctx.font = (o.bold ? 'bold ' : '') + (o.size || 15) + 'px ' +
                      (o.font || '-apple-system, "PingFang TC", "Noto Sans TC", sans-serif');
           ctx.textAlign = o.align || 'center';
-          ctx.fillText(o.text, ox + o.x, sy + o.y);
+          ctx.fillText(o.text, ox + o.x, sy + o.y - s.cutTop);
         });
       }
 
       if (hasAns && it.answer) {
-        ctx.fillStyle = SOFT;
+        /* 顏色與譜例一致（VexFlow 畫的是純黑），灰字在白底上看不清楚 */
+        ctx.fillStyle = INK;
         ctx.textAlign = 'center';
         /* 答案可能很長（例如四部和聲的整串羅馬級數），
            量一下寬度，放不下就逐步縮字級，避免超出圖片邊界。 */
-        var size = 14, maxW = cellW - 12;
+        var size = 15, maxW = cellW - 12;
         do {
           ctx.font = size + 'px -apple-system, "PingFang TC", "Noto Sans TC", sans-serif';
           if (ctx.measureText(it.answer).width <= maxW) break;
           size -= 1;
         } while (size > 9);
-        ctx.fillText(it.answer, x + cellW / 2, sy + cellH + extraH + 18);
+        /* 對齊符頭的水平中心——符頭不在 SVG 正中央，
+           有臨時記號時還會右移，置中在格子會看起來歪掉。 */
+        var ax = (s.box && s.box.headCentre != null) ? (ox + s.box.headCentre) : (x + cellW / 2);
+        ctx.fillText(it.answer, ax, sy + cellH + extraH + 16);
       }
     });
 

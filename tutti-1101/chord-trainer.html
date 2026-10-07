@@ -73,6 +73,8 @@
   .level-tab.active{ background: var(--accent); border-color: var(--accent); color: var(--panel); }
   .custom-panel{ margin-bottom: 24px; padding: 18px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; }
   .custom-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap: 8px; margin-top: 10px; }
+  .custom-panel.readonly .custom-item{ cursor:default; opacity:0.92; }
+  .custom-panel.readonly .custom-item input{ cursor:default; }
   .custom-item{ display:flex; align-items:center; gap: 8px; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 8px; font-size: 13.5px; color: var(--ink); cursor:pointer; transition: border-color 0.12s ease; touch-action: manipulation; }
   .custom-item:hover{ border-color: var(--accent-line); }
   .custom-item input{ cursor:pointer; accent-color: var(--accent); width: 18px; height: 18px; }
@@ -363,7 +365,6 @@
         <div class="dictation-progress" id="chr-dictDots"></div>
         <div class="play-area" style="border-bottom:none; padding-bottom: 8px; margin-bottom: 8px;">
           <button class="play-btn" id="chr-dictPlayBtn" disabled>▶ 播放整段</button>
-          <div class="play-caption" id="chr-dictCaption">音色載入中，請稍候</div>
         </div>
         <p class="dictation-hint">點擊選中欲作答的題號格子，接著點擊下方選項即可填入答案，系統會自動跳至下一題！若要修改，可點擊格子內的選項清除，或直接點選新題號。</p>
         <div class="dictation-slots" id="chr-dictSlots"></div>
@@ -983,7 +984,19 @@ function updateStaffHeader(pageId){
       });
       updateCustomVis(); updateStartBtn();
     }
-    function updateCustomVis(){ document.getElementById('chr-customPanel').style.display = curLevel.id === CUSTOM_ID ? 'block' : 'none'; }
+    /* 面板永遠顯示：選「自訂」時可以勾選，選其他難度時唯讀列出該難度包含的項目，
+       讓使用者看得到每個難度的內容。 */
+    function updateCustomVis(){
+      const panel = document.getElementById('chr-customPanel');
+      const isCustom = (curLevel.id === CUSTOM_ID);
+      panel.style.display = 'block';
+      panel.classList.toggle('readonly', !isCustom);
+      const lab = panel.querySelector('.switch-group-label');
+      if(lab) lab.textContent = isCustom ? '自訂內容（至少選 2 種）' : ('「' + curLevel.name + '」包含：');
+      const hint = document.getElementById('chr-customHint');
+      if(hint) hint.style.display = isCustom ? '' : 'none';
+      renderCustom();
+    }
     function updateStartBtn(){
       const insufficient = curLevel.id === CUSTOM_ID && activePool().length < 2;
       const btn = document.getElementById('chr-enterBtn'); btn.disabled = insufficient;
@@ -992,6 +1005,21 @@ function updateStaffHeader(pageId){
     function updateStatus(){ document.getElementById('chr-statusBadge').textContent = `${curLevel.name}｜${qtype==='single'?'單題作答':'連續聽寫'} (${mode==='test'?'測驗模式':'練習模式'})`; }
     function renderCustom(){
       const grid = document.getElementById('chr-customGrid'); grid.innerHTML = '';
+      const isCustom = (curLevel.id === CUSTOM_ID);
+      /* 非自訂難度：顯示該難度的 pool，而且不可點 */
+      const shown = isCustom ? customPool : curLevel.pool;
+
+      if(!isCustom){
+        ORDER.forEach(key => {
+          if(shown.indexOf(key) < 0) return;
+          const item = document.createElement('label'); item.className = 'custom-item on';
+          const cb = document.createElement('input'); cb.type = 'checkbox';
+          cb.checked = true; cb.disabled = true;
+          item.appendChild(cb); item.appendChild(document.createTextNode(QUALITIES[key].label));
+          grid.appendChild(item);
+        });
+        return;
+      }
 
       const allItem = document.createElement('label'); allItem.className = 'custom-item select-all';
       const allCb = document.createElement('input'); allCb.type = 'checkbox';

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v96'; // v.96：錯題本分層、譜例優化（導出為贊助者專屬）
+const CACHE_NAME = 'ear-training-shell-v97'; // v.97：難度內容顯示、譜例導出版面
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
