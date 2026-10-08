@@ -696,27 +696,41 @@ function updateStaffHeader(pageId){
     if(audioCtx.state !== 'running') audioCtx.resume();
     return audioCtx;
   }
-  /* ⚠ iOS 切到背景再回來之後的音訊問題（v.97.7，實測確認）
-     iOS 切到背景一段時間後會收回整個 App 的聲音通道：
-       • AudioContext 的 state 仍說 running，但時間停住、沒有聲音——只看 state 偵測不到
-       • 連新建的 AudioContext 也一樣不動（v.97.6 實測），因為卡住的是通道本身
-       • 排進去的音符不會消失，而是被凍住，通道恢復時一起湧出來（聽起來像迴音）
-     通道要靠頁尾那段 unlock（播一段無聲音檔）在使用者手勢裡重新打開，
-     v.97.7 起回到前景後會重新啟用它，並由這裡的閘門在手勢裡再呼叫一次。
+  /* ⚠ iOS 切到背景再回來之後沒有聲音（v.97 系列，每一層都經過實機驗證；詳見開發者手冊）
+     這個問題有四層，缺一層都修不好：
+       ① resume() 是非同步的：還沒恢復就排程，音符會被凍住
+          → 每個排程函式開頭先過 audioReady() 閘門
+       ② 頁尾開聲音通道的 unlock 原本每次開頁只跑一次，回來後通道打不開
+          → 回到前景後重新啟用（見頁尾），閘門也會在手勢裡再呼叫一次
+       ③ 被凍住的音符會在恢復時一起湧出來（聽起來像迴音）
+          → 回來時實測時間沒在走，就取消凍住的音符；換 context 時舊的會被關閉
+       ④ 最底層：Safari 讓取樣率相同的 AudioContext 共用同一個發聲裝置，
+          背景回來後這個裝置卡住，state 仍說 running、時間卻不動——連新建的 context 也一樣
+          → 備用 context 改用「不同的取樣率」，拿到全新的裝置（makeSpareCtx）
+     另外聲音經由媒體元素播出並設定 MediaSession（原理見 piano-engine.js），
+     動態島與鎖定畫面才會穩定顯示 App 圖示。
 
      背景行為：
-       • 練習模式：切出去繼續播完（已宣告 audioSession = playback，iOS 允許背景發聲；
-         音符在按下播放時就全部排好時間，JS 被凍結也不影響）
+       • 練習模式：切出去繼續播完（已宣告 audioSession = playback；音符在按下播放時就全部排好時間）
        • 考試模式：維持切出去就停止並記為已播放（exam-common 的 guardVisibility，這裡不動）
-       • 回到前景時實測時間有沒有在走：有 → 不打擾（還在播或已正常播完）；
-         沒有 → 通道斷了，取消凍住的音符、清掉播放中狀態，並標記下一次播放前要檢查
 
-     閘門 audioReady（每個排程函式開頭先過它）：
+     閘門 audioReady 的規則：
        平常 → 直接放行，不多等
-       回來後或 context 沒在跑 → 在手勢裡重開通道、建一個備用 context，
-         最多觀察 AUDIO_PROBE_MAX 毫秒，新舊任何一個時間開始走就立刻播放
+       媒體元素閒置暫停過 → 在這次點擊裡把它播回來（不顯示提示）
+       從背景回來或 context 沒在跑 → 在手勢裡重開通道、建備用 context，
+         最多觀察 AUDIO_PROBE_MAX 毫秒，任何一個的時間開始走就立刻播放
      ⚠ 閘門要放在會改狀態的那幾行之前（isPlaying、replaysLeft、played…），
        否則 retry 會被自己剛設下的旗標擋掉。音符的時間是在 retry 裡才算的。 */
+  try{
+    if(window.PianoEngine && window.PianoEngine.enableMediaOutput)
+      window.PianoEngine.enableMediaOutput({ title: '音程辨認', artist: '音樂聽力練習',
+        onStop: function(){ try{ window.stopAllPlayback(); }catch(e){} } });
+  }catch(e){}
+  function audioOut(c){ return (window.PianoEngine && window.PianoEngine.outputFor) ? window.PianoEngine.outputFor(c) : c.destination; }
+  function mediaNeeds(c){ return !!(window.PianoEngine && window.PianoEngine.mediaNeedsClaim && window.PianoEngine.mediaNeedsClaim(c)); }
+  function mediaClaim(c){ try{ if(window.PianoEngine && window.PianoEngine.claimMedia) window.PianoEngine.claimMedia(c); }catch(e){} }
+  function mediaSettled(c){ return !(window.PianoEngine && window.PianoEngine.mediaSettled) || window.PianoEngine.mediaSettled(c); }
+
   var AUDIO_PROBE_MAX = 3000;     // 最多觀察多久（通道剛打開時硬體要暖機）
   var AUDIO_PROBE_STEP = 100;
   var AUDIO_MIN_ADV = 0.05;       // 時間至少要走 0.05 秒才算真的在跑
@@ -746,6 +760,7 @@ function updateStaffHeader(pageId){
   }
 
   function closeAudioCtx(c){
+    try{ if(c && window.PianoEngine && window.PianoEngine.releaseMedia) window.PianoEngine.releaseMedia(c); }catch(e){}
     try{ if(c && c.close && c.state !== 'closed') c.close(); }catch(e){}
   }
   function cancelAudioWait(){
@@ -784,10 +799,19 @@ function updateStaffHeader(pageId){
       p.timer = setTimeout(wait, 100);
     })();
   }
-  function stateMark(c, t0){
-    if(!c) return '無';
-    var adv = c.currentTime - t0;
-    return (c.state === 'running' && adv >= AUDIO_MIN_ADV) ? '✓' : (c.state === 'running' ? '✕' : c.state);
+  /* ⚠ 備用 context 要用跟舊的「不同」的取樣率（v.97.9 實機驗證有效）。
+     Safari 會讓同一頁裡取樣率相同的 AudioContext 共用同一個底層發聲裝置；
+     切到背景時 iOS 停掉這個裝置，回來後沒有重新啟動。
+     實測（v.97.8）：媒體元素已經在播（動態島有顯示），但新舊 context 時間都不動——
+     新建的 context 接到同一個卡住的裝置上了。
+     換一個取樣率就會拿到全新的裝置。舊的 context 換過去後會被關閉，
+     卡住的裝置跟著釋放，下一次再換回另一個取樣率，兩個輪流用。
+     鋼琴取樣不必重新解碼：AudioBufferSourceNode 會自動轉換取樣率，音高不受影響。 */
+  function makeSpareCtx(old){
+    var C = window.AudioContext || window.webkitAudioContext;
+    var want = (old && Math.round(old.sampleRate) === 44100) ? 48000 : 44100;
+    try{ return new C({ sampleRate: want }); }catch(e){}
+    return new C();                         // 不支援指定取樣率的舊版：退回原本的做法
   }
 
   function audioReady(retry){
@@ -797,22 +821,28 @@ function updateStaffHeader(pageId){
     var old;
     try{ old = ensureAudio(); }catch(e){ return true; }   // 連建都失敗就照原本的路走
     if(!old) return true;
-    if(old.state === 'running' && !audioSuspect) return true;   // 平常走這裡，不多等
+    if(old.state === 'running' && !audioSuspect && !mediaNeeds(old)) return true;   // 平常走這裡，不多等
 
     /* ---- 以下在使用者手勢裡同步執行 ---- */
     var wasSuspect = audioSuspect;
+    /* 只是媒體元素閒置暫停過（平常重播）→ 在手勢裡把它播回來就好，不必建備用 context、也不顯示提示 */
+    var needSpare = audioSuspect || old.state !== 'running';
     audioSuspect = false;
-    try{ if(typeof window.__audioUnlock === 'function') window.__audioUnlock(); }catch(e){}   // 重開聲音通道
+    if(needSpare){ try{ if(typeof window.__audioUnlock === 'function') window.__audioUnlock(); }catch(e){} }   // 重開聲音通道
     try{ if(old.state !== 'running') old.resume(); }catch(e){}
+    mediaClaim(old);                        // ⚠ 必須在點擊的同一個呼叫堆疊裡
     var spare = null;
-    try{
-      spare = new (window.AudioContext || window.webkitAudioContext)();
-      if(spare.state !== 'running') spare.resume();
-    }catch(e){ spare = null; }
+    if(needSpare){
+      try{
+        spare = makeSpareCtx(old);
+        if(spare.state !== 'running') spare.resume();
+        mediaClaim(spare);
+      }catch(e){ spare = null; }
+    }
 
     var p = audioPending = { retry: retry, timer: 0, spare: spare };
     var o0 = old.currentTime, s0 = spare ? spare.currentTime : 0, began = Date.now();
-    audioToast('🔊 檢查音訊…');
+    if(needSpare) audioToast('🔊 正在恢復聲音…');
 
     function rebindTo(c){
       return !!(window.PianoEngine && window.PianoEngine.rebind && pianoInstrument && window.PianoEngine.rebind(pianoInstrument, c));
@@ -820,8 +850,8 @@ function updateStaffHeader(pageId){
     (function check(){
       if(audioPending !== p) return;        // 被取消了（按停止／切頁），cancelAudioWait 已處理
       var ms = Date.now() - began;
-      var oldAlive   = old.state === 'running' && (old.currentTime - o0) >= AUDIO_MIN_ADV;
-      var spareAlive = !!spare && spare.state === 'running' && (spare.currentTime - s0) >= AUDIO_MIN_ADV;
+      var oldAlive   = old.state === 'running' && (old.currentTime - o0) >= AUDIO_MIN_ADV && mediaSettled(old);
+      var spareAlive = !!spare && spare.state === 'running' && (spare.currentTime - s0) >= AUDIO_MIN_ADV && mediaSettled(spare);
 
       if(wasSuspect && spareAlive && rebindTo(spare)){
         p.spare = null; switchAudioCtx(spare);
@@ -843,15 +873,12 @@ function updateStaffHeader(pageId){
         reloadThenFire(p); return;
       }
       if(ms >= AUDIO_PROBE_MAX){
-        /* 停在這裡的畫面就是現場量測：回報時看最後一行即可 */
-        var info = '舊 ' + stateMark(old, o0) + '｜新 ' + stateMark(spare, s0);
         closeAudioCtx(spare); p.spare = null;
         audioPending = null;
         audioSuspect = true;                // 下一次點擊再完整試一次
-        audioToast('🔊 請再點一下播放（' + info + '）', 5000);
+        audioToast('🔊 請再點一下播放', 3000);
         return;
       }
-      audioToast('🔊 檢查音訊… ' + (ms / 1000).toFixed(1) + ' 秒｜舊 ' + stateMark(old, o0) + '｜新 ' + stateMark(spare, s0));
       try{ if(old.state !== 'running') old.resume(); }catch(e){}
       try{ if(spare && spare.state !== 'running') spare.resume(); }catch(e){}
       p.timer = setTimeout(check, AUDIO_PROBE_STEP);
