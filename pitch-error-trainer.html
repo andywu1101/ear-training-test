@@ -1474,76 +1474,55 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     }catch(e){}
     return audioCtx;
   }
-  /* ⚠ iOS 把 PWA 切到背景時會做三件事，每一件都會害回來之後播不出聲音：
-       ① AudioContext 進入 'interrupted'（WebKit 自己加的狀態，不是標準的 'suspended'）
-       ② 凍結 JavaScript 計時器——解除「播放中」旗標的 setTimeout 沒跑到，旗標卡住
-       ③ 最麻煩的一種：**state 顯示 running，但音訊 session 其實已經死了**。
-          音符排程得出去，就是沒有聲音。只看 state 的話完全偵測不到，重建也不會被觸發。
+  /* ⚠ iOS 把 App 切到背景時會把 AudioContext 停掉，切回來必須 resume()。
+     但 resume() 是非同步的——它回傳 Promise，要過幾十毫秒才真的恢復。
+     在那之前排出去的音符，iOS 會直接丟掉，而且完全不報錯：
+     按鈕有反應、變灰、顯示「播放中」，就是沒有聲音。
+     （v.97 的診斷日誌裡「排程測試音（state=suspended）」出現在「resume 成功」
+       前面，就是這個順序顛倒造成的。）
 
-     所以不能信 state，要實測 currentTime 有沒有前進——真的在跑的 context，
-     它的時間會跟著真實時間往前走。 */
-  var rebuildingAudio = false;
-  var lastCtxTime = -1, lastWallTime = 0;
+     所以每一個排程函式的開頭都要先過 audioReady()：
+       已經 running → 回傳 true，照常排程
+       還沒 running → 回傳 false（呼叫者立刻 return），等真的 running 再把它叫回來
+     ⚠ 音符的時間是在 retry 裡才算的，所以不會有「排程時間已經過期」的問題；
+       這也是為什麼閘門要放在函式開頭、而不是包住整批呼叫。
+     ⚠ 閘門要放在「會改狀態」的那幾行之前（isPlaying、replaysLeft、played…），
+       否則 retry 會被自己剛設下的旗標擋掉。 */
+  var AUDIO_WAIT_MS = 1500;     // 等不到就放棄，讓使用者再按一次（不要無限等）
+  var audioWaiting = false;     // 同時只留一條輪詢，避免連點疊出一堆
 
-  /* 便宜的檢查：比對上一次的觀測值。只在「state 說 running 卻沒在走」時判定為死，
-     suspended 的情況交給 resume() 處理，避免誤判而多餘地重建。 */
-  function audioLooksDead(){
-    if(!audioCtx) return false;
-    var now = Date.now(), ct = audioCtx.currentTime;
-    var dead = (audioCtx.state === 'running' && lastCtxTime >= 0
-                && now - lastWallTime > 400 && ct === lastCtxTime);
-    lastCtxTime = ct; lastWallTime = now;
-    return dead;
+  function audioReady(retry){
+    var ctx;
+    try{ ctx = ensureAudio(); }catch(e){ return true; }   // 連建都失敗，就讓它照原本的路走
+    if(!ctx) return true;
+    if(ctx.state === 'running') return true;
+    if(audioWaiting) return false;
+    audioWaiting = true;
+    var t0 = Date.now();
+    (function poll(){
+      if(!audioCtx){ audioWaiting = false; return; }
+      if(audioCtx.state === 'running'){
+        audioWaiting = false;
+        if(typeof retry === 'function'){ try{ retry(); }catch(e){} }
+        return;
+      }
+      if(Date.now() - t0 > AUDIO_WAIT_MS){ audioWaiting = false; return; }
+      try{ audioCtx.resume(); }catch(e){}
+      setTimeout(poll, 50);
+    })();
+    return false;
   }
-  /* 比較確實的檢查：隔 300 ms 再看一次時間有沒有動 */
-  function verifyAudioAlive(){
-    if(!audioCtx || rebuildingAudio) return;
-    var t0 = audioCtx.currentTime;
-    setTimeout(function(){
-      if(!audioCtx || rebuildingAudio) return;
-      if(audioCtx.state !== 'running' || audioCtx.currentTime === t0) rebuildAudio();
-    }, 300);
-  }
 
+  /* 切回前景：把停掉的 context 喚醒，並清掉被凍結的計時器留下的「播放中」旗標。 */
   function wakeAudioOnReturn(){
     try{ if(typeof window.peStopAll === 'function') window.peStopAll(); }catch(e){}
-    if(!audioCtx || rebuildingAudio) return;
-    var p = null;
-    try{ if(audioCtx.state !== 'running') p = audioCtx.resume(); }catch(e){}
-    /* resume() 失敗是「靜默」的——它回傳 Promise，被拒絕時不會進 catch，
-       所以一律等結果，再用 currentTime 實測一次。 */
-    Promise.resolve(p).catch(function(){}).then(function(){ verifyAudioAlive(); });
+    try{ if(audioCtx && audioCtx.state !== 'running') audioCtx.resume(); }catch(e){}
   }
 
-  /* 最後手段：音訊環境真的壞掉時重建。
-     ⚠ 不可以先把 pianoInst 清成 null——播放函式開頭會檢查它，
-       萬一重新載入沒成功，使用者就變成「按鈕按得下去、但完全沒反應」，比壞掉前更糟。
-     ⚠ 舊的 context 要關掉（iOS 同時能存在的數量有限），但要等新的就緒之後才關。 */
-  function rebuildAudio(){
-    rebuildingAudio = true;
-    lastCtxTime = -1;
-    var old = audioCtx;
-    audioCtx = null;                       // 讓 ensureAudio() 建一個新的
-    var b = document.getElementById('loadingBanner');
-    if(b){ b.textContent = '🎹 正在重新連接音訊…'; b.style.display = ''; }
-    try{ if(typeof loadPiano === 'function') loadPiano(); }catch(e){}
-    setTimeout(function(){
-      try{ if(old && old.close) old.close(); }catch(e){}
-      rebuildingAudio = false;
-    }, 3000);
-  }
-
-  /* 自我修復：iOS 只有在「使用者手勢」裡才一定允許喚醒音訊，
-     所以每次點擊都順手檢查一次。這也讓使用者多按幾下就能救回來。 */
+  /* iOS 只有在「使用者手勢」裡才一定允許喚醒音訊，所以每次點擊都順手叫一次。
+     真正的保證在 audioReady()，這裡只是讓它早一點開始恢復。 */
   document.addEventListener('pointerdown', function(){
     try{ ensureAudio(); }catch(e){}
-    if(rebuildingAudio) return;
-    if(audioLooksDead()){ rebuildAudio(); return; }
-    if(!pianoInst && typeof loadPiano === 'function'){
-      rebuildingAudio = true;
-      try{ loadPiano(); }catch(e){}
-      setTimeout(function(){ rebuildingAudio = false; }, 3000);
-    }
   }, true);
 
   document.addEventListener('visibilitychange', function(){
@@ -2256,9 +2235,9 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       this._examReady = refreshPlayBtn;
       refreshPlayBtn();
 
-      pb.onclick = function(){
-        ensureAudio();
+      pb.onclick = function examPlay(){
         if(!pianoInst || self.isPlaying || self._examTuning || used >= maxPlays) return;
+        if(!audioReady(examPlay)) return;
         const firstTime = (used === 0);
         used++;
         const ss = EXm.loadSession();
@@ -2293,6 +2272,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     // 播放正確版一次（考試用；不動播放次數，結束後回呼）
     playCorrectOnce(onEnd){
       if(!pianoInst) return;
+      const __self = this;
+      if(!audioReady(function(){ __self.playCorrectOnce(onEnd); })) return;
       const ctx = ensureAudio();
       let time = ctx.currentTime + 0.1;
       const secPerUnit = 60 / this.bpm;
@@ -2388,6 +2369,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     // 解答頁與錯題本用：依該題自身的速度與拍號播放（不動作答狀態、不佔次數）
     playStatic(item, useScore){
       if(!pianoInst) return;
+      const __self = this;
+      if(!audioReady(function(){ __self.playStatic(item, useScore); })) return;
       window.peStopAll();
       const ctx = ensureAudio();
       let time = ctx.currentTime + 0.1;
@@ -2436,6 +2419,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     play(){
       if(!pianoInst || this.isPlaying) return;
       if(this.replaysLeft <= 0) return;
+      const __self = this;
+      if(!audioReady(function(){ __self.play(); })) return;
       window.peStopAll();
       if(this.maxReplays !== Infinity) this.replaysLeft--;
 
@@ -2482,6 +2467,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
     playTuning(){
       if(!pianoInst) return;
+      const __self = this;
+      if(!audioReady(function(){ __self.playTuning(); })) return;
       const ctx = ensureAudio();
       pianoInst.play(69, ctx.currentTime + 0.05, { duration: 2.0, gain: 3.5 });
     }
