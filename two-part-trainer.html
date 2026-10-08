@@ -1195,59 +1195,124 @@ function showPage(pageId) {
   };
   function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state!=='running') audioCtx.resume(); }catch(e){} return audioCtx; }
   /* ⚠ iOS 把 App 切到背景時會把 AudioContext 停掉，切回來必須 resume()。
-     但 resume() 是非同步的——它回傳 Promise，要過幾十毫秒才真的恢復。
-     在那之前排出去的音符，iOS 會直接丟掉，而且完全不報錯：
-     按鈕有反應、變灰、顯示「播放中」，就是沒有聲音。
-     （v.97 的診斷日誌裡「排程測試音（state=suspended）」出現在「resume 成功」
-       前面，就是這個順序顛倒造成的。）
+     但 resume() 是非同步的，而且被別的 App 搶走音訊之後可能要好幾秒才真的恢復。
 
-     所以每一個排程函式的開頭都要先過 audioReady()：
+     ⚠ 排給停住的 context 的音符不會被丟掉，而是被「凍住」——時間戳停在那裡，
+       context 一恢復就全部一起湧出來（實測聽起來像迴音）。所以有兩件事要做：
+         ① 切出去的那一刻就把殘留的排程取消掉（下面的 hidden／pagehide）
+         ② 還沒醒就不要排程（audioReady 閘門）
+
+     audioReady 的用法：每個排程函式開頭先過它
        已經 running → 回傳 true，照常排程
-       還沒 running → 回傳 false（呼叫者立刻 return），等真的 running 再把它叫回來
-     ⚠ 音符的時間是在 retry 裡才算的，所以不會有「排程時間已經過期」的問題；
-       這也是為什麼閘門要放在函式開頭、而不是包住整批呼叫。
-     ⚠ 閘門要放在「會改狀態」的那幾行之前（isPlaying、replaysLeft、played…），
-       否則 retry 會被自己剛設下的旗標擋掉。 */
-  var AUDIO_WAIT_MS = 1500;     // 等不到就放棄，讓使用者再按一次（不要無限等）
-  var audioWaiting = false;     // 同時只留一條輪詢，避免連點疊出一堆
+       還沒 running → 回傳 false（呼叫者立刻 return），把這次的請求「留著」，
+                      等 context 真的醒了再把它叫回來
+     ⚠ 音符的時間是在 retry 裡才算的，所以不會有排程時間過期的問題；
+       這也是為什麼閘門要放在函式開頭、不是包住整批呼叫。
+     ⚠ 閘門要放在會改狀態的那幾行之前（isPlaying、replaysLeft、played…），
+       否則 retry 會被自己剛設下的旗標擋掉。
+     ⚠ 等待中要顯示秒數。iOS 恢復要多久沒有文件可查，這個數字就是現場量測。 */
+  var AUDIO_WAIT_MS = 10000;
+  var audioPending = null;        // { retry, t0, tick }
+
+  /* 等待提示：用獨立的浮動元素，不去動各頁自己的播放說明文字 */
+  function audioToast(msg){
+    var el = document.getElementById('audioWakeToast');
+    if(!msg){ if(el) el.style.display = 'none'; return; }
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'audioWakeToast';
+      el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:2000;'
+        + 'background:rgba(38,36,32,0.92);color:#fff;font-size:13.5px;line-height:1.4;'
+        + 'padding:9px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,0.3);'
+        + 'pointer-events:none;white-space:nowrap;';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.display = '';
+  }
+
+  function cancelAudioWait(){
+    if(!audioPending) return;
+    try{ clearInterval(audioPending.tick); }catch(e){}
+    audioPending = null;
+    audioToast(null);
+  }
+
+  /* context 醒了：把留著的那次播放叫回來 */
+  function fireAudioPending(){
+    if(!audioPending) return;
+    var fn = audioPending.retry;
+    cancelAudioWait();
+    if(typeof fn === 'function'){ try{ fn(); }catch(e){} }
+  }
 
   function audioReady(retry){
     var ctx;
-    try{ ctx = ensureAudio(); }catch(e){ return true; }   // 連建都失敗，就讓它照原本的路走
+    try{ ctx = ensureAudio(); }catch(e){ return true; }   // 連建都失敗就照原本的路走
     if(!ctx) return true;
-    if(ctx.state === 'running') return true;
-    if(audioWaiting) return false;
-    audioWaiting = true;
-    var t0 = Date.now();
-    (function poll(){
-      if(!audioCtx){ audioWaiting = false; return; }
-      if(audioCtx.state === 'running'){
-        audioWaiting = false;
-        if(typeof retry === 'function'){ try{ retry(); }catch(e){} }
-        return;
-      }
-      if(Date.now() - t0 > AUDIO_WAIT_MS){ audioWaiting = false; return; }
-      try{ audioCtx.resume(); }catch(e){}
-      setTimeout(poll, 50);
-    })();
+    if(ctx.state === 'running'){ cancelAudioWait(); return true; }
+
+    if(audioPending){
+      /* 又按了一次：換成最新的請求並重新計時。
+         iOS 不一定只靠時間恢復，很多情況要在「使用者手勢」裡 resume 才算，
+         所以每一次點擊都要重新給它機會，不能只靠背景輪詢。 */
+      audioPending.retry = retry;
+      audioPending.t0 = Date.now();
+    } else {
+      audioPending = { retry: retry, t0: Date.now(), tick: 0 };
+      audioPending.tick = setInterval(function(){
+        if(!audioPending) return;
+        if(!audioCtx){ cancelAudioWait(); return; }
+        if(audioCtx.state === 'running'){ fireAudioPending(); return; }
+        var ms = Date.now() - audioPending.t0;
+        if(ms > AUDIO_WAIT_MS){
+          cancelAudioWait();
+          audioToast('🔊 請再點一下播放');
+          setTimeout(function(){ audioToast(null); }, 3000);
+          return;
+        }
+        audioToast('🔊 音訊恢復中… ' + (ms / 1000).toFixed(1) + ' 秒');
+        try{ audioCtx.resume(); }catch(e){}
+      }, 100);
+      /* 醒的那一刻就知道，不用等下一次輪詢 */
+      try{ ctx.addEventListener('statechange', function(){
+        if(audioCtx && audioCtx.state === 'running') fireAudioPending();
+      }); }catch(e){}
+    }
+    try{ ctx.resume(); }catch(e){}            // 這一次在使用者手勢裡，最有機會成功
+    audioToast('🔊 音訊恢復中… 0.0 秒');
     return false;
   }
 
-  /* 切回前景：把停掉的 context 喚醒，並清掉被凍結的計時器留下的「播放中」旗標。 */
+  /* 使用者按停止／切頁／交卷 → 他已經放棄了，不要十秒後突然響起來。
+     ⚠ 包在各頁原本的停止函式外面，所以所有既有的呼叫點都自動生效。 */
+  (function(){
+    var orig = window.tpStopAll;
+    if(typeof orig === 'function'){
+      window.tpStopAll = function(){ cancelAudioWait(); return orig.apply(this, arguments); };
+    }
+  })();
+
   function wakeAudioOnReturn(){
     try{ if(typeof window.tpStopAll === 'function') window.tpStopAll(); }catch(e){}
     try{ if(audioCtx && audioCtx.state !== 'running') audioCtx.resume(); }catch(e){}
   }
+  /* 切出去：趁 context 還活著，把還沒發聲的音符節點取消掉。
+     ⚠ 這一步不做的話，它們會被凍在排程裡，等 context 恢復時一起湧出來。 */
+  function sleepAudioOnLeave(){
+    cancelAudioWait();
+    try{ if(typeof window.tpStopAll === 'function') window.tpStopAll(); }catch(e){}
+  }
 
-  /* iOS 只有在「使用者手勢」裡才一定允許喚醒音訊，所以每次點擊都順手叫一次。
-     真正的保證在 audioReady()，這裡只是讓它早一點開始恢復。 */
+  /* iOS 只有在使用者手勢裡才一定允許喚醒音訊，所以每次點擊都順手叫一次。 */
   document.addEventListener('pointerdown', function(){
     try{ ensureAudio(); }catch(e){}
   }, true);
 
   document.addEventListener('visibilitychange', function(){
-    if(!document.hidden) wakeAudioOnReturn();
+    if(document.hidden) sleepAudioOnLeave(); else wakeAudioOnReturn();
   });
+  window.addEventListener('pagehide', sleepAudioOnLeave);
   window.addEventListener('pageshow', wakeAudioOnReturn);
   /* 載入音色時的畫面提示。Salamander 要在瀏覽器解碼 30 個取樣，過程中顯示進度；
      萬一載入失敗，引擎會自動退回原本的音色，不讓使用者卡住。 */
