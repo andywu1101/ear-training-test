@@ -191,6 +191,19 @@
     });
   }
 
+  /* 把已載入的音色改接到另一個 AudioContext（v.97.6）
+     iOS 把 App 切到背景再回來時，舊的 context 可能「說自己在跑、其實已經斷線」，
+     這時頁面會換一個在使用者手勢裡新建的 context。
+     AudioBuffer 不屬於任何 context（規格明定可以跨 context 使用），
+     所以 Salamander 已解碼的取樣直接沿用，不必重新解碼，幾乎不用等。
+     ⚠ soundfont-player 的音色在內部綁死原本的 context，搬不過去 → 回傳 false，由頁面重新載入。 */
+  function rebind(inst, ctx) {
+    if (!inst || !ctx || !(inst instanceof SalamanderPiano)) return false;
+    try { inst.stop(); } catch (e) {}     // 舊 context 上凍住的音符一併取消
+    inst.ctx = ctx;
+    return true;
+  }
+
   /* 對外介面：回傳的物件與 soundfont-player 的 instrument 相容。
      載入 Salamander 失敗時自動退回原本的音色，不讓使用者卡住。 */
 
@@ -341,6 +354,7 @@
 
   global.PianoEngine = {
     load: load,
+    rebind: rebind,
     renderOffline: renderOffline,
     currentKit: currentKit,
     setKit: setKit,

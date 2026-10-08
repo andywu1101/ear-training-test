@@ -890,29 +890,35 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     }catch(e){}
     return audioCtx;
   }
-  /* ⚠ iOS 把 App 切到背景時會把 AudioContext 停掉，切回來必須 resume()。
-     但 resume() 是非同步的，而且被別的 App 搶走音訊之後可能要好幾秒才真的恢復。
+  /* ⚠ iOS 切到背景再回來之後的音訊問題（v.97.6，實測確認）
+     iOS 切到背景一段時間後，AudioContext 會「state 說 running、其實已經斷線」：
+       • 只看 state 完全偵測不到——閘門放行、按鈕變灰、就是沒聲音
+       • 它的時間是停住的，排進去的音符不會消失，而是被凍住，
+         等 session 之後恢復，就全部一起湧出來（聽起來像迴音）
+     所以不能信 state，要實測 currentTime 有沒有前進。
 
-     ⚠ 排給停住的 context 的音符不會被丟掉，而是被「凍住」——時間戳停在那裡，
-       context 一恢復就全部一起湧出來（實測聽起來像迴音）。所以有兩件事要做：
-         ① 切出去的那一刻就把殘留的排程取消掉（下面的 hidden／pagehide）
-         ② 還沒醒就不要排程（audioReady 閘門）
-
-     audioReady 的用法：每個排程函式開頭先過它
-       已經 running → 回傳 true，照常排程
-       還沒 running → 回傳 false（呼叫者立刻 return），把這次的請求「留著」，
-                      等 context 真的醒了再把它叫回來
-     ⚠ 音符的時間是在 retry 裡才算的，所以不會有排程時間過期的問題；
-       這也是為什麼閘門要放在函式開頭、不是包住整批呼叫。
+     做法（切出去又回來之後的第一次播放才做，平常不會多等）：
+       ① 在使用者這次點擊的手勢裡，同步建一個備用的新 context
+          （iOS 只在手勢裡才保證新 context 會出聲，所以一定要在這一刻建，不能等檢查完才建）
+       ② 等 PROBE_MS，看舊的、新的兩個 context 時間有沒有前進
+       ③ 剛從背景回來 → 優先換到新的；Salamander 音色直接沿用已解碼的取樣（PianoEngine.rebind）
+          沒有從背景回來、只是單純暫停 → 舊的有在走就繼續用舊的
+          soundfont 音色搬不過去 → 換到新的之後重新載入音色
+       ④ 都不動 → 提示再點一次
+     ⚠ 舊 context 等新的確定在跑之後才關閉；關閉時凍住的音符一起消失。
      ⚠ 閘門要放在會改狀態的那幾行之前（isPlaying、replaysLeft、played…），
-       否則 retry 會被自己剛設下的旗標擋掉。
-     ⚠ 等待中要顯示秒數。iOS 恢復要多久沒有文件可查，這個數字就是現場量測。 */
+       否則 retry 會被自己剛設下的旗標擋掉。音符的時間是在 retry 裡才算的。 */
   var AUDIO_WAIT_MS = 10000;
-  var audioPending = null;        // { retry, t0, tick }
+  var PROBE_MS = 200;
+  var audioPending = null;        // { retry, timer }
+  var audioWasHidden = false;     // 切出去過
+  var audioSuspect = false;       // 回來之後，下一次播放前要實測
 
-  /* 等待提示：用獨立的浮動元素，不去動各頁自己的播放說明文字 */
-  function audioToast(msg){
+  /* 提示：用獨立的浮動元素，不去動各頁自己的播放說明文字 */
+  var audioToastTimer = 0;
+  function audioToast(msg, autoHideMs){
     var el = document.getElementById('audioWakeToast');
+    clearTimeout(audioToastTimer);
     if(!msg){ if(el) el.style.display = 'none'; return; }
     if(!el){
       el = document.createElement('div');
@@ -925,62 +931,109 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     }
     el.textContent = msg;
     el.style.display = '';
+    if(autoHideMs) audioToastTimer = setTimeout(function(){ audioToast(null); }, autoHideMs);
   }
 
+  function closeAudioCtx(c){
+    try{ if(c && c.close && c.state !== 'closed') c.close(); }catch(e){}
+  }
   function cancelAudioWait(){
     if(!audioPending) return;
-    try{ clearInterval(audioPending.tick); }catch(e){}
+    clearTimeout(audioPending.timer);
+    if(audioPending.spare && audioPending.spare !== audioCtx) closeAudioCtx(audioPending.spare);
     audioPending = null;
     audioToast(null);
   }
-
-  /* context 醒了：把留著的那次播放叫回來 */
   function fireAudioPending(){
     if(!audioPending) return;
     var fn = audioPending.retry;
-    cancelAudioWait();
+    clearTimeout(audioPending.timer);
+    audioPending = null;
     if(typeof fn === 'function'){ try{ fn(); }catch(e){} }
+  }
+  /* 換到新的 context：舊的稍後再關（新的已確定在跑） */
+  function switchAudioCtx(next){
+    var old = audioCtx;
+    audioCtx = next;
+    if(old && old !== next) setTimeout(function(){ closeAudioCtx(old); }, 1500);
+  }
+  /* soundfont 音色：只能在新的 context 上重新載入，等音色換好才播 */
+  function reloadThenFire(p){
+    var before = pianoInst, t0 = Date.now();
+    audioToast('🎹 重新載入音色…');
+    try{ if(typeof loadPiano === 'function') loadPiano(); }catch(e){}
+    (function wait(){
+      if(audioPending !== p) return;
+      if(pianoInst && pianoInst !== before){ audioToast(null); fireAudioPending(); return; }
+      if(Date.now() - t0 > AUDIO_WAIT_MS){
+        audioPending = null;
+        audioToast('⚠️ 音色載入失敗，請重新開啟 App', 4000);
+        return;
+      }
+      p.timer = setTimeout(wait, 100);
+    })();
   }
 
   function audioReady(retry){
-    var ctx;
-    try{ ctx = ensureAudio(); }catch(e){ return true; }   // 連建都失敗就照原本的路走
-    if(!ctx) return true;
-    if(ctx.state === 'running'){ cancelAudioWait(); return true; }
+    /* 正在檢查或重新載入中：換成最新的這次請求，等結果出來再播 */
+    if(audioPending){ audioPending.retry = retry; return false; }
 
-    if(audioPending){
-      /* 又按了一次：換成最新的請求並重新計時。
-         iOS 不一定只靠時間恢復，很多情況要在「使用者手勢」裡 resume 才算，
-         所以每一次點擊都要重新給它機會，不能只靠背景輪詢。 */
-      audioPending.retry = retry;
-      audioPending.t0 = Date.now();
-    } else {
-      audioPending = { retry: retry, t0: Date.now(), tick: 0 };
-      audioPending.tick = setInterval(function(){
-        if(!audioPending) return;
-        if(!audioCtx){ cancelAudioWait(); return; }
-        if(audioCtx.state === 'running'){ fireAudioPending(); return; }
-        var ms = Date.now() - audioPending.t0;
-        if(ms > AUDIO_WAIT_MS){
-          cancelAudioWait();
-          audioToast('🔊 請再點一下播放');
-          setTimeout(function(){ audioToast(null); }, 3000);
-          return;
-        }
-        audioToast('🔊 音訊恢復中… ' + (ms / 1000).toFixed(1) + ' 秒');
-        try{ audioCtx.resume(); }catch(e){}
-      }, 100);
-      /* 醒的那一刻就知道，不用等下一次輪詢 */
-      try{ ctx.addEventListener('statechange', function(){
-        if(audioCtx && audioCtx.state === 'running') fireAudioPending();
-      }); }catch(e){}
-    }
-    try{ ctx.resume(); }catch(e){}            // 這一次在使用者手勢裡，最有機會成功
-    audioToast('🔊 音訊恢復中… 0.0 秒');
+    var old;
+    try{ old = ensureAudio(); }catch(e){ return true; }   // 連建都失敗就照原本的路走
+    if(!old) return true;
+    if(old.state === 'running' && !audioSuspect) return true;   // 平常走這裡，不多等
+
+    /* ---- 以下在使用者手勢裡同步執行 ---- */
+    var wasSuspect = audioSuspect;
+    audioSuspect = false;
+    try{ if(old.state !== 'running') old.resume(); }catch(e){}
+    var spare = null;
+    try{
+      spare = new (window.AudioContext || window.webkitAudioContext)();
+      if(spare.state !== 'running') spare.resume();
+    }catch(e){ spare = null; }
+
+    var p = audioPending = { retry: retry, timer: 0, spare: spare };
+    var o0 = old.currentTime, s0 = spare ? spare.currentTime : 0;
+    var MIN_ADV = PROBE_MS / 1000 / 4;      // 至少要走到預期的四分之一，才算真的在跑
+    audioToast('🔊 檢查音訊…');
+
+    p.timer = setTimeout(function(){
+      if(audioPending !== p) return;        // 等待中被取消（按停止／切頁），cancelAudioWait 已處理
+      var oldAlive   = old.state === 'running' && (old.currentTime - o0) >= MIN_ADV;
+      var spareAlive = !!spare && spare.state === 'running' && (spare.currentTime - s0) >= MIN_ADV;
+      var canRebind  = function(){
+        return spareAlive && window.PianoEngine && window.PianoEngine.rebind && pianoInst && window.PianoEngine.rebind(pianoInst, spare);
+      };
+
+      if(wasSuspect && canRebind()){
+        switchAudioCtx(spare);
+        audioToast('🔊 已重新連接音訊', 1200);
+        fireAudioPending(); return;
+      }
+      if(oldAlive){
+        closeAudioCtx(spare); p.spare = null;
+        audioToast(null);
+        fireAudioPending(); return;
+      }
+      if(canRebind()){
+        switchAudioCtx(spare);
+        audioToast('🔊 已重新連接音訊', 1200);
+        fireAudioPending(); return;
+      }
+      if(spareAlive){
+        switchAudioCtx(spare); p.spare = null;
+        reloadThenFire(p); return;
+      }
+      closeAudioCtx(spare); p.spare = null;
+      audioPending = null;
+      audioSuspect = true;                  // 下一次點擊再完整試一次
+      audioToast('🔊 請再點一下播放', 3000);
+    }, PROBE_MS);
     return false;
   }
 
-  /* 使用者按停止／切頁／交卷 → 他已經放棄了，不要十秒後突然響起來。
+  /* 使用者按停止／切頁／交卷 → 他已經放棄了，不要等一下突然響起來。
      ⚠ 包在各頁原本的停止函式外面，所以所有既有的呼叫點都自動生效。 */
   (function(){
     var orig = window.psStopAll;
@@ -989,18 +1042,20 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     }
   })();
 
-  function wakeAudioOnReturn(){
-    try{ if(typeof window.psStopAll === 'function') window.psStopAll(); }catch(e){}
-    try{ if(audioCtx && audioCtx.state !== 'running') audioCtx.resume(); }catch(e){}
-  }
-  /* 切出去：趁 context 還活著，把還沒發聲的音符節點取消掉。
-     ⚠ 這一步不做的話，它們會被凍在排程裡，等 context 恢復時一起湧出來。 */
+  /* 切出去：趁 context 還活著，把還沒發聲的音符節點取消掉 */
   function sleepAudioOnLeave(){
+    audioWasHidden = true;
     cancelAudioWait();
     try{ if(typeof window.psStopAll === 'function') window.psStopAll(); }catch(e){}
   }
+  /* 回來：清掉被凍結的計時器留下的「播放中」旗標，並標記下一次播放要實測 */
+  function wakeAudioOnReturn(){
+    if(audioWasHidden){ audioSuspect = true; audioWasHidden = false; }
+    try{ if(typeof window.psStopAll === 'function') window.psStopAll(); }catch(e){}
+    try{ if(audioCtx && audioCtx.state !== 'running') audioCtx.resume(); }catch(e){}
+  }
 
-  /* iOS 只有在使用者手勢裡才一定允許喚醒音訊，所以每次點擊都順手叫一次。 */
+  /* iOS 只有在使用者手勢裡才一定允許喚醒音訊，所以每次點擊都順手叫一次 */
   document.addEventListener('pointerdown', function(){
     try{ ensureAudio(); }catch(e){}
   }, true);
