@@ -616,7 +616,20 @@ window.addEventListener('resize', setVH); setVH();
     if(pianoInst) pianoInst.stop(); 
     clearTimers(); fptModule.isPlaying = false; fptModule.updatePlayBtns(); 
   };
-  function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume(); }catch(e){} return audioCtx; }
+  function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state!=='running') audioCtx.resume(); }catch(e){} return audioCtx; }
+  /* ⚠ iOS 切到背景時，AudioContext 的狀態會變成 'interrupted'（WebKit 自己加的，
+     不在 Web Audio 標準裡），而不是 'suspended'。只檢查 suspended 的話，
+     切回前景時不會嘗試喚醒，聲音就永遠發不出來——所以上面改成「只要不是 running 就喚醒」。
+     這裡再補一道：回到前景時主動喚醒一次，使用者不必先按一下播放。
+     萬一 iOS 不允許（有些版本要求由使用者動作觸發），下次呼叫 ensureAudio() 會再試，
+     不會比原本更糟。音色實例綁在這個 context 上，所以一律喚醒、不重建。 */
+  function wakeAudioOnReturn(){
+    try{ if(audioCtx && audioCtx.state !== 'running') audioCtx.resume(); }catch(e){}
+  }
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) wakeAudioOnReturn();
+  });
+  window.addEventListener('pageshow', wakeAudioOnReturn);
   /* 載入音色時的畫面提示。Salamander 要在瀏覽器解碼 30 個取樣，過程中顯示進度；
      萬一載入失敗，引擎會自動退回原本的音色，不讓使用者卡住。 */
   var PIANO_UI = {
