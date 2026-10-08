@@ -973,7 +973,11 @@ function showPage(pageId) {
           if (id !== 'placeholder') {
             const block = ALL_BLOCKS[id];
             let isWrong = wrongBeats ? !!wrongBeats[globalIdx] : false;
-            const tiedIn = globalIdx > barStartIdx && !!tieArr[globalIdx - 1]
+            /* ⚠ 不可以加「要在同一小節」的條件（原本是 globalIdx > barStartIdx）。
+               雙音模式的音高是繪圖時用 A／E 交替算出來的，連結線連進來時要沿用前一個音高；
+               限定同一小節的話，跨小節的連結線在新小節第一拍就會照常交替，
+               兩端變成不同音高（E⌒A），而播放端是跨小節合併成一個音的，兩邊就對不起來。 */
+            const tiedIn = globalIdx > 0 && !!tieArr[globalIdx - 1]
                            && seq[globalIdx - 1] && seq[globalIdx - 1] !== 'placeholder';
             const { notes, ties, beams, tuplet } = getVexNotes(block, isWrong, pitchState, tiedIn);
             allNotes.push(...notes); allBeams.push(...beams); allTies.push(...ties);
