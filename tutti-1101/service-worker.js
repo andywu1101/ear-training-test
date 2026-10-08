@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v97-8'; // v.97：難度內容顯示、譜例導出版面、iOS 音訊修正
+const CACHE_NAME = 'ear-training-shell-v97-9'; // v.97：難度內容顯示、譜例導出版面、iOS 音訊修正
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

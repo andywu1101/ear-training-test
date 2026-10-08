@@ -1201,6 +1201,22 @@ function showPage(pageId) {
     return (c.state === 'running' && adv >= AUDIO_MIN_ADV) ? '✓' : (c.state === 'running' ? '✕' : c.state);
   }
 
+  /* ⚠ v.97.9：備用 context 要用跟舊的「不同」的取樣率。
+     Safari 會讓同一頁裡取樣率相同的 AudioContext 共用同一個底層發聲裝置；
+     切到背景時 iOS 停掉這個裝置，回來後沒有重新啟動。
+     實測（v.97.8）：媒體元素已經在播（動態島有顯示），但新舊 context 時間都不動——
+     新建的 context 接到同一個卡住的裝置上了。
+     換一個取樣率就會拿到全新的裝置。舊的 context 換過去後會被關閉，
+     卡住的裝置跟著釋放，下一次再換回另一個取樣率，兩個輪流用。
+     鋼琴取樣不必重新解碼：AudioBufferSourceNode 會自動轉換取樣率，音高不受影響。 */
+  function makeSpareCtx(old){
+    var C = window.AudioContext || window.webkitAudioContext;
+    var want = (old && Math.round(old.sampleRate) === 44100) ? 48000 : 44100;
+    try{ return new C({ sampleRate: want }); }catch(e){}
+    return new C();                         // 不支援指定取樣率的舊版：退回原本的做法
+  }
+  function rateTag(c){ return (c && c.sampleRate) ? ' ' + Math.round(c.sampleRate / 1000) + 'k' : ''; }
+
   function audioReady(retry){
     /* 正在檢查或重新載入中：換成最新的這次請求，等結果出來再播 */
     if(audioPending){ audioPending.retry = retry; return false; }
@@ -1221,7 +1237,7 @@ function showPage(pageId) {
     var spare = null;
     if(needSpare){
       try{
-        spare = new (window.AudioContext || window.webkitAudioContext)();
+        spare = makeSpareCtx(old);
         if(spare.state !== 'running') spare.resume();
         mediaClaim(spare);
       }catch(e){ spare = null; }
@@ -1261,14 +1277,14 @@ function showPage(pageId) {
       }
       if(ms >= AUDIO_PROBE_MAX){
         /* 停在這裡的畫面就是現場量測：回報時看最後一行即可 */
-        var info = '舊 ' + stateMark(old, o0) + '｜新 ' + stateMark(spare, s0);
+        var info = '舊 ' + stateMark(old, o0) + rateTag(old) + '｜新 ' + stateMark(spare, s0) + rateTag(spare);
         closeAudioCtx(spare); p.spare = null;
         audioPending = null;
         audioSuspect = true;                // 下一次點擊再完整試一次
         audioToast('🔊 請再點一下播放（' + info + '）', 5000);
         return;
       }
-      if(needSpare) audioToast('🔊 檢查音訊… ' + (ms / 1000).toFixed(1) + ' 秒｜舊 ' + stateMark(old, o0) + '｜新 ' + stateMark(spare, s0));
+      if(needSpare) audioToast('🔊 檢查音訊… ' + (ms / 1000).toFixed(1) + ' 秒｜舊 ' + stateMark(old, o0) + rateTag(old) + '｜新 ' + stateMark(spare, s0) + rateTag(spare));
       try{ if(old.state !== 'running') old.resume(); }catch(e){}
       try{ if(spare && spare.state !== 'running') spare.resume(); }catch(e){}
       p.timer = setTimeout(check, AUDIO_PROBE_STEP);
