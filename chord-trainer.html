@@ -708,11 +708,33 @@ function updateStaffHeader(pageId){
   /* ⚠ iOS 切到背景時，AudioContext 的狀態會變成 'interrupted'（WebKit 自己加的，
      不在 Web Audio 標準裡），而不是 'suspended'。只檢查 suspended 的話，
      切回前景時不會嘗試喚醒，聲音就永遠發不出來——所以上面改成「只要不是 running 就喚醒」。
-     這裡再補一道：回到前景時主動喚醒一次，使用者不必先按一下播放。
-     萬一 iOS 不允許（有些版本要求由使用者動作觸發），下次呼叫 ensureAudio() 會再試，
-     不會比原本更糟。音色實例綁在這個 context 上，所以一律喚醒、不重建。 */
+
+     但光喚醒還不夠：如果切出去期間有別的 App 播過聲音，音訊 session 會被整個接管拆掉，
+     這時 resume() 會失敗，而且是「靜默失敗」——它回傳的是 Promise，被拒絕時不會進 catch，
+     程式還以為處理好了。所以這裡要等它的結果、再確認一次狀態，真的救不回來才重建。 */
+  var rebuildingAudio = false;
   function wakeAudioOnReturn(){
-    try{ if(audioCtx && audioCtx.state !== 'running') audioCtx.resume(); }catch(e){}
+    if(!audioCtx || audioCtx.state === 'running' || rebuildingAudio) return;
+    var p = null;
+    try{ p = audioCtx.resume(); }catch(e){}
+    Promise.resolve(p).catch(function(){}).then(function(){
+      if(!audioCtx || audioCtx.state === 'running' || rebuildingAudio) return;
+      rebuildAudio();
+    });
+  }
+  /* 最後手段：關掉壞掉的音訊環境、建一個新的、重新載入音色。
+     ⚠ 一定要先 close() 舊的——iOS 同時能存在的 AudioContext 數量有限，
+       每切換一次背景就留一個下來，很快就會建不出新的。
+     ⚠ 音色不沿用舊的已解碼取樣：AudioBuffer 理論上可以跨 context，
+       但舊 context 關掉之後是否仍然有效沒有把握，寧可重新解碼（慢幾秒）也不要靜默無聲。 */
+  function rebuildAudio(){
+    rebuildingAudio = true;
+    try{ if(audioCtx) audioCtx.close(); }catch(e){}
+    audioCtx = null; pianoInst = null;
+    var b = document.getElementById('loadingBanner');
+    if(b){ b.textContent = '🎹 正在重新連接音訊…'; b.style.display = ''; }
+    try{ if(typeof loadPiano === 'function') loadPiano(); }catch(e){}
+    setTimeout(function(){ rebuildingAudio = false; }, 1500);
   }
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden) wakeAudioOnReturn();
