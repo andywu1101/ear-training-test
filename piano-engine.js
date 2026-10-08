@@ -106,7 +106,8 @@
     g.gain.setValueAtTime(base, t + dur);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + RELEASE);
 
-    out.connect(g); g.connect(ctx.destination);
+    out.connect(g); g.connect(outputFor(ctx));
+    markBusy(ctx, t + dur + RELEASE);
     node.start(t); node.stop(t + dur + RELEASE + 0.02);
 
     var self = this;
@@ -185,10 +186,158 @@
 
   function buildMusyng(ctx) {
     return Soundfont.instrument(ctx, 'acoustic_grand_piano', {
+      destination: outputFor(ctx),
       nameToUrl: function () { return MUSYNG.file; }
     }).catch(function () {
-      return Soundfont.instrument(ctx, 'acoustic_grand_piano');   // 本機檔失敗就退回 CDN
+      return Soundfont.instrument(ctx, 'acoustic_grand_piano', { destination: outputFor(ctx) });   // 本機檔失敗就退回 CDN
     });
+  }
+
+  /* ===== 媒體元素輸出（v.97.8，先在節奏頁試行）=====
+     iOS 對「只走 Web Audio」的頁面，不當作正規的媒體播放：
+       • 動態島的 App 圖示時有時無
+       • 切到背景被收回聲音後，Web Audio 自己要不回來（實測新舊 context 時間都不動）
+     正規做法是讓聲音經由真正的媒體元素播出（跟網頁上的影片、Podcast 一樣），
+     並用 MediaSession 告訴 iOS 是誰在播。回來後在使用者點擊裡讓媒體元素 play()，
+     是 iOS 承認的「要回聲音」的方式。
+
+     架構：每個即時 context 一條總線（GainNode），所有聲音都接到總線。
+           總線「只會」接到其中一個出口，絕不同時接兩個（否則會聽到兩層聲音）：
+             direct ── ctx.destination（跟原本一樣）
+             media  ── MediaStreamDestination → <audio> 元素
+           一開始是 direct；媒體元素在使用者點擊裡真的播起來之後，才切到 media。
+           媒體元素被拒絕播放或不支援 → 留在 direct，等於原本的行為，不會變成沒聲音。
+     ⚠ 只用在即時 context。導出用的 OfflineAudioContext 沒有 createMediaStreamDestination，
+       一律直接接 destination，導出結果不受影響。
+     ⚠ 頁面沒有呼叫 enableMediaOutput() 的話，這整段都不會啟動，行為與原本完全相同。 */
+  var MEDIA_IDLE_SEC = 5;         // 最後一個音結束後多久暫停媒體元素（不要一直佔著「播放中」）
+  var MEDIA_CLAIM_TIMEOUT = 1500; // 媒體元素多久沒播起來就當作失敗
+  var MEDIA_MAX_FAILS = 2;        // 連續失敗幾次就整個停用，退回原本的做法
+  var mediaOut = { enabled: false, meta: null, fails: 0 };
+
+  function isRealtime(ctx) {
+    return !!(ctx && typeof ctx.createMediaStreamDestination === 'function');
+  }
+  function enableMediaOutput(meta) {
+    var C = global.AudioContext || global.webkitAudioContext;
+    mediaOut.enabled = !!(C && C.prototype && C.prototype.createMediaStreamDestination);
+    mediaOut.meta = meta || null;
+    return mediaOut.enabled;
+  }
+  /* 總線：第一次用到時建立，先接 direct */
+  function busOf(ctx) {
+    if (ctx.__mo) return ctx.__mo;
+    var mo = { bus: ctx.createGain(), dest: null, el: null, route: 'direct',
+               state: 'idle', busyUntil: 0, idleTimer: 0 };
+    try {
+      mo.dest = ctx.createMediaStreamDestination();
+      mo.el = document.createElement('audio');
+      mo.el.setAttribute('playsinline', '');
+      mo.el.srcObject = mo.dest.stream;
+      /* iOS 自己把媒體元素暫停時（例如被別的 App 搶走），出口立刻切回 direct，
+         否則之後的聲音會送進一個暫停中的元素，什麼都聽不到 */
+      mo.el.addEventListener('pause', function () {
+        if (mo.state !== 'claiming') routeTo(ctx, mo, 'direct');
+      });
+    } catch (e) { mo.dest = null; mo.el = null; }
+    mo.bus.connect(ctx.destination);
+    ctx.__mo = mo;
+    return mo;
+  }
+  function routeTo(ctx, mo, which) {
+    if (mo.route === which) return;
+    try { mo.bus.disconnect(); } catch (e) {}
+    mo.bus.connect(which === 'media' ? mo.dest : ctx.destination);
+    mo.route = which;
+  }
+  /* 所有聲音的出口 */
+  function outputFor(ctx) {
+    if (!mediaOut.enabled || !isRealtime(ctx)) return ctx.destination;
+    try { return busOf(ctx).bus; } catch (e) { return ctx.destination; }
+  }
+  function markBusy(ctx, endTime) {
+    var mo = ctx && ctx.__mo;
+    if (mo && endTime > mo.busyUntil) mo.busyUntil = endTime;
+  }
+  function setNowPlaying(state) {
+    try {
+      var ms = navigator.mediaSession;
+      if (!ms) return;
+      var meta = mediaOut.meta || {};
+      if (state === 'playing' && global.MediaMetadata) {
+        ms.metadata = new global.MediaMetadata({
+          title: meta.title || '音樂聽力練習',
+          artist: meta.artist || '音樂聽力練習',
+          artwork: [
+            { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }
+          ]
+        });
+        var stop = function () { try { if (meta.onStop) meta.onStop(); } catch (e) {} };
+        try { ms.setActionHandler('pause', stop); } catch (e) {}
+        try { ms.setActionHandler('stop', stop); } catch (e) {}
+      }
+      ms.playbackState = state;
+    } catch (e) {}
+  }
+  /* 這個 context 還需要「要回媒體播放」嗎？（頁面的播放閘門用它決定要不要先處理） */
+  function mediaNeedsClaim(ctx) {
+    if (!mediaOut.enabled || !isRealtime(ctx)) return false;
+    var mo = ctx.__mo;
+    if (!mo) return true;
+    if (!mo.el) return false;                       // 這台不支援媒體元素輸出，走 direct
+    return mo.state !== 'claiming' && (mo.route !== 'media' || mo.el.paused);
+  }
+  function mediaSettled(ctx) {
+    return !(ctx && ctx.__mo && ctx.__mo.state === 'claiming');
+  }
+  /* ⚠ 一定要在使用者點擊的「同一個呼叫堆疊」裡呼叫，iOS 才會讓媒體元素播起來 */
+  function claimMedia(ctx) {
+    if (!mediaOut.enabled || !isRealtime(ctx)) return;
+    var mo;
+    try { mo = busOf(ctx); } catch (e) { return; }
+    if (!mo.el || mo.state === 'claiming') return;
+    if (mo.route === 'media' && !mo.el.paused) return;
+    mo.state = 'claiming';
+    var done = false;
+    function ok() {
+      if (done) return; done = true;
+      mo.state = 'ready'; mediaOut.fails = 0;
+      routeTo(ctx, mo, 'media');
+      setNowPlaying('playing');
+      startIdleWatch(ctx, mo);
+    }
+    function fail() {
+      if (done) return; done = true;
+      mo.state = 'ready';
+      try { mo.el.pause(); } catch (e) {}
+      routeTo(ctx, mo, 'direct');
+      if (++mediaOut.fails >= MEDIA_MAX_FAILS) mediaOut.enabled = false;
+    }
+    var p;
+    try { p = mo.el.play(); } catch (e) { fail(); return; }
+    if (p && p.then) p.then(ok, fail); else ok();
+    setTimeout(function () { if (!done) fail(); }, MEDIA_CLAIM_TIMEOUT);
+  }
+  /* 閒置一陣子就暫停媒體元素，並把出口切回 direct（暫停中的媒體元素出不了聲音） */
+  function startIdleWatch(ctx, mo) {
+    clearInterval(mo.idleTimer);
+    mo.idleTimer = setInterval(function () {
+      if (ctx.state === 'closed' || !mo.el || mo.el.paused) { clearInterval(mo.idleTimer); return; }
+      if (ctx.currentTime > mo.busyUntil + MEDIA_IDLE_SEC) {
+        clearInterval(mo.idleTimer);
+        try { mo.el.pause(); } catch (e) {}
+        routeTo(ctx, mo, 'direct');
+        setNowPlaying('paused');
+      }
+    }, 1000);
+  }
+  /* context 不用了：停掉它的媒體元素 */
+  function releaseMedia(ctx) {
+    var mo = ctx && ctx.__mo;
+    if (!mo) return;
+    clearInterval(mo.idleTimer);
+    try { if (mo.el) { mo.el.pause(); mo.el.srcObject = null; } } catch (e) {}
   }
 
   /* 把已載入的音色改接到另一個 AudioContext（v.97.6）
@@ -221,6 +370,13 @@
     }
     var m = await buildMusyng(ctx);
     m.__kit = 'musyng';
+    /* soundfont 音色的發聲在套件內部，這裡記下每個音的結束時間，閒置判斷才準 */
+    var mPlay = m.play;
+    m.play = function (midi, when, o) {
+      var t = (when == null) ? ctx.currentTime : when;
+      markBusy(ctx, t + ((o && o.duration) || 3.3) + RELEASE);
+      return mPlay.apply(this, arguments);
+    };
     return m;
   }
 
@@ -355,6 +511,12 @@
   global.PianoEngine = {
     load: load,
     rebind: rebind,
+    enableMediaOutput: enableMediaOutput,
+    outputFor: outputFor,
+    mediaNeedsClaim: mediaNeedsClaim,
+    mediaSettled: mediaSettled,
+    claimMedia: claimMedia,
+    releaseMedia: releaseMedia,
     renderOffline: renderOffline,
     currentKit: currentKit,
     setKit: setKit,

@@ -1115,6 +1115,18 @@ function showPage(pageId) {
          最多觀察 AUDIO_PROBE_MAX 毫秒，新舊任何一個時間開始走就立刻播放
      ⚠ 閘門要放在會改狀態的那幾行之前（isPlaying、replaysLeft、played…），
        否則 retry 會被自己剛設下的旗標擋掉。音符的時間是在 retry 裡才算的。 */
+  /* v.97.8 試行：節奏頁的聲音改經由媒體元素播出，讓 iOS 把 App 當成正規的播放器
+     （動態島穩定顯示圖示、切回來能要回聲音）。原理與退回機制見 piano-engine.js。 */
+  try{
+    if(window.PianoEngine && window.PianoEngine.enableMediaOutput)
+      window.PianoEngine.enableMediaOutput({ title: '節奏聽寫', artist: '音樂聽力練習',
+        onStop: function(){ try{ window.rhyStopAll(); }catch(e){} } });
+  }catch(e){}
+  function audioOut(c){ return (window.PianoEngine && window.PianoEngine.outputFor) ? window.PianoEngine.outputFor(c) : c.destination; }
+  function mediaNeeds(c){ return !!(window.PianoEngine && window.PianoEngine.mediaNeedsClaim && window.PianoEngine.mediaNeedsClaim(c)); }
+  function mediaClaim(c){ try{ if(window.PianoEngine && window.PianoEngine.claimMedia) window.PianoEngine.claimMedia(c); }catch(e){} }
+  function mediaSettled(c){ return !(window.PianoEngine && window.PianoEngine.mediaSettled) || window.PianoEngine.mediaSettled(c); }
+
   var AUDIO_PROBE_MAX = 3000;     // 最多觀察多久（通道剛打開時硬體要暖機）
   var AUDIO_PROBE_STEP = 100;
   var AUDIO_MIN_ADV = 0.05;       // 時間至少要走 0.05 秒才算真的在跑
@@ -1144,6 +1156,7 @@ function showPage(pageId) {
   }
 
   function closeAudioCtx(c){
+    try{ if(c && window.PianoEngine && window.PianoEngine.releaseMedia) window.PianoEngine.releaseMedia(c); }catch(e){}
     try{ if(c && c.close && c.state !== 'closed') c.close(); }catch(e){}
   }
   function cancelAudioWait(){
@@ -1195,22 +1208,28 @@ function showPage(pageId) {
     var old;
     try{ old = ensureAudio(); }catch(e){ return true; }   // 連建都失敗就照原本的路走
     if(!old) return true;
-    if(old.state === 'running' && !audioSuspect) return true;   // 平常走這裡，不多等
+    if(old.state === 'running' && !audioSuspect && !mediaNeeds(old)) return true;   // 平常走這裡，不多等
 
     /* ---- 以下在使用者手勢裡同步執行 ---- */
     var wasSuspect = audioSuspect;
+    /* 只是媒體元素閒置暫停過（平常重播）→ 在手勢裡把它播回來就好，不必建備用 context、也不顯示提示 */
+    var needSpare = audioSuspect || old.state !== 'running';
     audioSuspect = false;
-    try{ if(typeof window.__audioUnlock === 'function') window.__audioUnlock(); }catch(e){}   // 重開聲音通道
+    if(needSpare){ try{ if(typeof window.__audioUnlock === 'function') window.__audioUnlock(); }catch(e){} }   // 重開聲音通道
     try{ if(old.state !== 'running') old.resume(); }catch(e){}
+    mediaClaim(old);                        // ⚠ 必須在點擊的同一個呼叫堆疊裡
     var spare = null;
-    try{
-      spare = new (window.AudioContext || window.webkitAudioContext)();
-      if(spare.state !== 'running') spare.resume();
-    }catch(e){ spare = null; }
+    if(needSpare){
+      try{
+        spare = new (window.AudioContext || window.webkitAudioContext)();
+        if(spare.state !== 'running') spare.resume();
+        mediaClaim(spare);
+      }catch(e){ spare = null; }
+    }
 
     var p = audioPending = { retry: retry, timer: 0, spare: spare };
     var o0 = old.currentTime, s0 = spare ? spare.currentTime : 0, began = Date.now();
-    audioToast('🔊 檢查音訊…');
+    if(needSpare) audioToast('🔊 檢查音訊…');
 
     function rebindTo(c){
       return !!(window.PianoEngine && window.PianoEngine.rebind && pianoInst && window.PianoEngine.rebind(pianoInst, c));
@@ -1218,8 +1237,8 @@ function showPage(pageId) {
     (function check(){
       if(audioPending !== p) return;        // 被取消了（按停止／切頁），cancelAudioWait 已處理
       var ms = Date.now() - began;
-      var oldAlive   = old.state === 'running' && (old.currentTime - o0) >= AUDIO_MIN_ADV;
-      var spareAlive = !!spare && spare.state === 'running' && (spare.currentTime - s0) >= AUDIO_MIN_ADV;
+      var oldAlive   = old.state === 'running' && (old.currentTime - o0) >= AUDIO_MIN_ADV && mediaSettled(old);
+      var spareAlive = !!spare && spare.state === 'running' && (spare.currentTime - s0) >= AUDIO_MIN_ADV && mediaSettled(spare);
 
       if(wasSuspect && spareAlive && rebindTo(spare)){
         p.spare = null; switchAudioCtx(spare);
@@ -1249,7 +1268,7 @@ function showPage(pageId) {
         audioToast('🔊 請再點一下播放（' + info + '）', 5000);
         return;
       }
-      audioToast('🔊 檢查音訊… ' + (ms / 1000).toFixed(1) + ' 秒｜舊 ' + stateMark(old, o0) + '｜新 ' + stateMark(spare, s0));
+      if(needSpare) audioToast('🔊 檢查音訊… ' + (ms / 1000).toFixed(1) + ' 秒｜舊 ' + stateMark(old, o0) + '｜新 ' + stateMark(spare, s0));
       try{ if(old.state !== 'running') old.resume(); }catch(e){}
       try{ if(spare && spare.state !== 'running') spare.resume(); }catch(e){}
       p.timer = setTimeout(check, AUDIO_PROBE_STEP);
@@ -1410,7 +1429,7 @@ function showPage(pageId) {
         let o=ctx.createOscillator(), g=ctx.createGain(); o.type='triangle';
         o.frequency.value = i===0 ? 1000 : 700;
         g.gain.setValueAtTime(0.2, time+i*secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time+i*secPerUnit+0.05);
-        o.connect(g); g.connect(ctx.destination); o.start(time+i*secPerUnit); o.stop(time+i*secPerUnit+0.05);
+        o.connect(g); g.connect(audioOut(ctx)); o.start(time+i*secPerUnit); o.stop(time+i*secPerUnit+0.05);
       }
       time += numerator * secPerUnit;
     } else {
@@ -1419,7 +1438,7 @@ function showPage(pageId) {
         let o=ctx.createOscillator(), g=ctx.createGain(); o.type='triangle';
         o.frequency.value = (i%3 === 0) ? 1000 : 700;
         g.gain.setValueAtTime(0.2, time+i*secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time+i*secPerUnit+0.05);
-        o.connect(g); g.connect(ctx.destination); o.start(time+i*secPerUnit); o.stop(time+i*secPerUnit+0.05);
+        o.connect(g); g.connect(audioOut(ctx)); o.start(time+i*secPerUnit); o.stop(time+i*secPerUnit+0.05);
       }
       time += numerator * secPerUnit;
     }
@@ -1516,7 +1535,7 @@ function showPage(pageId) {
           let o=ctx.createOscillator(), g=ctx.createGain(); o.type='triangle';
           o.frequency.value = i===0 ? 1000 : 700;
           g.gain.setValueAtTime(0.2, time+i*secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time+i*secPerUnit+0.05);
-          o.connect(g); g.connect(ctx.destination); o.start(time+i*secPerUnit); o.stop(time+i*secPerUnit+0.05);
+          o.connect(g); g.connect(audioOut(ctx)); o.start(time+i*secPerUnit); o.stop(time+i*secPerUnit+0.05);
         }
         time += numerator * secPerUnit;
       } else {
@@ -1525,7 +1544,7 @@ function showPage(pageId) {
           let o=ctx.createOscillator(), g=ctx.createGain(); o.type='triangle';
           o.frequency.value = (i%3 === 0) ? 1000 : 700;
           g.gain.setValueAtTime(0.2, time+i*secPerUnit); g.gain.exponentialRampToValueAtTime(0.01, time+i*secPerUnit+0.05);
-          o.connect(g); g.connect(ctx.destination); o.start(time+i*secPerUnit); o.stop(time+i*secPerUnit+0.05);
+          o.connect(g); g.connect(audioOut(ctx)); o.start(time+i*secPerUnit); o.stop(time+i*secPerUnit+0.05);
         }
         time += numerator * secPerUnit;
       }
