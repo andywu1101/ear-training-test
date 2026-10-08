@@ -1595,6 +1595,20 @@ if('serviceWorker' in navigator){
   }
   document.addEventListener("touchend",unlock,true);
   document.addEventListener("click",unlock,true);
+  /* ⚠ v.97.7：iOS 切到背景一段時間後會收回聲音通道，回來後必須在使用者手勢裡再開一次。
+     原本這段每次開頁只執行一次（done 旗標），回來之後就再也不會執行，
+     通道永遠打不開——連新建的 AudioContext 也一樣沒聲音。
+     所以回到前景時重新啟用，讓下一次碰觸畫面時再開一次通道。 */
+  function rearm(){
+    if(!done) return;
+    done=false;
+    document.addEventListener("touchend",unlock,true);
+    document.addEventListener("click",unlock,true);
+  }
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) rearm(); });
+  window.addEventListener("pageshow",function(e){ if(e && e.persisted) rearm(); });
+  /* 播放閘門在手勢裡會呼叫這個：不管旗標，直接再開一次 */
+  window.__audioUnlock=function(){ done=false; unlock(); };
 })();
 </script>
 
