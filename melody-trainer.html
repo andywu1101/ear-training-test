@@ -1486,7 +1486,8 @@ function showPage(pageId) {
     const made = offscreenStaff(id => renderStaticStaff(id, seq, pitchArray, null, null, item, tieAcross, null));
     try{
       if(!made.svg) throw new Error('沒有譜例');
-      await SheetExport.exportSheets([{ svg: made.svg }], '單旋律', {
+      /* centre:false（v.98）：導出專用的符頭置中是給單一和絃用的，整段旋律套用會讓符頭與符桿、符槓錯開 */
+      await SheetExport.exportSheets([{ svg: made.svg, centre: false }], '單旋律', {
         onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
       });
       btn.textContent = '✓';

@@ -210,6 +210,12 @@
      ⚠ 只用在即時 context。導出用的 OfflineAudioContext 沒有 createMediaStreamDestination，
        一律直接接 destination，導出結果不受影響。
      ⚠ 頁面沒有呼叫 enableMediaOutput() 的話，這整段都不會啟動，行為與原本完全相同。 */
+  /* ⚠ v.98：總開關，暫時關閉。
+     實機觀察到少數時候音高偏約 1.5 個半音（＝44.1k 與 48k 的比例）、播放中按提交會破音或跳針，
+     而且停 5 秒（媒體元素閒置、切回直接輸出）就恢復——推測與媒體元素這段轉送有關。
+     關閉後聲音一律走 ctx.destination；代價是鎖定畫面與動態島不再顯示 App 圖示。
+     程式全部保留，要恢復只要改成 true。詳見手冊第二十部。 */
+  var MEDIA_OUTPUT_ON = false;
   var MEDIA_IDLE_SEC = 5;         // 最後一個音結束後多久暫停媒體元素（不要一直佔著「播放中」）
   var MEDIA_CLAIM_TIMEOUT = 1500; // 媒體元素多久沒播起來就當作失敗
   var MEDIA_MAX_FAILS = 2;        // 連續失敗幾次就整個停用，退回原本的做法
@@ -220,7 +226,7 @@
   }
   function enableMediaOutput(meta) {
     var C = global.AudioContext || global.webkitAudioContext;
-    mediaOut.enabled = !!(C && C.prototype && C.prototype.createMediaStreamDestination);
+    mediaOut.enabled = MEDIA_OUTPUT_ON && !!(C && C.prototype && C.prototype.createMediaStreamDestination);
     mediaOut.meta = meta || null;
     return mediaOut.enabled;
   }
