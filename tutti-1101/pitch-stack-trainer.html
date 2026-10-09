@@ -1157,6 +1157,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     const t = ctx.currentTime + 0.08;
     const n = midis.length;
     midis.forEach(m => pianoInst.play(m, t, { duration: STACK_SUSTAIN, gain: gainFor(m, n) }));
+    PianoEngine.holdUntil(ctx, t + STACK_SUSTAIN);
     if(onDone) pendingTimers.push(setTimeout(onDone, (STACK_SUSTAIN + 0.2) * 1000));
   }
   /* ===== 導出正解音檔（v.94）=====
@@ -1270,7 +1271,9 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     if(!audioReady(playTuningA)) return;
     const ctx = ensureAudio();
     if(!ctx) return;
-    pianoInst.play(69, ctx.currentTime + 0.05, { duration: 2, gain: GAIN_BASE });
+    const tA = ctx.currentTime + 0.05;
+    pianoInst.play(69, tA, { duration: 2, gain: GAIN_BASE });
+    PianoEngine.holdUntil(ctx, tA + 2);
   }
 
   /* ============================================================
@@ -1376,14 +1379,14 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       if(!pianoInst){ btn.disabled = true; btn.textContent = '🎹 音色載入中…'; return; }
       if(this.isPlaying){ btn.disabled = true; btn.textContent = '♪ 播放中…'; return; }
       const noLeft = (this.replaysLeft <= 0);
-      btn.disabled = noLeft;
+      btn.disabled = noLeft || PianoEngine.isLocked();   // v.98.8：標準音或淡出中也不能按
       btn.textContent = (this.maxReplays === Infinity)
         ? '▶ 播放音堆'
         : ('▶ 播放音堆 (剩 ' + Math.max(0, this.replaysLeft) + ' 次)');
     },
 
     play(){
-      if(this.isPlaying || !pianoInst || this.replaysLeft <= 0) return;
+      if(this.isPlaying || !pianoInst || this.replaysLeft <= 0 || PianoEngine.isLocked()) return;
       this.replaysLeft--;
       this.isPlaying = true;
       this.updatePlayBtn();
@@ -1625,7 +1628,11 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     psModule.initSettings();
 
     document.getElementById('ps-playBtn').onclick = () => psModule.play();
-    document.getElementById('ps-tuningBtn').onclick = () => { ensureAudio(); playTuningA(); };
+    document.getElementById('ps-tuningBtn').onclick = () => { if(PianoEngine.isLocked()) return; ensureAudio(); playTuningA(); };
+    /* v.98.8：有聲音在播（題目或標準音）時，同一畫面的播放類按鈕全部變灰，播完（或淡出完）才恢復 */
+    PianoEngine.onLockChange(function(){
+      document.getElementById('ps-tuningBtn').disabled = PianoEngine.isLocked(); psModule.updatePlayBtn();
+    });
     document.getElementById('ps-submitBtn').onclick = () => {
       if(psModule.submitted) showPage('ps-answer');    // 已提交：回去看解答
       else psModule.submit();

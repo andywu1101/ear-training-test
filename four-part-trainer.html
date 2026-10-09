@@ -3181,6 +3181,7 @@ window.addEventListener('resize', setVH); setVH();
         }
         t += measureDur;
       });
+      PianoEngine.holdUntil(ctx, t);
 
       const timer = setTimeout(() => {
         this.isPlaying = false; this.updatePlayBtns();
@@ -3232,7 +3233,7 @@ window.addEventListener('resize', setVH); setVH();
       btns.forEach(id => {
         let b = document.getElementById(id);
         if (!b) return;
-        if (this.isPlaying) b.disabled = true;
+        if (this.isPlaying || PianoEngine.isLocked()) b.disabled = true;   // v.98.8：標準音或淡出中也不能按
         else b.disabled = !pianoInst || (this.mode === 'test' && this.testSession && this.testSession.replaysLeft <= 0);
       });
       // 解答頁的播放按鈕（不受測驗次數限制）
@@ -3454,8 +3455,8 @@ window.addEventListener('resize', setVH); setVH();
         setTimeout(() => { let el = document.getElementById('staffContainerOuter'); if (el) el.scrollLeft = 0; }, 80);
       };
 
-      document.getElementById('btn-play-all').onclick = () => { if(this.mode==='test'&&this.testSession)this.testSession.replaysLeft--; this.playProgression('block'); };
-      document.getElementById('btn-play-arp').onclick = () => { if(this.mode==='test'&&this.testSession)this.testSession.replaysLeft--; this.playProgression('arpeggio'); };
+      document.getElementById('btn-play-all').onclick = () => { if(PianoEngine.isLocked()) return; if(this.mode==='test'&&this.testSession)this.testSession.replaysLeft--; this.playProgression('block'); };
+      document.getElementById('btn-play-arp').onclick = () => { if(PianoEngine.isLocked()) return; if(this.mode==='test'&&this.testSession)this.testSession.replaysLeft--; this.playProgression('arpeggio'); };
       // 解答頁的播放按鈕（不受測驗次數限制，可自由聆聽正解）
       document.getElementById('btn-play-all-ans').onclick = () => this.playProgression('block');
       document.getElementById('fpt-ansExport').onclick = () => {
@@ -3541,14 +3542,18 @@ window.addEventListener('resize', setVH); setVH();
     var LABEL = btn.textContent, timer = null;
     btn.onclick = function tuningPlay(){
       try{
-        if(!pianoInst) return;
+        if(!pianoInst || PianoEngine.isLocked()) return;
         if(!audioReady(tuningPlay)) return;
         var ctx = ensureAudio();
-        pianoInst.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
+        var tA = ctx.currentTime + 0.02;
+        pianoInst.play(69, tA, { duration: 2.0, gain: 3.5 });
+        PianoEngine.holdUntil(ctx, tA + 2.0);
         btn.textContent = '🎵 A 響起…';
         clearTimeout(timer); timer = setTimeout(function(){ btn.textContent = LABEL; }, 2000);
       }catch(e){}
     };
+    /* v.98.8：有聲音在播（題目或標準音）時，同一畫面的播放類按鈕全部變灰，播完（或淡出完）才恢復 */
+    PianoEngine.onLockChange(function(){ btn.disabled = PianoEngine.isLocked(); fptModule.updatePlayBtns(); });
   })();
 
 })();

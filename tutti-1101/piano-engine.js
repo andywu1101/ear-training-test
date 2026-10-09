@@ -106,7 +106,10 @@
     g.gain.setValueAtTime(base, t + dur);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + RELEASE);
 
-    out.connect(g); g.connect(outputFor(ctx));
+    /* v.98.8：最後再串一個淡出用的增益，停止時只動它，不干擾上面排好的音頭與尾音 */
+    var fg = ctx.createGain();
+    out.connect(g); g.connect(fg); fg.connect(outputFor(ctx));
+    node.__fg = fg; node.__t = t;
     markBusy(ctx, t + dur + RELEASE);
     node.start(t); node.stop(t + dur + RELEASE + 0.02);
 
@@ -118,10 +121,52 @@
     };
     return node;
   };
-  SalamanderPiano.prototype.stop = function () {
-    this.playing.forEach(function (n) { try { n.stop(); } catch (e) {} });
+  /* 停止（v.98.8）：正在響的音 0.5 秒內淡出（避免硬切的破音），還沒開始響的音立刻取消。
+     fade 傳 0 ＝立刻停止（iOS 換 context 時取消凍住的音符用，見 rebind）。 */
+  var STOP_FADE = 0.5;
+  SalamanderPiano.prototype.stop = function (fade) {
+    fade = (fade == null) ? STOP_FADE : fade;
+    var now = this.ctx.currentTime;
+    this.playing.forEach(function (n) {
+      try {
+        if (fade <= 0 || !n.__fg || n.__t > now) { n.stop(); return; }
+        var p = n.__fg.gain;
+        p.cancelScheduledValues(now);
+        p.setValueAtTime(1, now);
+        p.linearRampToValueAtTime(0, now + fade);
+        n.stop(now + fade + 0.02);
+      } catch (e) {}
+    });
     this.playing = [];
+    if (fade > 0) lockRelease(fade);
   };
+
+  /* ---------- 播放鎖（v.98.8） ----------
+     只要有聲音在播（題目或標準音），練習畫面上所有播放類按鈕都變灰，播完才恢復，
+     讓設備一次只專心播一段。頁面排好音之後呼叫 holdUntil(ctx, 最後一個音的結束時間)，
+     這裡會再加上尾音 RELEASE，鎖到聲音真的放完為止；
+     用 isLocked() 判斷要不要變灰，用 onLockChange(fn) 在鎖住／解開時刷新按鈕。
+     停止時（stop）改成「淡出結束才解開」。 */
+  var lock = { until: 0, timer: 0, fns: [] };
+  function lockNotify() { lock.fns.forEach(function (fn) { try { fn(); } catch (e) {} }); }
+  function lockArm() {
+    clearTimeout(lock.timer);
+    var ms = lock.until - Date.now();
+    if (ms > 0) lock.timer = setTimeout(lockNotify, ms + 30);
+  }
+  function holdUntil(ctx, endTime) {
+    var sec = endTime + RELEASE - ctx.currentTime;
+    var u = Date.now() + Math.max(0, sec) * 1000;
+    if (u > lock.until) lock.until = u;
+    lockArm(); lockNotify();
+  }
+  function lockRelease(fade) {
+    if (!isLocked()) return;               // 本來就沒聲音：不必多鎖
+    lock.until = Date.now() + fade * 1000;
+    lockArm(); lockNotify();
+  }
+  function isLocked() { return Date.now() < lock.until; }
+  function onLockChange(fn) { if (typeof fn === 'function') lock.fns.push(fn); }
 
   /* ---------- 載入 ---------- */
   var NOTE = { C:0, 'C#':1, Db:1, D:2, 'D#':3, Eb:3, E:4, F:5, 'F#':6, Gb:6,
@@ -354,7 +399,7 @@
      ⚠ soundfont-player 的音色在內部綁死原本的 context，搬不過去 → 回傳 false，由頁面重新載入。 */
   function rebind(inst, ctx) {
     if (!inst || !ctx || !(inst instanceof SalamanderPiano)) return false;
-    try { inst.stop(); } catch (e) {}     // 舊 context 上凍住的音符一併取消
+    try { inst.stop(0); } catch (e) {}    // 舊 context 上凍住的音符一併取消（立刻停止，不淡出）
     inst.ctx = ctx;
     return true;
   }
@@ -382,6 +427,13 @@
       var t = (when == null) ? ctx.currentTime : when;
       markBusy(ctx, t + ((o && o.duration) || 3.3) + RELEASE);
       return mPlay.apply(this, arguments);
+    };
+    /* 標準音色停止時自帶 0.3 秒 release；播放鎖等它放完才解開 */
+    var mStop = m.stop;
+    m.stop = function () {
+      var r = mStop.apply(this, arguments);
+      lockRelease(RELEASE);
+      return r;
     };
     return m;
   }
@@ -528,6 +580,10 @@
     setKit: setKit,
     DEFAULT_KIT: DEFAULT_KIT,
     LS_KEY: LS_KEY,
-    params: SAL
+    params: SAL,
+    STOP_FADE: STOP_FADE,
+    holdUntil: holdUntil,
+    isLocked: isLocked,
+    onLockChange: onLockChange
   };
 })(window);

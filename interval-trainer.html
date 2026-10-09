@@ -975,6 +975,7 @@ function updateStaffHeader(pageId){
       intervals.forEach(iv => pianoInstrument.play(root + iv, t, { duration: CHORD_HOLD_SEC, gain: gainFor(root + iv, intervals.length) }));
       t += CHORD_HOLD_SEC + CHORD_TRIPLE_GAP;
     }
+    PianoEngine.holdUntil(ctx, t - CHORD_TRIPLE_GAP);   // 最後一次之後的間隔不算
     const totalMs = (t - ctx.currentTime) * 1000; animatePlayhead(totalMs); return totalMs;
   }
 
@@ -1361,6 +1362,7 @@ function updateStaffHeader(pageId){
         const rm = testSession.replaysLeft === Infinity ? '不限' : testSession.replaysLeft;
         btn.textContent = (rm === '不限') ? '▶ 播放音程' : `▶ 播放音程 (剩 ${rm} 次)`; btn.disabled = !pianoInstrument || testSession.replaysLeft <= 0;
       } else { btn.textContent = '▶ 播放音程'; btn.disabled = !pianoInstrument; }
+      if(PianoEngine.isLocked()) btn.disabled = true;   // v.98.8：播放中、標準音或淡出中都不能按
     }
 
     function addToRev(q, userKey, qNum){
@@ -1537,7 +1539,7 @@ function updateStaffHeader(pageId){
       const btn = document.getElementById('int-dictPlayBtn'); if(!dictSession){ btn.disabled=true; return; }
       const rm = dictSession.replaysLeft === Infinity ? '不限' : dictSession.replaysLeft;
       btn.textContent = (rm === '不限') ? '▶ 播放整段' : `▶ 播放整段 (剩 ${rm} 次)`;
-      btn.disabled = !pianoInstrument || dictSession.submitted || dictSession.replaysLeft <= 0;
+      btn.disabled = !pianoInstrument || dictSession.submitted || dictSession.replaysLeft <= 0 || PianoEngine.isLocked();
     }
 
     function setActiveDictSlot(idx) {
@@ -1623,7 +1625,7 @@ function updateStaffHeader(pageId){
           showPage('int-practice'); ensureAudio();
         };
         document.getElementById('int-playBtn').onclick = () => {
-          if(!pianoInstrument || !current) return; window.stopAllPlayback();
+          if(!pianoInstrument || !current || PianoEngine.isLocked()) return; window.stopAllPlayback();
           if(mode === 'test' && testSession && !testSession.finished){ if(testSession.replaysLeft<=0)return; if(testSession.replaysLeft!==Infinity)testSession.replaysLeft--; }
           hasPlayed = true; document.querySelectorAll('#int-answerGrid .answer-btn').forEach(b=>{b.disabled=false; b.classList.remove('pending-lock');});
           playBlock(current.root, current.intervals, 3); updatePlayBtn();
@@ -1658,8 +1660,10 @@ function updateStaffHeader(pageId){
           window.stopAllPlayback(); document.getElementById('int-testSummary').style.display='none'; document.getElementById('int-questionPanel').style.display='block';
           const v = document.getElementById('int-testReplaySelect').value; const max = v==='inf'?Infinity:parseInt(v,10); testSession={total:TEST_TOTAL,index:1,correct:0,maxReplays:max,replaysLeft:max,finished:false}; newTestQ();
         };
+        /* v.98.8：有聲音在播（題目或標準音）時，同一畫面的播放類按鈕全部變灰，播完（或淡出完）才恢復。考試模式不套用 */
+        if(!(window.EXAM && window.EXAM.isExamMode())) PianoEngine.onLockChange(function(){ updatePlayBtn(); if(dictSession) updateDictCaption(); });
         document.getElementById('int-dictPlayBtn').onclick = function dictPlay(){
-          if(!pianoInstrument||!dictSession||dictSession.replaysLeft<=0) return;
+          if(!pianoInstrument||!dictSession||dictSession.replaysLeft<=0||PianoEngine.isLocked()) return;
           if(!audioReady(dictPlay)) return;
           window.stopAllPlayback();
           if(dictSession.replaysLeft!==Infinity) dictSession.replaysLeft--; dictSession.hasPlayed = true;
@@ -1673,6 +1677,7 @@ function updateStaffHeader(pageId){
               t += CHORD_HOLD_SEC + ((r<2)?CHORD_TRIPLE_GAP:DICT_PAUSE_BETWEEN_Q);
             }
           });
+          PianoEngine.holdUntil(ctx, t - DICT_PAUSE_BETWEEN_Q);   // 最後一題之後的停頓不算
           const totalMs = (t - ctx.currentTime)*1000;
           evs.forEach(ev => {
             trackTimeout(()=>{ const d=document.getElementById(`int-dot-${ev.qi}`); if(d)d.classList.add('active'); }, ev.start*1000);
@@ -1941,14 +1946,17 @@ function updateStaffHeader(pageId){
     var LABEL = btn.textContent, timer = null;
     btn.onclick = function tuningPlay(){
       try{
-        if(!pianoInstrument) return;
+        if(!pianoInstrument || PianoEngine.isLocked()) return;
         if(!audioReady(tuningPlay)) return;
         var ctx = ensureAudio();
-        pianoInstrument.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
+        var tA = ctx.currentTime + 0.02;
+        pianoInstrument.play(69, tA, { duration: 2.0, gain: 3.5 });
+        PianoEngine.holdUntil(ctx, tA + 2.0);
         btn.textContent = '🎵 A 響起…';
         clearTimeout(timer); timer = setTimeout(function(){ btn.textContent = LABEL; }, 2000);
       }catch(e){}
     };
+    PianoEngine.onLockChange(function(){ btn.disabled = PianoEngine.isLocked(); });   // v.98.8
   });
   (function(){
     var _q = new URLSearchParams(location.search);

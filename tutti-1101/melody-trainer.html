@@ -1987,6 +1987,7 @@ function showPage(pageId) {
         if(e.midi !== null) pianoInst.play(e.midi, time, { duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, 1) });
         time += e.len * secPer16th;
       });
+      PianoEngine.holdUntil(ctx, time);
       const timerId = setTimeout(() => { this.isPlaying = false; this.updatePlayBtn(); if(onEnd) onEnd(); }, (time-ctx.currentTime)*1000 + 100);
       pendingTimers.push(timerId);
     },
@@ -2232,6 +2233,7 @@ function showPage(pageId) {
               b.disabled = !pianoInst;
           }
       }
+      if(PianoEngine.isLocked()) b.disabled = true;   // v.98.8：標準音或淡出中也不能按
     },
 
     refreshReviewCount: function() {
@@ -2383,7 +2385,7 @@ function showPage(pageId) {
       };
 
       document.getElementById('mel-playBtn').onclick = () => {
-        ensureAudio(); if(!pianoInst || this.isPlaying) return;
+        ensureAudio(); if(!pianoInst || this.isPlaying || PianoEngine.isLocked()) return;
         if(this.mode === 'test' && this.testSession.replaysLeft <= 0) return;
 
         this.hasPlayed = true;
@@ -2505,14 +2507,18 @@ function showPage(pageId) {
     var LABEL = btn.textContent, timer = null;
     btn.onclick = function tuningPlay(){
       try{
-        if(!pianoInst) return;
+        if(!pianoInst || PianoEngine.isLocked()) return;
         if(!audioReady(tuningPlay)) return;
         var ctx = ensureAudio();
-        pianoInst.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
+        var tA = ctx.currentTime + 0.02;
+        pianoInst.play(69, tA, { duration: 2.0, gain: 3.5 });
+        PianoEngine.holdUntil(ctx, tA + 2.0);
         btn.textContent = '🎵 A 響起…';
         clearTimeout(timer); timer = setTimeout(function(){ btn.textContent = LABEL; }, 2000);
       }catch(e){}
     };
+    /* v.98.8：有聲音在播（題目或標準音）時，同一畫面的播放類按鈕全部變灰，播完（或淡出完）才恢復 */
+    PianoEngine.onLockChange(function(){ btn.disabled = PianoEngine.isLocked(); melModule.updatePlayBtn(); });
   })();
 
   if(bootPaperReview(melModule)){ /* 考卷回顧 */ }
