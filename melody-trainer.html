@@ -2434,12 +2434,12 @@ function showPage(pageId) {
 
       document.getElementById('mel-tieBtn').onclick = () => { this.toggleTie(); };
 
-      document.getElementById('mel-submitBtn').onclick = () => {
+      document.getElementById('mel-submitBtn').onclick = (ev, confirmed) => {
         if(!this.hasPlayed) return;
-        // 未填提醒：仍可提交，但跳出確認（未填計為錯誤）
+        // 未填提醒：仍可提交，但跳出確認（未填計為錯誤）（v.98.8：改用自訂確認框，iPhone 的系統提示框會讓播放中的聲音跳針；確定後再呼叫一次本函式並帶 true）
         let emptyCount = this.userSeq.filter(x => x === 'placeholder').length;
-        if(emptyCount > 0){
-          if(!window.confirm(`還有 ${emptyCount} 拍節奏未填寫。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
+        if(emptyCount > 0 && confirmed !== true){
+          appConfirm(`還有 ${emptyCount} 拍節奏未填寫。\n\n未填的部分會計為錯誤，確定要提交嗎？`, () => document.getElementById('mel-submitBtn').onclick(null, true)); return;
         }
         window.melStopAll();
         let isCorrect = true;

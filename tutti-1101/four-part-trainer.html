@@ -3248,7 +3248,7 @@ window.addEventListener('resize', setVH); setVH();
       }
     },
 
-    submitAnswer: function() {
+    submitAnswer: function(confirmed) {
       // 提交前檢查未完成項目，跳出確認提示
       let emptyBass = this.userBass.filter(v => v === null).length;
       let emptySeq = this.userSeq.filter(v => v === '' || v.endsWith('/')).length;
@@ -3257,9 +3257,9 @@ window.addEventListener('resize', setVH); setVH();
       if (keyMissing) issues.push('調性尚未選擇');
       if (emptyBass > 0) issues.push(`${emptyBass} 格低音未填`);
       if (emptySeq > 0) issues.push(`${emptySeq} 格級數未填或未完成`);
-      if (issues.length > 0) {
+      if (issues.length > 0 && confirmed !== true) {   // （v.98.8：改用自訂確認框，iPhone 的系統提示框會讓播放中的聲音跳針；確定後再呼叫一次本函式並帶 true）
         let msg = '尚有未完成項目：\n・' + issues.join('\n・') + '\n\n未填的部分會計為錯誤，確定要提交嗎？';
-        if (!window.confirm(msg)) return;
+        appConfirm(msg, () => this.submitAnswer(true)); return;
       }
 
       window.fptStopAll();

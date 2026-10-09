@@ -1687,13 +1687,13 @@ function updateStaffHeader(pageId){
           });
           trackTimeout(() => { updateDictCaption(); }, totalMs + 80);
         };
-        document.getElementById('chr-dictSubmitBtn').onclick = () => {
+        document.getElementById('chr-dictSubmitBtn').onclick = function dictSubmit(ev, confirmed){
           if(!dictSession||dictSession.submitted) return;
-          // 提交前檢查未填格子：仍可繳交，但跳出提醒（未填計為錯誤）
+          // 提交前檢查未填格子：仍可繳交，但跳出提醒（未填計為錯誤）（v.98.8：改用自訂確認框，iPhone 的系統提示框會讓播放中的聲音跳針；確定後再呼叫一次本函式並帶 true）
           let emptyCount = 0;
           dictSession.questions.forEach((q,i) => { const s=document.getElementById(`chr-slot-${i}`); if(!s.querySelector('.dict-tag')) emptyCount++; });
-          if(emptyCount > 0){
-            if(!window.confirm(`尚有 ${emptyCount} 格未填答。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
+          if(emptyCount > 0 && confirmed !== true){
+            appConfirm(`尚有 ${emptyCount} 格未填答。\n\n未填的部分會計為錯誤，確定要提交嗎？`, () => dictSubmit(null, true)); return;
           }
           window.stopAllPlayback(); let cor = 0;
           /* 連續聽寫：整次存成錯題本的「一筆」，裡面只收答錯的題目。

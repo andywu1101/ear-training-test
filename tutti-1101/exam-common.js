@@ -480,10 +480,13 @@
     function guard(fn) {
       return function () {
         if (_locked) {
-          if (!window.confirm('目前題目還在播放中。\n\n若現在跳轉，本段將視同已播放、之後不能再重聽。\n\n確定要跳轉嗎？')) return;
-          try { if (typeof window.stopAllPlayback === 'function') window.stopAllPlayback(); } catch (e) {}
-          var ck = currentSection(); if (ck) markPlayed(ck);
-          setPlaying(false);
+          appConfirm('目前題目還在播放中。\n\n若現在跳轉，本段將視同已播放、之後不能再重聽。\n\n確定要跳轉嗎？', function () {
+            try { if (typeof window.stopAllPlayback === 'function') window.stopAllPlayback(); } catch (e) {}
+            var ck = currentSection(); if (ck) markPlayed(ck);
+            setPlaying(false);
+            fn();
+          });
+          return;
         }
         fn();
       };
@@ -497,7 +500,7 @@
       if (rep.total > 0) msg = '尚有 ' + rep.total + ' 題未作答 (' + rep.parts.join('、') + ')，未作答一律計為零分。\n\n確定要交卷嗎？';
       else msg = '確定要交卷嗎？交卷後不能再修改答案。';
       if (rep.unplayed.length) msg = '「' + rep.unplayed.join('、') + '」尚未播放。\n\n' + msg;
-      if (window.confirm(msg)) location.href = 'exam.html?done=1';
+      appConfirm(msg, function () { location.href = 'exam.html?done=1'; });
     });
     document.getElementById('exam-more').onclick = guard(function () { modal.classList.add('open'); });
     document.getElementById('exam-opt-close').onclick = function () { modal.classList.remove('open'); };
@@ -514,6 +517,42 @@
       if (document.hidden && _locked) { markPlayed(sectionKey); _locked = false; if (onHidden) onHidden(); }
     });
   }
+
+  /* =================================================================
+   * 自訂確認框（v.98.8）— 取代瀏覽器內建的 confirm()
+   * ⚠ iPhone 跳出系統提示框時會暫停網頁音訊，但媒體元素還在輸出，
+   *   會一直重播最後一小段（跳針），連進解答頁後都停不下來。
+   *   自訂框只是頁面上的元素，不會打斷播放：按「取消」繼續播，按「確定」才由呼叫端停止。
+   * 用法：appConfirm(訊息, 按確定後要做的事)。訊息裡的 \n 會換行。
+   * 不像 confirm() 會停在原地等回答，所以「確定之後」的動作要放進回呼。
+   * ================================================================= */
+  function appConfirm(msg, onOk) {
+    if (document.getElementById('app-confirm')) return;      // 已經開著：不重複開
+    if (!document.getElementById('app-confirm-style')) {
+      var st = document.createElement('style'); st.id = 'app-confirm-style';
+      st.textContent =
+        '#app-confirm{position:fixed;inset:0;z-index:2000;background:rgba(38,36,32,0.55);display:flex;align-items:center;justify-content:center;padding:24px 16px;}' +
+        '#app-confirm .box{background:#efeee6;border:1px solid #ddd8c9;border-radius:16px;max-width:360px;width:100%;padding:22px 20px 18px;box-shadow:0 20px 50px rgba(0,0,0,0.28);}' +
+        '#app-confirm .msg{font-family:Inter,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:15px;line-height:1.6;color:#262420;white-space:pre-line;margin:0 0 18px;}' +
+        '#app-confirm .btns{display:flex;gap:10px;}' +
+        '#app-confirm button{flex:1;font-family:Inter,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-weight:700;font-size:14.5px;padding:12px;border-radius:999px;border:1px solid #ddd8c9;background:#fbfaf6;color:#262420;cursor:pointer;touch-action:manipulation;}' +
+        '#app-confirm button.ok{background:#33415c;border-color:#33415c;color:#fff;}';
+      document.head.appendChild(st);
+    }
+    var ov = document.createElement('div'); ov.id = 'app-confirm';
+    ov.innerHTML = '<div class="box" role="alertdialog" aria-modal="true"><p class="msg"></p>' +
+      '<div class="btns"><button type="button" class="no">取消</button><button type="button" class="ok">確定</button></div></div>';
+    ov.querySelector('.msg').textContent = msg;
+    function close() { document.removeEventListener('keydown', onKey); ov.remove(); }
+    function ok() { close(); if (typeof onOk === 'function') onOk(); }
+    function onKey(e) { if (e.key === 'Escape') close(); else if (e.key === 'Enter') { e.preventDefault(); ok(); } }
+    ov.querySelector('.no').onclick = close;
+    ov.querySelector('.ok').onclick = ok;
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
+  }
+  window.appConfirm = appConfirm;
 
   window.EXAM = {
     LS_SESSION: LS_SESSION, LS_HISTORY: LS_HISTORY,
