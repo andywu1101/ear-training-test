@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="聽力訓練">
 <meta name="theme-color" content="#33415c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
 <!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
@@ -26,7 +26,7 @@
     --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -292,7 +292,7 @@
     <div class="pattern-grid" id="settingsPatternGrid"></div>
 
     <button class="start-big-btn" id="rhy-enterBtn" disabled>🎯 開始節奏訓練 →</button>
-    <button class="review-entry-btn" onclick="showPage('rhy-review')">📕 錯題本（<span id="rhy-reviewCount">0</span> 題）</button>
+    <button class="review-entry-btn" onclick="showPage('rhy-review')">📕 錯題本 (<span id="rhy-reviewCount">0</span> 題)</button>
   </div>
 
   <div id="pageRhyPractice" class="page-view">
@@ -341,7 +341,7 @@
       <button class="play-btn" id="rhy-ansPlayCorrect">🔁 聽正解</button>
       <button class="action-btn exp-btn" id="rhy-ansExport" title="導出正解">⬇️</button>
     </div>
-    <div class="review-label">你的作答（紅色為錯誤）：</div>
+    <div class="review-label">你的作答 (紅色為錯誤)：</div>
     <div class="review-staff"><div id="rhy-ansUser"></div></div>
     <div class="review-label" style="margin-top:8px;">正確解答：</div>
     <div class="review-staff"><div id="rhy-ansCorrect"></div></div>
@@ -1839,7 +1839,7 @@ function showPage(pageId) {
         const left = maxPlays - used;
         if(self.isPlaying){ pb.textContent = '🔊 播放中...'; pb.disabled = true; return; }
         pb.disabled = !pianoInst || left <= 0;
-        pb.textContent = left > 0 ? `▶ 播放題目（剩餘 ${left} 次）` : '▶ 已用完播放次數';
+        pb.textContent = left > 0 ? `▶ 播放題目 (剩餘 ${left} 次)` : '▶ 已用完播放次數';
         EXm.buildHeader(host, KEY, headText());
       }
       this.updatePlayBtn = function(){ refreshPlayBtn(); };
@@ -1871,7 +1871,7 @@ function showPage(pageId) {
         correctTie: [...this.questionTie], userTie: [...this.userTie],
         meter: this.meter, meterType: this.meterType, barsCount: this.barsCount, beatsPerBar: this.beatsPerBar,
         bpm: this.bpm, pitchMode: this.pitchMode,
-        label: `${this.meter}拍・${this.barsCount}小節`, correctText: '（節奏聽寫）', yourText: ''
+        label: `${this.meter}拍・${this.barsCount}小節`, correctText: '(節奏聽寫)', yourText: ''
       };
       this._ansItem = item;
       document.getElementById('rhy-ansBadge').textContent = isCorrect ? '✅ 答對了' : '📖 解答對照';
@@ -1902,14 +1902,14 @@ function showPage(pageId) {
         const box = document.createElement('div'); box.className = 'review-item';
         box.innerHTML = `
           <div style="font-size:13px; font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-            <span style="color:var(--wrong);">❌ 錯題（${item.meter}拍・${item.barsCount}小節）</span>
+            <span style="color:var(--wrong);">❌ 錯題 (${item.meter}拍・${item.barsCount}小節)</span>
             <div style="display:flex; gap:8px;">
               <button class="select-all-btn rhy-rev-user" style="color:var(--wrong); border-color:var(--wrong); background:var(--wrong-soft);">🔊 聽你的作答</button>
               <button class="select-all-btn rhy-rev-correct">🔁 聽正解</button>
               <button class="select-all-btn exp-mini rhy-rev-export" title="導出正解">⬇️</button>
             </div>
           </div>
-          <div class="review-label">你的作答（紅色為錯誤）：</div>
+          <div class="review-label">你的作答 (紅色為錯誤)：</div>
           <div class="review-staff"><div id="rhy-rev-user-${uid}"></div></div>
           <div class="review-label" style="margin-top:8px;">正確解答：</div>
           <div class="review-staff"><div id="rhy-rev-correct-${uid}"></div></div>
@@ -2086,17 +2086,17 @@ function showPage(pageId) {
   <div class="help-box">
     <button class="help-close" onclick="closeHelp('rhy-helpModal')" aria-label="關閉">×</button>
     <h2>節奏練習 — 玩法說明</h2>
-    <p class="help-lead">聽寫節奏型（拍子與節奏顆粒）。</p>
+    <p class="help-lead">聽寫節奏型 (拍子與節奏顆粒)。</p>
     <h3>設定</h3>
-    <p>音高演奏可選「<b>單音</b>（都用 A4）」或「<b>雙音</b>（兩音嚴格交替，幫助分辨顆粒）」；拍號含單拍子 2/4、3/4、4/4 與複拍子 3/8、6/8、12/8；可調小節數、速度；下方勾選這次要出現的節奏型（以一拍為單位，可全選）。測驗模式會自動重播數次（含倒數）。</p>
+    <p>音高演奏可選「<b>單音</b> (都用 A4)」或「<b>雙音</b> (兩音嚴格交替，幫助分辨顆粒)」；拍號含單拍子 2/4、3/4、4/4 與複拍子 3/8、6/8、12/8；可調小節數、速度；下方勾選這次要出現的節奏型 (以一拍為單位，可全選)。測驗模式會自動重播數次 (含倒數)。</p>
     <h3>作答</h3>
-    <p>按「播放題目」（先有預備拍節拍器）→ 點五線譜上要填的拍位 → 點下方節奏鍵盤填入（自動往後），用「⌫刪除」修改（設定頁開啟「連結線」後，選中某一拍再按「⌒」即可把它連到下一拍，再按一次取消）→ 提交 → 解答頁會把你的作答用<b>紅色標出錯處</b>並與正解對照，可分別聆聽「你的作答」與「正解」。</p>
+    <p>按「播放題目」 (先有預備拍節拍器)→ 點五線譜上要填的拍位 → 點下方節奏鍵盤填入 (自動往後)，用「⌫刪除」修改 (設定頁開啟「連結線」後，選中某一拍再按「⌒」即可把它連到下一拍，再按一次取消)→ 提交 → 解答頁會把你的作答用<b>紅色標出錯處</b>並與正解對照，可分別聆聽「你的作答」與「正解」。</p>
     <div class="help-common">
-      <h3>共通規則（六個練習都適用）</h3>
+      <h3>共通規則 (六個練習都適用)</h3>
       <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>
       <p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>
-      <p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>
-      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>
+      <p>有格子沒填也可以提交，但會跳提醒 (<b>未填的部分算錯</b>)。</p>
+      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器 (重整或關閉都不會消失)，可重播對照。</p>
     </div>
     <p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
     <div class="help-foot"><a class="help-video" href="https://youtu.be/fwHc6VuFatg?t=312" target="_blank" rel="noopener">▶ 看完整操作教學</a><button onclick="closeHelp('rhy-helpModal')">我知道了</button></div>

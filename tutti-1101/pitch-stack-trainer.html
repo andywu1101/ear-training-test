@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="聽力訓練">
 <meta name="theme-color" content="#33415c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
 <!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
@@ -26,7 +26,7 @@
     --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* 觸控裝置操作優化（比照 04 四部和聲）：
@@ -250,7 +250,7 @@
           <option value="4">4 個音</option>
           <option value="5">5 個音</option>
           <option value="6">6 個音</option>
-          <option value="random">隨機 2～6 個音（不顯示音數）</option>
+          <option value="random">隨機 2～6 個音 (不顯示音數)</option>
         </select>
       </div>
       <div class="switch-group" id="ps-testReplayWrapper" style="display:none;">
@@ -271,7 +271,7 @@
     </div>
 
     <button class="start-big-btn" id="ps-enterBtn">🎯 確認設定，開始練習 →</button>
-    <button class="review-entry-btn" onclick="showPage('ps-review')">📕 錯題本（<span id="ps-reviewCount">0</span> 題）</button>
+    <button class="review-entry-btn" onclick="showPage('ps-review')">📕 錯題本 (<span id="ps-reviewCount">0</span> 題)</button>
   </div>
 
   <!-- ================= 作答頁 ================= -->
@@ -300,7 +300,7 @@
       </div>
       <div class="unified-action-row">
         <button class="play-btn" id="ps-playBtn" disabled>▶ 播放音堆</button>
-        <button class="action-btn" id="ps-tuningBtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <button class="action-btn" id="ps-tuningBtn" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
         <button class="action-btn btn-submit" id="ps-submitBtn">✔ 提交作答</button>
       </div>
       <div class="play-caption" id="ps-playCaption"></div>
@@ -322,16 +322,16 @@
       <button class="action-btn" id="ps-ansPlayArp">🔁 分解琶音</button>
       <button class="action-btn" id="ps-ansPlayMine" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽我寫的</button>
       <button class="action-btn exp-btn" id="ps-ansExport" title="導出正解">⬇️</button>
-      <button class="action-btn" id="ps-ansTuning" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+      <button class="action-btn" id="ps-ansTuning" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
     </div>
 
     <div class="ps-compare">
       <div class="ps-compare-col">
-        <div class="review-label">正確答案（綠色＝你答對的音）</div>
+        <div class="review-label">正確答案 (綠色＝你答對的音)</div>
         <div class="review-staff"><div id="ps-ansCorrectStaff"></div></div>
       </div>
       <div class="ps-compare-col">
-        <div class="review-label">你的作答（紅色＝多寫的音）</div>
+        <div class="review-label">你的作答 (紅色＝多寫的音)</div>
         <div class="review-staff"><div id="ps-ansMineStaff"></div></div>
       </div>
     </div>
@@ -376,16 +376,16 @@
     <h2>音堆練習 — 玩法說明</h2>
     <p class="help-lead">聆聽同時彈出的音堆，把裡面的每一個音高寫到五線譜上。</p>
     <h3>玩法</h3>
-    <p>每一題是<b>一個音堆</b>（所有音同時彈出），以<b>全音符</b>記在一個小節裡。你要聽出裡面有哪些音高，並把它們全部寫上去。<b>所有音高完全正確</b>才算答對，寫錯、漏掉或多寫都算錯。</p>
+    <p>每一題是<b>一個音堆</b> (所有音同時彈出)，以<b>全音符</b>記在一個小節裡。你要聽出裡面有哪些音高，並把它們全部寫上去。<b>所有音高完全正確</b>才算答對，寫錯、漏掉或多寫都算錯。</p>
     <h3>設定</h3>
-    <p>可選<b>練習模式</b>（播放次數不限）或<b>測驗模式</b>（自訂 1～10 次）。譜表可選高音譜號、低音譜號或大譜表。音數可指定 2～6 個，也可以選<b>隨機</b>——隨機時不會告訴你有幾個音，難度最高。</p>
+    <p>可選<b>練習模式</b> (播放次數不限)或<b>測驗模式</b> (自訂 1～10 次)。譜表可選高音譜號、低音譜號或大譜表。音數可指定 2～6 個，也可以選<b>隨機</b>——隨機時不會告訴你有幾個音，難度最高。</p>
     <h3>作答</h3>
-    <p>在譜上<b>按住</b>會出現灰色預覽音符，<b>滑動</b>調整位置，<b>放開</b>才填入。剛填的音會是<b>選中狀態</b>，點譜上已填的音符也可以改選它。選中後用 <b>↑↓</b> 做半音微調（往上用升記號、往下用降記號，會跨到別的音上），或按 <b>🗑</b> 刪除。「<b>🎵 標準音 A</b>」隨時可按，不佔播放次數。</p>
+    <p>在譜上<b>按住</b>會出現灰色預覽音符，<b>滑動</b>調整位置，<b>放開</b>才填入。剛填的音會是<b>選中狀態</b>，點譜上已填的音符也可以改選它。選中後用 <b>↑↓</b> 做半音微調 (往上用升記號、往下用降記號，會跨到別的音上)，或按 <b>🗑</b> 刪除。「<b>🎵 標準音 A</b>」隨時可按，不佔播放次數。</p>
     <h3>記譜</h3>
-    <p>同音高的不同寫法（例如 F♯ 與 G♭）<b>視為相同</b>，不影響對錯，只要實際音高正確就好。</p>
+    <p>同音高的不同寫法 (例如 F♯ 與 G♭)<b>視為相同</b>，不影響對錯，只要實際音高正確就好。</p>
     <div class="help-common">
       <h3>錯題本</h3>
-      <p>沒有完全答對的題目會自動收進「錯題本」，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。每個練習最多保留最近 50 筆。</p>
+      <p>沒有完全答對的題目會自動收進「錯題本」，存在本機瀏覽器 (重整或關閉都不會消失)，可重播對照。每個練習最多保留最近 50 筆。</p>
       <h3>回報問題</h3>
       <p style="margin-top:2px;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
     </div>
@@ -1379,7 +1379,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       btn.disabled = noLeft;
       btn.textContent = (this.maxReplays === Infinity)
         ? '▶ 播放音堆'
-        : ('▶ 播放音堆（剩 ' + Math.max(0, this.replaysLeft) + ' 次）');
+        : ('▶ 播放音堆 (剩 ' + Math.max(0, this.replaysLeft) + ' 次)');
     },
 
     play(){
@@ -1452,7 +1452,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       }
       this.ghost = { dn: dn, acc: 0 };
       this.render();
-      document.getElementById('ps-selInfo').innerHTML = '預覽：<b>' + pitchName(this.ghost) + '</b>（放開填入）';
+      document.getElementById('ps-selInfo').innerHTML = '預覽：<b>' + pitchName(this.ghost) + '</b> (放開填入)';
     },
     pointerMove(clientY){
       if(this.submitted || this.pickMode || !this.ghost) return;
@@ -1460,7 +1460,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       if(dn === null || dn === this.ghost.dn) return;
       this.ghost = { dn: dn, acc: 0 };
       this.render();
-      document.getElementById('ps-selInfo').innerHTML = '預覽：<b>' + pitchName(this.ghost) + '</b>（放開填入）';
+      document.getElementById('ps-selInfo').innerHTML = '預覽：<b>' + pitchName(this.ghost) + '</b> (放開填入)';
     },
     pointerUp(){
       if(this.submitted || this.pickMode || !this.ghost) return;
@@ -1549,7 +1549,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
       const lines = [];
       lines.push('正確答案：' + this.correct.map(pitchName).join('　'));
-      lines.push('你的作答：' + (this.user.length ? this.user.map(pitchName).join('　') : '（空白）'));
+      lines.push('你的作答：' + (this.user.length ? this.user.map(pitchName).join('　') : '(空白)'));
       if(r.missing.length) lines.push('漏掉：' + r.missing.map(m => pitchName(spellMidi(m, false))).join('　'));
       if(r.extra.length) lines.push('多寫：' + r.extra.map(m => pitchName(spellMidi(m, false))).join('　'));
       document.getElementById('ps-ansDetail').textContent = lines.join('\n');
@@ -1575,7 +1575,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           (bits.length ? ('　｜　' + bits.join('、')) : '') + '</div>' +
           '<div class="review-label" style="margin-top:8px;">正確答案：' + (item.correct || []).map(pitchName).join('　') + '</div>' +
           '<div class="review-staff"><div id="ps-rev-c-' + n + '"></div></div>' +
-          '<div class="review-label">你當時的作答：' + ((item.mine || []).length ? item.mine.map(pitchName).join('　') : '（空白）') + '</div>' +
+          '<div class="review-label">你當時的作答：' + ((item.mine || []).length ? item.mine.map(pitchName).join('　') : '(空白)') + '</div>' +
           '<div class="review-staff"><div id="ps-rev-m-' + n + '"></div></div>' +
           '<div class="unified-action-row" style="margin-top:4px;">' +
           '<button class="play-btn" data-rev-play="' + n + '">🎧 聽正確音堆</button>' +

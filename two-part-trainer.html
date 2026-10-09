@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="聽力訓練">
 <meta name="theme-color" content="#33415c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
 <!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
@@ -26,7 +26,7 @@
     --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -310,7 +310,7 @@
     <div class="pattern-grid" id="settingsPatternGrid"></div>
 
     <button class="start-big-btn" id="tp-enterBtn" disabled>🎯 開始兩聲部訓練 →</button>
-    <button class="review-entry-btn" onclick="showPage('tp-review')">📕 錯題本（<span id="tp-reviewCount">0</span> 題）</button>
+    <button class="review-entry-btn" onclick="showPage('tp-review')">📕 錯題本 (<span id="tp-reviewCount">0</span> 題)</button>
   </div>
 
   <div id="pageTpPractice" class="page-view">
@@ -332,7 +332,7 @@
         <button class="play-btn" id="tp-playBtn-both" disabled>▶ 雙聲部</button>
         <button class="play-btn sub-play" id="tp-playBtn-top" disabled>高音</button>
         <button class="play-btn sub-play" id="tp-playBtn-bot" disabled>低音</button>
-        <button class="action-btn" id="tuningABtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <button class="action-btn" id="tuningABtn" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
         <button class="action-btn" id="tp-tieBtn" style="display:none;">⌒ 連結線</button>
         <button class="action-btn" id="tp-backspaceBtn">⌫ 退格</button>
         <button class="action-btn btn-submit" id="tp-submitBtn" disabled>✔ 提交</button>
@@ -397,7 +397,7 @@
       <button class="action-btn" id="tp-ansPlayBottom">🎵 正解低音</button>
       <button class="action-btn exp-btn" id="tp-ansExport" title="導出正解">⬇️</button>
     </div>
-    <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+    <div class="review-label">你的作答 (紅色為錯誤音符)：</div>
     <div class="review-staff"><div id="tp-ansUser"></div></div>
     <div class="review-label" style="margin-top:8px;">正確解答：</div>
     <div class="review-staff"><div id="tp-ansCorrect"></div></div>
@@ -2206,7 +2206,7 @@ function showPage(pageId) {
         const max = EXm.maxFor(KEY);
         const bad = beats.filter(function(b){ return !b.rhythmOK || b.wrongPitches>0; }).length + tieUnits;
         EXm.saveResult(KEY, { lostUnits: EXm.beatLoss(beats) + tieUnits, max: max, unanswered: blank,
-          detail: [{ correct: bad===0, your: '有誤 '+bad+' 拍（上下聲部合計）', right: '共 '+beats.length+' 拍' }] });
+          detail: [{ correct: bad===0, your: '有誤 '+bad+' 拍 (上下聲部合計)', right: '共 '+beats.length+' 拍' }] });
       }
       saveNow();
       const _origUpdateUI = this.updateUI.bind(this);
@@ -2222,7 +2222,7 @@ function showPage(pageId) {
         }
         const off = !pianoInst || left <= 0;
         bBoth.disabled = off; bTop.disabled = off; bBot.disabled = off;
-        bBoth.textContent = left > 0 ? `▶ 雙聲部（剩餘 ${left} 次）` : '🚫 次數用盡';
+        bBoth.textContent = left > 0 ? `▶ 雙聲部 (剩餘 ${left} 次)` : '🚫 次數用盡';
         EXm.buildHeader(host, KEY, headText());
       }
       this.updatePlayBtn = function(){ refreshPlayBtn(); };
@@ -2351,7 +2351,7 @@ function showPage(pageId) {
         cTie: { top: [...this.questionTie.top], bottom: [...this.questionTie.bottom] },
         uTie: { top: [...this.userTie.top], bottom: [...this.userTie.bottom] },
         meter: this.meter, meterType: this.meterType, barsCount: this.barsCount, beatsPerBar: this.beatsPerBar, bpm: this.bpm,
-        label: `大譜表・${this.meter}拍・${this.barsCount}小節`, correctText: '（兩聲部聽寫）', yourText: ''
+        label: `大譜表・${this.meter}拍・${this.barsCount}小節`, correctText: '(兩聲部聽寫)', yourText: ''
       };
       this._ansItem = item;
       document.getElementById('tp-ansBadge').textContent = isCorrect ? '✅ 答對了' : '📖 解答對照';
@@ -2382,14 +2382,14 @@ function showPage(pageId) {
         const box = document.createElement('div'); box.className = 'review-item';
         box.innerHTML = `
           <div style="font-size:13px; font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-            <span style="color:var(--wrong);">❌ 錯題（${item.label || ''}）</span>
+            <span style="color:var(--wrong);">❌ 錯題 (${item.label || ''})</span>
             <div style="display:flex; gap:6px;">
               <button class="select-all-btn tp-rev-user" style="color:var(--wrong); border-color:var(--wrong); background:rgba(166,73,59,0.09);">🔊 聽你的作答</button>
               <button class="select-all-btn tp-rev-correct">🔁 聽正解(雙軌)</button>
               <button class="select-all-btn exp-mini tp-rev-export" title="導出正解">⬇️</button>
             </div>
           </div>
-          <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+          <div class="review-label">你的作答 (紅色為錯誤音符)：</div>
           <div class="review-staff"><div id="tp-rev-user-${uid}"></div></div>
           <div class="review-label" style="margin-top:8px;">正確解答：</div>
           <div class="review-staff"><div id="tp-rev-correct-${uid}"></div></div>
@@ -2550,7 +2550,7 @@ function showPage(pageId) {
         // 未填提醒：仍可提交，但跳出確認（未填計為錯誤）
         let emptyCount = this.userSeq.top.filter(x => x === 'placeholder').length + this.userSeq.bottom.filter(x => x === 'placeholder').length;
         if(emptyCount > 0){
-          if(!window.confirm(`還有 ${emptyCount} 拍節奏未填寫（高音＋低音合計）。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
+          if(!window.confirm(`還有 ${emptyCount} 拍節奏未填寫 (高音＋低音合計)。\n\n未填的部分會計為錯誤，確定要提交嗎？`)) return;
         }
         window.tpStopAll();
         let isCorrect = true;
@@ -2650,13 +2650,13 @@ function showPage(pageId) {
     <h3>設定</h3>
     <p>可選拍號、小節數、速度與要出現的節奏型；測驗模式可限制重播次數。</p>
     <h3>作答</h3>
-    <p>播放時可選「<b>雙聲部</b>」一起聽，或單獨聽「<b>高音</b>」「<b>低音</b>」孤立聲部。作答分「編輯節奏／編輯音高」兩個分頁，並可切換目前編輯的聲部（點譜上高音區或低音區即可切換）。音高輸入方式與單旋律相同：點到某個音後，直接按 ♯／♭／♮ 就會套用到該音並自動跳到下一個音（剛打完的音也能直接按記號修改），八度可事後微調。填完提交 → 解答頁雙譜對照、紅色標錯，可聆聽你的作答／正解雙軌。</p>
+    <p>播放時可選「<b>雙聲部</b>」一起聽，或單獨聽「<b>高音</b>」「<b>低音</b>」孤立聲部。作答分「編輯節奏／編輯音高」兩個分頁，並可切換目前編輯的聲部 (點譜上高音區或低音區即可切換)。音高輸入方式與單旋律相同：點到某個音後，直接按 ♯／♭／♮ 就會套用到該音並自動跳到下一個音 (剛打完的音也能直接按記號修改)，八度可事後微調。填完提交 → 解答頁雙譜對照、紅色標錯，可聆聽你的作答／正解雙軌。</p>
     <div class="help-common">
-      <h3>共通規則（六個練習都適用）</h3>
+      <h3>共通規則 (六個練習都適用)</h3>
       <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>
       <p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>
-      <p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>
-      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>
+      <p>有格子沒填也可以提交，但會跳提醒 (<b>未填的部分算錯</b>)。</p>
+      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器 (重整或關閉都不會消失)，可重播對照。</p>
     </div>
     <p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
     <div class="help-foot"><a class="help-video" href="https://youtu.be/fwHc6VuFatg?t=468" target="_blank" rel="noopener">▶ 看完整操作教學</a><button onclick="closeHelp('tp-helpModal')">我知道了</button></div>

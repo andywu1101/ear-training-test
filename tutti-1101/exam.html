@@ -11,13 +11,13 @@
 <meta name="apple-mobile-web-app-title" content="聽力訓練">
 <meta name="theme-color" content="#33415c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
 <style>
   :root{
     --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body{ margin:0; background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height:100vh; padding: 20px 16px 64px; }
@@ -144,7 +144,7 @@
 
     <!-- 大學檔 -->
     <div class="exam-card">
-      <h2>大學檔 <span class="card-sub">（模擬大學聯合招生難易度）</span></h2>
+      <h2>大學檔 <span class="card-sub">(模擬大學聯合招生難易度)</span></h2>
       <p>七大項綜合、<b>滿分 100 分</b>，固定範圍、隨機出題。全部作答完畢後一次交卷計分。</p>
       <ul class="score-breakdown">
         <li><span>一、音高的辨認</span><b>10 分</b><em>2 題，各 5 個錯音</em></li>
@@ -161,7 +161,7 @@
 
     <!-- 高中檔 -->
     <div class="exam-card">
-      <h2>高中檔 <span class="card-sub">（模擬音樂班甄選）</span></h2>
+      <h2>高中檔 <span class="card-sub">(模擬音樂班甄選)</span></h2>
       <p>六大項綜合、<b>滿分 100 分</b>，配分與內容比照高中音樂班甄選聯合術科測驗。</p>
       <ul class="score-breakdown">
         <li><span>一、音程</span><b>10 分</b><em>10 題</em></li>
@@ -232,7 +232,7 @@
   <div id="pageHistory" class="page-view">
     <button class="nav-back-btn" onclick="goStart()">← 返回</button>
     <h1>歷史趨勢</h1>
-    <p class="subtitle">縱軸為分數（滿分 100）。兩個檔位分開比較。</p>
+    <p class="subtitle">縱軸為分數 (滿分 100)。兩個檔位分開比較。</p>
     <div class="hist-tabs" id="histTabs"></div>
     <div id="histStats"></div>
     <div class="chart-wrap" id="chartWrap"></div>
@@ -271,8 +271,8 @@
       var p = EX.progress(s); var secLabel = EX.SECTIONS[p.key] ? EX.SECTIONS[p.key].label : '';
       var pname = (EX.PRESETS[s.preset||'standard']||{}).short || '';
       qs('resumeSlot').innerHTML =
-        '<div class="resume-box"><div class="rt">有一份未完成的考試（'+esc(pname)+'）</div>' +
-        '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;">進度：第 '+p.index+' / '+p.total+' 段（'+esc(secLabel)+'）</div>' +
+        '<div class="resume-box"><div class="rt">有一份未完成的考試 ('+esc(pname)+')</div>' +
+        '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:12px;">進度：第 '+p.index+' / '+p.total+' 段 ('+esc(secLabel)+')</div>' +
         '<div class="resume-actions">' +
         '<button class="big-btn" style="font-size:14.5px;padding:12px;" onclick="resumeExam()">繼續作答</button>' +
         '<button class="ghost-btn" onclick="abandonExam()">放棄重來</button>' +
@@ -326,7 +326,7 @@
     qs('resultReview').innerHTML = rows.filter(function(r){ return r.detail && r.detail.length; }).map(function(r){
       var items = r.detail.map(function(d,i){
         var ans = d.correct ? '<span class="right">'+esc(d.right)+'</span>'
-          : '你的：<span class="your bad">'+esc(d.your||'（未作答）')+'</span>　正解：<span class="right">'+esc(d.right)+'</span>';
+          : '你的：<span class="your bad">'+esc(d.your||'(未作答)')+'</span>　正解：<span class="right">'+esc(d.right)+'</span>';
         return '<div class="q-item"><span class="q-idx">'+(i+1)+'</span><span class="q-mark '+(d.correct?'ok':'no')+'">'+
                (d.correct?'✓':'✗')+'</span><span class="q-ans">'+ans+'</span></div>';
       }).join('');
@@ -459,7 +459,7 @@
     }).join('');
     var kb = EX.papersSizeKB();
     qs('paperFoot').innerHTML =
-      '<span class="muted" style="font-size:12px;margin-right:10px;">已保留 '+papers.length+' / '+EX.PAPERS_CAP+' 份（約 '+kb+' KB）</span>' +
+      '<span class="muted" style="font-size:12px;margin-right:10px;">已保留 '+papers.length+' / '+EX.PAPERS_CAP+' 份 (約 '+kb+' KB)</span>' +
       '<button class="danger-btn" onclick="clearPapersAll()">🗑️ 清空回顧資料</button>';
   }
 
@@ -493,7 +493,7 @@
     }).join('');
 
     var ag = qs('paperAgainBtn');
-    if(ag){ ag.textContent = '再考一次（' + ((EX.PRESETS[pid]||{}).short || '') + '）→';
+    if(ag){ ag.textContent = '再考一次 (' + ((EX.PRESETS[pid]||{}).short || '') + ')→';
             ag.onclick = function(){ startExam(pid); }; }
     showView('pagePaper');
   }
@@ -514,7 +514,7 @@
       if(rec && EX.getPaper(rec.id)){ openPaper(rec.id); return; }
       renderResult(rec); showView('pageResult');
       var again = qs('againBtn');
-      if(again){ var pid = presetOfRec(rec||{}); again.textContent = '再考一次（'+((EX.PRESETS[pid]||{}).short||'')+'）→';
+      if(again){ var pid = presetOfRec(rec||{}); again.textContent = '再考一次 ('+((EX.PRESETS[pid]||{}).short||'')+')→';
                  again.onclick = function(){ startExam(pid); }; }
       return;
     }

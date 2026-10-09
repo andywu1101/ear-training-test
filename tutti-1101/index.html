@@ -45,13 +45,13 @@ window.addEventListener('appinstalled', function(){
 });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
 <style>
   :root{
     --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body{ margin:0; background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height:100vh; padding: 20px 16px 64px; }
@@ -526,7 +526,7 @@ window.addEventListener('appinstalled', function(){
     <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
     <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.97　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.98　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -566,21 +566,21 @@ window.addEventListener('appinstalled', function(){
         <button type="button" class="opt-item" data-kit="salamander" onclick="setPianoKit('salamander')">
           <span class="opt-radio"></span>
           <span class="opt-body">
-            <span class="opt-name">Yamaha C5（高音質）</span>
+            <span class="opt-name">Yamaha C5 (高音質)</span>
             <span class="opt-sub">真實鋼琴錄音，檔案較大</span>
           </span>
         </button>
         <button type="button" class="opt-item" data-kit="musyng" onclick="setPianoKit('musyng')">
           <span class="opt-radio"></span>
           <span class="opt-body">
-            <span class="opt-name">標準音色（原本的）</span>
+            <span class="opt-name">標準音色 (原本的)</span>
             <span class="opt-sub">載入較快，適合網路較慢時</span>
           </span>
         </button>
       </div>
       <p class="set-toast" id="pianoKitToast"></p>
       <p class="set-credit">高音質音色取樣自 Yamaha C5，來源為 Alexander Holm 錄製的
-        Salamander Grand Piano（已釋出為公有領域）。<br>
+        Salamander Grand Piano (已釋出為公有領域)。<br>
         本網站使用 Cloudflare Web Analytics 統計造訪人數，不使用 cookie、不記錄個人資料。
         練習紀錄一律只存在你的裝置上。</p>
     </div>
@@ -589,7 +589,7 @@ window.addEventListener('appinstalled', function(){
   <div id="pageHub" class="page-view">
     <button class="nav-back-btn" onclick="showHubChoose()">← 返回</button>
     <h1>錯題本目錄</h1>
-    <p class="subtitle">這裡整合各項練習累積的錯題（儲存在本機瀏覽器）。點「跳回複習」會直接開啟該練習的錯題本。</p>
+    <p class="subtitle">這裡整合各項練習累積的錯題 (儲存在本機瀏覽器)。點「跳回複習」會直接開啟該練習的錯題本。</p>
     <div class="hub-total" id="hubTotal"></div>
     <div id="hubGroups"></div>
 
@@ -685,7 +685,7 @@ window.addEventListener('appinstalled', function(){
 
     <!-- 銀行轉帳明細 -->
     <div class="donate-links" id="donateBank" style="display:none;">
-      <div class="bank-row"><span class="bk">銀行</span><b>中國信託（822）</b><button class="copy-btn" type="button" onclick="copyText(event,'822')">複製代號</button></div>
+      <div class="bank-row"><span class="bk">銀行</span><b>中國信託 (822)</b><button class="copy-btn" type="button" onclick="copyText(event,'822')">複製代號</button></div>
       <div class="bank-row"><span class="bk">帳號</span><b>163540424795</b><button class="copy-btn" type="button" onclick="copyText(event,'163540424795')">複製</button></div>
       <div class="bank-row"><span class="bk">戶名</span><b>伍○恆</b></div>
       <p class="pay-note">轉帳僅需銀行代號與帳號；戶名供核對用。</p>
@@ -728,19 +728,19 @@ window.addEventListener('appinstalled', function(){
 
     <div id="a2hsSafariHint" class="a2hs-hint" style="display:none;">
       你現在是用 LINE 或其他 App 的內建瀏覽器開啟，這種瀏覽器<b>沒有</b>「加入主畫面」的功能。<br>
-      請先找到「⋯」或「⋮」選單（可能在右上角或右下角），點選<b>「在瀏覽器中開啟」</b>。<br>
+      請先找到「⋯」或「⋮」選單 (可能在右上角或右下角)，點選<b>「在瀏覽器中開啟」</b>。<br>
       若打開後不是 <span id="a2hsBrowserName">Safari</span>，請按下面的按鈕複製網址，再自己貼到 <span id="a2hsBrowserName2">Safari</span> 的網址列。
       <button type="button" id="a2hsCopyBtn" class="a2hs-copy" onclick="copySiteUrl()">📋 複製網址</button>
     </div>
 
     <ol class="a2hs-steps" id="a2hsStepsIOS">
-      <li><span class="a2hs-num">1</span><span>從網址列找到分享圖示 <svg class="a2hs-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg> 並點擊（可能在網址列上，或更多「⋯」裡）</span></li>
+      <li><span class="a2hs-num">1</span><span>從網址列找到分享圖示 <svg class="a2hs-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 10.5H6.6a1.6 1.6 0 0 0-1.6 1.6v7.3a1.6 1.6 0 0 0 1.6 1.6h10.8a1.6 1.6 0 0 0 1.6-1.6v-7.3a1.6 1.6 0 0 0-1.6-1.6H15.5"/><path d="M12 2.9v11.6"/><path d="M8.3 6.5 12 2.8l3.7 3.7"/></svg> 並點擊 (可能在網址列上，或更多「⋯」裡)</span></li>
       <li><span class="a2hs-num">2</span><span>找到並點擊「加入主畫面」</span></li>
       <li><span class="a2hs-num">3</span><span>點擊「加入」按鈕</span></li>
     </ol>
     <ol class="a2hs-steps" id="a2hsStepsAndroid" style="display:none;">
       <li><span class="a2hs-num">1</span><span>從網址列找到選單「⋮」</span></li>
-      <li><span class="a2hs-num">2</span><span>找到「安裝應用程式」或「加到主畫面」（不同版本用詞不同）</span></li>
+      <li><span class="a2hs-num">2</span><span>找到「安裝應用程式」或「加到主畫面」 (不同版本用詞不同)</span></li>
       <li><span class="a2hs-num">3</span><span>點「安裝」或「新增」</span></li>
     </ol>
     <p class="a2hs-done">大功告成 🎉</p>
@@ -806,7 +806,7 @@ if (location.hash === '#hub-practice' || location.hash === '#hub') {
 window.REVIEW_STORE = {
   PREFIX: 'earTrainer.review.',
   TYPES: ['interval','chord','rhythm','melody','twopart','fourpart','pitcherr','pitchstack'],
-  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行', pitcherr:'音高辨認（找錯音）', pitchstack:'音堆練習' },
+  TYPE_LABEL: { interval:'音程練習', chord:'和絃辨認', rhythm:'節奏練習', melody:'單旋律曲調', twopart:'兩聲部曲調', fourpart:'四部和聲進行', pitcherr:'音高辨認 (找錯音)', pitchstack:'音堆練習' },
   TYPE_PAGE: { interval:'interval-trainer.html', chord:'chord-trainer.html', rhythm:'rhythm-trainer.html', melody:'melody-trainer.html', twopart:'two-part-trainer.html', fourpart:'four-part-trainer.html', pitcherr:'pitch-error-trainer.html', pitchstack:'pitch-stack-trainer.html' },
   load(type){ try { return JSON.parse(localStorage.getItem(this.PREFIX+type) || '[]'); } catch(e){ return []; } },
   clear(type){ try { localStorage.setItem(this.PREFIX+type, '[]'); } catch(e){} },
@@ -1102,7 +1102,7 @@ function bkFmtDate(ts){
   try{
     var d = new Date(ts); var p = function(n){ return String(n).padStart(2,'0'); };
     return d.getFullYear() + '/' + p(d.getMonth()+1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
-  }catch(e){ return '（未知）'; }
+  }catch(e){ return '(未知)'; }
 }
 
 function closeBkConfirm(){
@@ -1273,7 +1273,8 @@ window.CHANGELOG = [
   { v: 'v.92', items: ['優化音程練習與和絃辨認的譜例顯示：解決出現臨時升降記號時，上下兩行音符未對齊的問題，並將音符改為置中，閱讀更清楚', '優化各練習的音量平衡，高音域的音符聽起來更清晰；四部和聲的低音聲部略為提高，更容易辨識', '兩聲部曲調的解答頁新增單獨聆聽高音、低音聲部的按鈕'] },
   { v: 'v.93', items: ['新增「高音質鋼琴音色」：改用 Yamaha C5 Grand Piano，音色更清晰、延音更自然', '新增「設定」頁面（選單頁最下方），可自由切換高音質音色與原本的標準音色；預設為高音質，若網路較慢或想要較快載入，可切換回原本的音色'] },
   { v: 'v.96', items: ['音程練習與和絃辨認的「連續聽寫」提交後，會逐題顯示譜例與正解，可直接重播對照', '音程練習與和絃辨認的錯題本改為分類顯示：「單題作答」與「連續聽寫」分開，連續聽寫再依每一次的日期分組；錯題本總覽的題數改為計算實際題目數量', '錯題本新增播放速度拉桿（節奏、單旋律、兩聲部、四部和聲、音高辨認五項），整頁共用一個速度，設定會自動記住', '四部和聲的譜例優化：全音符置中並與級數對齊、調名加上冒號', '!!贊助者可獲得專屬版本，將題目導出為音檔與譜例圖檔，方便備課與出題（請透過贊助頁的 LINE 與我聯繫）'] },
-  { v: 'v.97', items: ['音程練習與和絃辨認的設定頁，選擇難度時會列出該難度包含哪些音程／和絃，方便確認練習範圍', '修正節奏聽寫在「雙音」模式下，跨越小節線的連結線會出現音高錯誤的問題', '修正在 iPhone／iPad 將 App 切到背景後再切回來，聲音會失效的問題', '!!優化贊助者版，音程、和絃辨認的連續聽寫譜例導出版面'] }
+  { v: 'v.97', items: ['音程練習與和絃辨認的設定頁，選擇難度時會列出該難度包含哪些音程／和絃，方便確認練習範圍', '修正節奏聽寫在「雙音」模式下，跨越小節線的連結線會出現音高錯誤的問題', '修正在 iPhone／iPad 將 App 切到背景後再切回來，聲音會失效的問題', '!!優化贊助者版，音程、和絃辨認的連續聽寫譜例導出版面'] },
+  { v: 'v.98', items: ['優化 Android 手機與 Windows 電腦的中文字體：統一使用思源黑體，標題不再顯示成明體，整體字形與 iPhone 一致', '介面文字中的括號改用半形，節省畫面空間'] }
 ];
 
 function showChangelog(){
@@ -1499,7 +1500,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDon
     var same = h.filter(function(r){ return (r.preset || (r.mode==='standard-hs'?'highschool':'standard')) === pid; });
     var best = Math.max.apply(null, same.map(function(r){ return r.total; }));
     var stat = document.getElementById('examCardStat');
-    if(stat) stat.textContent = ' ｜ 最近 '+last.total+' 分（'+name+'）';
+    if(stat) stat.textContent = ' ｜ 最近 '+last.total+' 分 ('+name+')';
     var b = document.getElementById('examCardBadge'); if(b){ b.textContent = '最佳 '+best+' 分'; b.style.display=''; }
   }catch(e){}
 })();

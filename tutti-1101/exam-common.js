@@ -27,15 +27,15 @@
   } catch (e) {}
 
   var SECTIONS = {
-    pitcherr1:{ no: '一', label: '音高的辨認（第 1 題）', max: 5,  page: 'pitch-error-trainer.html', type: 'saved' },
-    pitcherr2:{ no: '一', label: '音高的辨認（第 2 題）', max: 5,  page: 'pitch-error-trainer.html', type: 'saved' },
+    pitcherr1:{ no: '一', label: '音高的辨認 (第 1 題)', max: 5,  page: 'pitch-error-trainer.html', type: 'saved' },
+    pitcherr2:{ no: '一', label: '音高的辨認 (第 2 題)', max: 5,  page: 'pitch-error-trainer.html', type: 'saved' },
     interval: { no: '一', label: '音程',              max: 10, page: 'interval-trainer.html', type: 'choice' },
     chord:    { no: '二', label: '和絃性質判斷',      max: 10, page: 'chord-trainer.html',    type: 'choice' },
-    rhythm1:  { no: '三', label: '節奏（第 1 題）',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
-    rhythm2:  { no: '三', label: '節奏（第 2 題）',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
-    rhythm3:  { no: '三', label: '節奏（第 3 題）',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
-    melody1:  { no: '四', label: '單旋律（第 1 題）', max: 10, page: 'melody-trainer.html',   type: 'saved' },
-    melody2:  { no: '四', label: '單旋律（第 2 題）', max: 10, page: 'melody-trainer.html',   type: 'saved' },
+    rhythm1:  { no: '三', label: '節奏 (第 1 題)',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
+    rhythm2:  { no: '三', label: '節奏 (第 2 題)',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
+    rhythm3:  { no: '三', label: '節奏 (第 3 題)',   max: 10, page: 'rhythm-trainer.html',   type: 'saved' },
+    melody1:  { no: '四', label: '單旋律 (第 1 題)', max: 10, page: 'melody-trainer.html',   type: 'saved' },
+    melody2:  { no: '四', label: '單旋律 (第 2 題)', max: 10, page: 'melody-trainer.html',   type: 'saved' },
     twopart:  { no: '五', label: '兩聲部',            max: 20, page: 'two-part-trainer.html', type: 'saved' },
     fourpart: { no: '六', label: '四部和聲',          max: 20, page: 'four-part-trainer.html',type: 'saved' }
   };
@@ -70,7 +70,7 @@
   var PRESETS = {
     standard: {
       mode: 'standard',
-      label: '大學檔（模擬大學聯合招生難易度）',
+      label: '大學檔 (模擬大學聯合招生難易度)',
       short: '大學檔',
       queue: ['pitcherr1', 'pitcherr2', 'interval', 'chord', 'rhythm1', 'rhythm2', 'melody1', 'melody2', 'twopart', 'fourpart'],
       /* 這一檔的大題編號（各檔不同，覆蓋 SECTIONS 的預設值） */
@@ -78,14 +78,14 @@
                    rhythm1: '四', rhythm2: '四', melody1: '五', melody2: '五',
                    twopart: '六', fourpart: '七' },
       groups: [
-        { no: '一', label: '音高的辨認',   max: 5,   keys: ['pitcherr1'], perUnit: 1, suffix: '（第 1 題）' },
-        { no: '一', label: '音高的辨認',   max: 5,   keys: ['pitcherr2'], perUnit: 1, suffix: '（第 2 題）' },
+        { no: '一', label: '音高的辨認',   max: 5,   keys: ['pitcherr1'], perUnit: 1, suffix: ' (第 1 題)' },
+        { no: '一', label: '音高的辨認',   max: 5,   keys: ['pitcherr2'], perUnit: 1, suffix: ' (第 2 題)' },
         { no: '二', label: '音程',         max: 10,  keys: ['interval'] },
         { no: '三', label: '和絃性質判斷', max: 10,  keys: ['chord'] },
-        { no: '四', label: '節奏',         max: 7.5, keys: ['rhythm1'], perUnit: 1.5, suffix: '（第 1 題）' },
-        { no: '四', label: '節奏',         max: 7.5, keys: ['rhythm2'], perUnit: 1.5, suffix: '（第 2 題）' },
-        { no: '五', label: '單旋律',       max: 10,  keys: ['melody1'], perUnit: 1, suffix: '（第 1 題）' },
-        { no: '五', label: '單旋律',       max: 10,  keys: ['melody2'], perUnit: 1, suffix: '（第 2 題）' },
+        { no: '四', label: '節奏',         max: 7.5, keys: ['rhythm1'], perUnit: 1.5, suffix: ' (第 1 題)' },
+        { no: '四', label: '節奏',         max: 7.5, keys: ['rhythm2'], perUnit: 1.5, suffix: ' (第 2 題)' },
+        { no: '五', label: '單旋律',       max: 10,  keys: ['melody1'], perUnit: 1, suffix: ' (第 1 題)' },
+        { no: '五', label: '單旋律',       max: 10,  keys: ['melody2'], perUnit: 1, suffix: ' (第 2 題)' },
         { no: '六', label: '兩聲部',       max: 15,  keys: ['twopart'], perUnit: 1 },
         { no: '七', label: '四部和聲',     max: 20,  keys: ['fourpart'], perUnit: 1 }
       ],
@@ -114,7 +114,7 @@
 
     highschool: {
       mode: 'standard-hs',
-      label: '高中檔（模擬音樂班甄選）',
+      label: '高中檔 (模擬音樂班甄選)',
       short: '高中檔',
       queue: ['interval', 'chord', 'rhythm1', 'rhythm2', 'rhythm3', 'melody1', 'twopart', 'fourpart'],
       groups: [
@@ -182,7 +182,7 @@
   function currentSection(s) { s = s || loadSession(); if (!s) return null; return s.queue[s.cursor] || null; }
   function configFor(k, s) { s = s || loadSession(); if (s && s.config && s.config[k]) return s.config[k]; return null; }
   function playMode(s) { s = s || loadSession(); return s ? s.play : 'A'; }
-  function playModeLabel(m) { return m === 'A' ? '逐題三連（每題連播 3 遍）' : '整段三輪（整段共播 3 輪）'; }
+  function playModeLabel(m) { return m === 'A' ? '逐題三連 (每題連播 3 遍)' : '整段三輪 (整段共播 3 輪)'; }
   function progress(s) { s = s || loadSession(); if (!s) return null; return { index: s.cursor + 1, total: s.queue.length, key: currentSection(s) }; }
 
   /* 取某段資料；沒有就用 gen() 產生並存起來（題目只產生一次） */
@@ -278,7 +278,7 @@
         var ua = (d.answers && d.answers[i]) || null;
         var ok = (ua === q.qualityKey);
         if (ok) cor++;
-        detail.push({ correct: ok, your: ua ? (d.labels[ua] || ua) : '（未作答）', right: d.labels[q.qualityKey] || q.qualityKey });
+        detail.push({ correct: ok, your: ua ? (d.labels[ua] || ua) : '(未作答)', right: d.labels[q.qualityKey] || q.qualityKey });
       });
       out[k] = { correct: cor, count: d.questions.length, detail: detail };
     });
@@ -379,7 +379,7 @@
     var st = document.createElement('style'); st.id = 'exam-ui-style';
     st.textContent =
       '#exam-head{background:#33415c;color:#fff;border-radius:12px;padding:8px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;flex:0 0 auto;}' +
-      '#exam-head .eh-title{font-family:Fraunces,serif;font-weight:600;font-size:20px;letter-spacing:0.01em;line-height:1.25;}' +
+      '#exam-head .eh-title{font-family:Fraunces,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-weight:600;font-size:20px;letter-spacing:0.01em;line-height:1.25;}' +
       '#exam-head .eh-play{font-size:12.5px;opacity:0.92;text-align:right;}' +
       '#exam-bar{flex:0 0 auto;}' +
       '#exam-warnmsg{flex:0 0 auto;}' +
@@ -389,7 +389,7 @@
       '#exam-warnmsg{display:none;background:rgba(166,73,59,0.1);border:1px solid rgba(166,73,59,0.4);color:#a6493b;font-size:12.5px;font-weight:700;border-radius:10px;padding:7px 12px;margin:6px 0;text-align:center;}' +
       '#exam-warnmsg.show{display:block;}' +
       '#exam-bar{display:flex;gap:8px;margin-top:10px;}' +
-      '#exam-bar button{flex:1;font-family:Inter,sans-serif;font-weight:700;font-size:13.5px;padding:10px 6px;border-radius:999px;border:1px solid #ddd8c9;background:#fbfaf6;color:#262420;cursor:pointer;touch-action:manipulation;transition:all .15s ease;}' +
+      '#exam-bar button{flex:1;font-family:Inter,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-weight:700;font-size:13.5px;padding:10px 6px;border-radius:999px;border:1px solid #ddd8c9;background:#fbfaf6;color:#262420;cursor:pointer;touch-action:manipulation;transition:all .15s ease;}' +
       '#exam-bar button:hover:not(:disabled),#exam-bar button:active:not(:disabled){border-color:#33415c;background:#33415c;color:#fbfaf6;}' +
       '#exam-bar button:disabled{opacity:0.4;cursor:not-allowed;}' +
       '#exam-bar button.submit{background:#a6493b;color:#fff;border-color:#a6493b;box-shadow:0 4px 14px rgba(166,73,59,0.28);}' +
@@ -397,8 +397,8 @@
       '.exam-modal{display:none;position:fixed;inset:0;z-index:1300;background:rgba(38,36,32,0.55);padding:24px 16px;overflow-y:auto;}' +
       '.exam-modal.open{display:flex;align-items:center;justify-content:center;}' +
       '.exam-modal .box{background:#efeee6;border:1px solid #ddd8c9;border-radius:16px;max-width:380px;width:100%;padding:24px 22px;box-shadow:0 20px 50px rgba(0,0,0,0.28);}' +
-      '.exam-modal h3{font-family:Fraunces,serif;font-size:20px;font-weight:600;margin:0 0 14px;text-align:center;}' +
-      '.exam-modal .opt{display:block;width:100%;font-family:Inter,sans-serif;font-weight:700;font-size:14.5px;padding:13px;margin-bottom:9px;border-radius:12px;border:1px solid #ddd8c9;background:#fbfaf6;color:#262420;cursor:pointer;text-align:center;touch-action:manipulation;}' +
+      '.exam-modal h3{font-family:Fraunces,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:20px;font-weight:600;margin:0 0 14px;text-align:center;}' +
+      '.exam-modal .opt{display:block;width:100%;font-family:Inter,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-weight:700;font-size:14.5px;padding:13px;margin-bottom:9px;border-radius:12px;border:1px solid #ddd8c9;background:#fbfaf6;color:#262420;cursor:pointer;text-align:center;touch-action:manipulation;}' +
       '.exam-modal .opt:hover,.exam-modal .opt:active{border-color:#33415c;background:rgba(51,65,92,0.08);}' +
       '.exam-modal .opt.danger{color:#a6493b;border-color:rgba(166,73,59,0.4);}' +
       '.exam-modal .dismiss{width:100%;background:none;border:none;font-size:13px;color:#75705f;text-decoration:underline;cursor:pointer;padding:8px;}';
@@ -427,7 +427,7 @@
     if (w) { if (on) w.classList.add('playing'); else { w.classList.remove('playing'); w.classList.remove('warn'); } }
     var msg = document.getElementById('exam-warnmsg');
     if (msg) {
-      if (on) { msg.textContent = '🔊 題目播放中…（本段僅播放一次）'; msg.classList.add('show'); }
+      if (on) { msg.textContent = '🔊 題目播放中… (本段僅播放一次)'; msg.classList.add('show'); }
       else msg.classList.remove('show');
     }
   }
@@ -435,7 +435,7 @@
   function warnLocked() {
     var w = document.getElementById('exam-lockwrap');
     var msg = document.getElementById('exam-warnmsg');
-    if (msg) { msg.textContent = '⚠️ 題目播放中，請聽完再操作（本段僅播放一次）'; msg.classList.add('show'); }
+    if (msg) { msg.textContent = '⚠️ 題目播放中，請聽完再操作 (本段僅播放一次)'; msg.classList.add('show'); }
     if (w) { w.classList.remove('warn'); void w.offsetWidth; w.classList.add('warn'); }
   }
 
@@ -469,8 +469,8 @@
     var modal = document.createElement('div'); modal.className = 'exam-modal'; modal.id = 'exam-moreModal';
     modal.innerHTML =
       '<div class="box"><h3>更多</h3>' +
-      '<button class="opt" id="exam-opt-pause">⏸ 暫離考試（保留進度）</button>' +
-      '<button class="opt" id="exam-opt-menu">🏠 回選單（保留進度）</button>' +
+      '<button class="opt" id="exam-opt-pause">⏸ 暫離考試 (保留進度)</button>' +
+      '<button class="opt" id="exam-opt-menu">🏠 回選單 (保留進度)</button>' +
       '<button class="opt danger" id="exam-opt-restart">🗑️ 放棄考試，重新開始</button>' +
       '<button class="dismiss" id="exam-opt-close">取消</button></div>';
     document.body.appendChild(modal);
@@ -494,7 +494,7 @@
       if (!isLast()) { location.href = gotoNext(); return; }
       var rep = unansweredReport();
       var msg;
-      if (rep.total > 0) msg = '尚有 ' + rep.total + ' 題未作答（' + rep.parts.join('、') + '），未作答一律計為零分。\n\n確定要交卷嗎？';
+      if (rep.total > 0) msg = '尚有 ' + rep.total + ' 題未作答 (' + rep.parts.join('、') + ')，未作答一律計為零分。\n\n確定要交卷嗎？';
       else msg = '確定要交卷嗎？交卷後不能再修改答案。';
       if (rep.unplayed.length) msg = '「' + rep.unplayed.join('、') + '」尚未播放。\n\n' + msg;
       if (window.confirm(msg)) location.href = 'exam.html?done=1';

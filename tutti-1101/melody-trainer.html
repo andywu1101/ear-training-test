@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="聽力訓練">
 <meta name="theme-color" content="#33415c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
 <!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
@@ -26,7 +26,7 @@
     --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -318,7 +318,7 @@
     <div class="pattern-grid" id="settingsPatternGrid"></div>
 
     <button class="start-big-btn" id="mel-enterBtn" disabled>🎯 開始單旋律訓練 →</button>
-    <button class="review-entry-btn" onclick="showPage('mel-review')">📕 錯題本（<span id="mel-reviewCount">0</span> 題）</button>
+    <button class="review-entry-btn" onclick="showPage('mel-review')">📕 錯題本 (<span id="mel-reviewCount">0</span> 題)</button>
   </div>
 
   <div id="pageMelPractice" class="page-view">
@@ -337,7 +337,7 @@
 
       <div class="unified-action-row">
         <button class="play-btn" id="mel-playBtn" disabled>▶ 播放題目</button>
-        <button class="action-btn" id="tuningABtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <button class="action-btn" id="tuningABtn" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
         <span id="mel-editBtns" style="display:flex; gap:8px;">
           <button class="action-btn" id="mel-tieBtn" style="display:none;">⌒ 連結線</button>
           <button class="action-btn" id="mel-backspaceBtn">⌫ 退格</button>
@@ -399,7 +399,7 @@
       <button class="play-btn" id="mel-ansPlayCorrect">🔁 聽正解</button>
       <button class="action-btn exp-btn" id="mel-ansExport" title="導出正解">⬇️</button>
     </div>
-    <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+    <div class="review-label">你的作答 (紅色為錯誤音符)：</div>
     <div class="review-staff"><div id="mel-ansUser"></div></div>
     <div class="review-label" style="margin-top:8px;">正確解答：</div>
     <div class="review-staff"><div id="mel-ansCorrect"></div></div>
@@ -2125,7 +2125,7 @@ function showPage(pageId) {
         const left = maxPlays - used;
         if(self.isPlaying || self._examTuning){ pb.textContent = '🔊 播放中...'; pb.disabled = true; return; }
         pb.disabled = !pianoInst || left <= 0;
-        pb.textContent = left > 0 ? `▶ 播放題目（剩餘 ${left} 次）` : '▶ 已用完播放次數';
+        pb.textContent = left > 0 ? `▶ 播放題目 (剩餘 ${left} 次)` : '▶ 已用完播放次數';
         EXm.buildHeader(host, KEY, headText());
       }
       this.updatePlayBtn = function(){ refreshPlayBtn(); };
@@ -2151,7 +2151,7 @@ function showPage(pageId) {
         if(firstTime){
           // 第一次播放先給標準音 A440（2 秒），再進預備拍
           self._examTuning = true; refreshPlayBtn();
-          document.getElementById('mel-playCaption').textContent = '🎵 標準音 A＝440Hz（2 秒）…';
+          document.getElementById('mel-playCaption').textContent = '🎵 標準音 A＝440Hz (2 秒)…';
           pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: 3.5 });
           const tid = setTimeout(runSeq, 2600); pendingTimers.push(tid);
         } else {
@@ -2243,7 +2243,7 @@ function showPage(pageId) {
         userSeq: [...this.userSeq], userPitch: JSON.parse(JSON.stringify(this.userPitch)), clef: this.clef,
         correctTie: [...this.questionTie], userTie: [...this.userTie],
         meter: this.meter, meterType: this.meterType, barsCount: this.barsCount, beatsPerBar: this.beatsPerBar, bpm: this.bpm,
-        label: `${this.clef === 'treble' ? '高音' : '低音'}・${this.meter}拍・${this.barsCount}小節`, correctText: '（旋律聽寫）', yourText: ''
+        label: `${this.clef === 'treble' ? '高音' : '低音'}・${this.meter}拍・${this.barsCount}小節`, correctText: '(旋律聽寫)', yourText: ''
       };
       this._ansItem = item;
       document.getElementById('mel-ansBadge').textContent = isCorrect ? '✅ 答對了' : '📖 解答對照';
@@ -2274,14 +2274,14 @@ function showPage(pageId) {
         const box = document.createElement('div'); box.className = 'review-item';
         box.innerHTML = `
           <div style="font-size:13px; font-weight:bold; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-            <span style="color:var(--wrong);">❌ 錯題（${item.label || ''}）</span>
+            <span style="color:var(--wrong);">❌ 錯題 (${item.label || ''})</span>
             <div style="display:flex; gap:8px;">
               <button class="select-all-btn mel-rev-user" style="color:var(--wrong); border-color:var(--wrong); background:var(--wrong-soft);">🔊 聽你的作答</button>
               <button class="select-all-btn mel-rev-correct">🔁 聽正解</button>
               <button class="select-all-btn exp-mini mel-rev-export" title="導出正解">⬇️</button>
             </div>
           </div>
-          <div class="review-label">你的作答（紅色為錯誤音符）：</div>
+          <div class="review-label">你的作答 (紅色為錯誤音符)：</div>
           <div class="review-staff"><div id="mel-rev-user-${uid}"></div></div>
           <div class="review-label" style="margin-top:8px;">正確解答：</div>
           <div class="review-staff"><div id="mel-rev-correct-${uid}"></div></div>
@@ -2527,17 +2527,17 @@ function showPage(pageId) {
   <div class="help-box">
     <button class="help-close" onclick="closeHelp('mel-helpModal')" aria-label="關閉">×</button>
     <h2>單旋律曲調 — 玩法說明</h2>
-    <p class="help-lead">把聽到的單旋律「節奏＋音高」完整寫出來（隨機無調性出題，用臨時記號作答）。</p>
+    <p class="help-lead">把聽到的單旋律「節奏＋音高」完整寫出來 (隨機無調性出題，用臨時記號作答)。</p>
     <h3>設定</h3>
-    <p>可選譜號（<b>高音／低音</b>）、拍號、小節數、速度與要出現的節奏型；測驗模式可限制重播次數（可自訂）。</p>
+    <p>可選譜號 (<b>高音／低音</b>)、拍號、小節數、速度與要出現的節奏型；測驗模式可限制重播次數 (可自訂)。</p>
     <h3>作答</h3>
-    <p>播放後用兩個分頁作答——「<b>編輯節奏</b>」點拍位再點節奏鍵盤填；「<b>編輯音高</b>」點一個音符 → 按音名（C～B、含高 Do）填入並自動跳下一個音。<b>要加升降記號時，點到那個音後直接按 ♯／♭／♮，就會套用到該音、並自動跳到下一個</b>（剛打完的音也能直接按記號修改）；八度用「高低八度」事後微調。填完提交 → 解答頁紅色標錯、與正解對照，可聆聽你的作答／正解。</p>
+    <p>播放後用兩個分頁作答——「<b>編輯節奏</b>」點拍位再點節奏鍵盤填；「<b>編輯音高</b>」點一個音符 → 按音名 (C～B、含高 Do)填入並自動跳下一個音。<b>要加升降記號時，點到那個音後直接按 ♯／♭／♮，就會套用到該音、並自動跳到下一個</b> (剛打完的音也能直接按記號修改)；八度用「高低八度」事後微調。填完提交 → 解答頁紅色標錯、與正解對照，可聆聽你的作答／正解。</p>
     <div class="help-common">
-      <h3>共通規則（六個練習都適用）</h3>
+      <h3>共通規則 (六個練習都適用)</h3>
       <p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>
       <p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>
-      <p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>
-      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>
+      <p>有格子沒填也可以提交，但會跳提醒 (<b>未填的部分算錯</b>)。</p>
+      <p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器 (重整或關閉都不會消失)，可重播對照。</p>
     </div>
     <p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
     <div class="help-foot"><a class="help-video" href="https://youtu.be/fwHc6VuFatg?t=468" target="_blank" rel="noopener">▶ 看完整操作教學</a><button onclick="closeHelp('mel-helpModal')">我知道了</button></div>

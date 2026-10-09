@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="聽力訓練">
 <meta name="theme-color" content="#33415c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
 <!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
@@ -30,7 +30,7 @@
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --correct-soft: rgba(75,122,91,0.10);
     --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* 觸控裝置（iPhone 加入主畫面當 App）操作優化：
@@ -333,7 +333,7 @@
       <div class="unified-action-row fpt-play-sticky">
         <button class="play-btn" id="btn-play-all" disabled>🔊 完整四部</button>
         <button class="play-btn" id="btn-play-arp" disabled>🎵 分解＋完整</button>
-        <button class="action-btn" id="tuningABtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <button class="action-btn" id="tuningABtn" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
       </div>
       <div class="editor-tabs-container">
         <div class="editor-tabs">
@@ -875,7 +875,7 @@ window.addEventListener('resize', setVH); setVH();
     { id: 2, name: 'Lv.2 含三和絃所有轉位' },
     { id: 3, name: 'Lv.3 含三和絃＋七和絃所有轉位' },
     { id: 4, name: 'Lv.4 含副屬和絃／拿坡里／變化和絃' },
-    { id: 5, name: 'Lv.5 含增六和絃（義／法／德）' }
+    { id: 5, name: 'Lv.5 含增六和絃 (義／法／德)' }
   ];
 
   // 24 大小調完整對應字典 (C=0 基準)
@@ -2452,7 +2452,7 @@ window.addEventListener('resize', setVH); setVH();
         if(self.isPlaying || self._examTuning){ bAll.disabled = true; bArp.disabled = true; return; }
         const off = !pianoInst || left <= 0;
         bAll.disabled = off; bArp.disabled = off;
-        bAll.textContent = left > 0 ? `🔊 完整四部（剩餘 ${left} 次）` : '🚫 次數用盡';
+        bAll.textContent = left > 0 ? `🔊 完整四部 (剩餘 ${left} 次)` : '🚫 次數用盡';
         EXm.buildHeader(host, KEY, headText());
       }
       this.updatePlayBtns = function(){ refreshPlayBtn(); };
@@ -2475,7 +2475,7 @@ window.addEventListener('resize', setVH); setVH();
         }
         if(firstTime){
           self._examTuning = true; refreshPlayBtn();
-          const cap = document.getElementById('fpt-playCaption'); if(cap) cap.textContent = '🎵 標準音 A＝440Hz（2 秒）…';
+          const cap = document.getElementById('fpt-playCaption'); if(cap) cap.textContent = '🎵 標準音 A＝440Hz (2 秒)…';
           pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: 3.5 });
           const tid = setTimeout(runSeq, 2600); pendingTimers.push(tid);
         } else runSeq();
@@ -3241,7 +3241,7 @@ window.addEventListener('resize', setVH); setVH();
         if (b) b.disabled = this.isPlaying || !pianoInst;
       });
       if (!this.isPlaying && this.mode === 'test' && this.testSession) {
-        document.getElementById('btn-play-all').textContent = `🔊 完整四部（剩 ${this.testSession.replaysLeft} 次）`;
+        document.getElementById('btn-play-all').textContent = `🔊 完整四部 (剩 ${this.testSession.replaysLeft} 次)`;
       } else if (!this.isPlaying) {
         document.getElementById('btn-play-all').textContent = '🔊 完整四部';
       }
@@ -3570,7 +3570,7 @@ window.addEventListener('resize', setVH); setVH();
   }
   function buildStorable(){ var m=window.fptModule; if(!m) return [];
     return (m.reviewItems||[]).map(function(it){ var kn=it.keyObj?it.keyObj.name:'';
-      return { id:it.id, bars:it.bars, keyObj:it.keyObj, userKeyAns:it.userKeyAns, userSeq:it.userSeq, userBass:it.userBass, questionSeq:it.questionSeq, questionVoicings:it.questionVoicings, results:it.results, ts:it.ts||Date.now(), label:kn, correctText:kn?('正解調性 '+kn):'（四部和聲）', yourText:'' }; }); }
+      return { id:it.id, bars:it.bars, keyObj:it.keyObj, userKeyAns:it.userKeyAns, userSeq:it.userSeq, userBass:it.userBass, questionSeq:it.questionSeq, questionVoicings:it.questionVoicings, results:it.results, ts:it.ts||Date.now(), label:kn, correctText:kn?('正解調性 '+kn):'(四部和聲)', yourText:'' }; }); }
   function persist(){ try{ window.REVIEW_STORE.save(KEY, buildStorable()); }catch(e){} }
   function hydrate(){ try{ var m=window.fptModule; if(!m) return; var stored=window.REVIEW_STORE.load(KEY);
     if(stored && stored.length > 50) stored = stored.slice(stored.length - 50);
@@ -3609,15 +3609,15 @@ window.addEventListener('resize', setVH); setVH();
   var hhtml = ''
     + '<div class="help-box"><button class="help-close" data-help-close aria-label="關閉">×</button>'
     + '<h2>四部和聲進行 — 玩法說明</h2>'
-    + '<p class="help-lead">聽辨古典四部和聲的進行——判斷調性、寫出低音線條、標出功能級數與轉位（全音符 4/4 記譜）。</p>'
-    + '<h3>設定</h3><p>可選調性（隨機 24 大小調／僅大調／僅小調）、小節數（6／8／10／12）、速度、難度 Lv1～Lv5（Lv1 本調三和絃原位，逐級加入轉位、七和絃、副屬／拿坡里，到 Lv5 增六和絃）。</p>'
-    + '<h3>作答</h3><p>按「完整四部」或「分解＋完整」聆聽，接著完成三件事——① <b>調性</b>：在譜例最前面的「調性?」下拉選單，從共用同一組調號的大調與關係小調中二選一。② <b>編輯低音</b>：用音名鍵盤寫出每格低音；先打音名，再用升／降／還原／「復原回本調」與八度做事後修飾（輸入後自動跳下一格）。③ <b>編輯級數</b>：選羅馬數字級數與轉位（原位／6／64，七和絃 65／43／42），另有大小寫切換、減／半減／增、副屬、拿坡里 N6、增六（義／法／德）等修飾鍵。</p>'
-    + '<p>按提交 → 若還有未完成（調性未選、低音或級數未填）會列出提醒、仍可提交（未填算錯）→ 解答頁把你的作答與標準正解「雙譜表對照」、紅色標錯，可聆聽完整／分解正解。</p>'
-    + '<div class="help-common"><h3>共通規則（六個練習都適用）</h3>'
+    + '<p class="help-lead">聽辨古典四部和聲的進行——判斷調性、寫出低音線條、標出功能級數與轉位 (全音符 4/4 記譜)。</p>'
+    + '<h3>設定</h3><p>可選調性 (隨機 24 大小調／僅大調／僅小調)、小節數 (6／8／10／12)、速度、難度 Lv1～Lv5 (Lv1 本調三和絃原位，逐級加入轉位、七和絃、副屬／拿坡里，到 Lv5 增六和絃)。</p>'
+    + '<h3>作答</h3><p>按「完整四部」或「分解＋完整」聆聽，接著完成三件事——① <b>調性</b>：在譜例最前面的「調性?」下拉選單，從共用同一組調號的大調與關係小調中二選一。② <b>編輯低音</b>：用音名鍵盤寫出每格低音；先打音名，再用升／降／還原／「復原回本調」與八度做事後修飾 (輸入後自動跳下一格)。③ <b>編輯級數</b>：選羅馬數字級數與轉位 (原位／6／64，七和絃 65／43／42)，另有大小寫切換、減／半減／增、副屬、拿坡里 N6、增六 (義／法／德)等修飾鍵。</p>'
+    + '<p>按提交 → 若還有未完成 (調性未選、低音或級數未填)會列出提醒、仍可提交 (未填算錯)→ 解答頁把你的作答與標準正解「雙譜表對照」、紅色標錯，可聆聽完整／分解正解。</p>'
+    + '<div class="help-common"><h3>共通規則 (六個練習都適用)</h3>'
     + '<p><b>練習模式</b>可無限聆聽、不限時間；<b>測驗模式</b>限制重播次數，模擬考試。</p>'
     + '<p>作答完按「<b>提交</b>」進入<b>解答頁</b>：顯示答對／答錯、你的作答與正解對照，可重播聆聽，再按「下一題」繼續。</p>'
-    + '<p>有格子沒填也可以提交，但會跳提醒（<b>未填的部分算錯</b>）。</p>'
-    + '<p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。</p>'
+    + '<p>有格子沒填也可以提交，但會跳提醒 (<b>未填的部分算錯</b>)。</p>'
+    + '<p>設定頁下方的「<b>錯題本</b>」會自動收錄答錯的題目，存在本機瀏覽器 (重整或關閉都不會消失)，可重播對照。</p>'
     + '</div>'
     + '<p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>'
     + '<div class="help-foot"><a class="help-video" href="https://youtu.be/fwHc6VuFatg?t=715" target="_blank" rel="noopener">▶ 看完整操作教學</a>'

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>音高辨認（找錯音） - 音樂聽力練習</title>
+<title>音高辨認 (找錯音) - 音樂聽力練習</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="聽力訓練">
 <meta name="theme-color" content="#33415c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
 <!-- 函式庫：本機優先，若本機檔案不存在則自動退回 CDN（確保永遠可用） -->
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
@@ -23,7 +23,7 @@
     --paper: #efeee6; --panel: #fbfaf6; --panel-border: #ddd8c9; --hairline: #e2ddce;
     --ink: #262420; --ink-soft: #75705f; --accent: #33415c; --accent-soft: rgba(51,65,92,0.08);
     --accent-line: rgba(51,65,92,0.35); --correct: #4b7a5b; --wrong: #a6493b; --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
-    --font-display: 'Fraunces', serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -247,7 +247,7 @@
       </div>
     </div>
 
-    <h1>音高辨認（找錯音）— 設定</h1>
+    <h1>音高辨認 (找錯音) — 設定</h1>
     <p class="subtitle">聆聽正確的演奏，並在題目的譜例上找出印錯的音高。節奏永遠正確，只有音高會錯。</p>
 
     <div class="switch-row">
@@ -350,7 +350,7 @@
     </div>
 
     <button class="start-big-btn" id="pe-enterBtn">🎯 確認設定，開始找錯音 →</button>
-    <button class="review-entry-btn" onclick="showPage('pe-review')">📕 錯題本（<span id="pe-reviewCount">0</span> 題）</button>
+    <button class="review-entry-btn" onclick="showPage('pe-review')">📕 錯題本 (<span id="pe-reviewCount">0</span> 題)</button>
   </div>
 
   <!-- ================= 作答頁 ================= -->
@@ -370,7 +370,7 @@
 
       <div class="unified-action-row">
         <button class="play-btn" id="pe-playBtn" disabled>▶ 播放題目</button>
-        <button class="action-btn" id="pe-tuningBtn" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+        <button class="action-btn" id="pe-tuningBtn" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
         <button class="action-btn" id="pe-clearBtn">🗑️ 清除圈選</button>
         <button class="action-btn btn-submit" id="pe-submitBtn">✔ 提交作答</button>
         <button class="action-btn btn-submit" id="pe-nextBtn" style="display:none;">下一題 →</button>
@@ -400,12 +400,12 @@
     <div class="unified-action-row" style="margin-bottom:14px;">
       <button class="play-btn" id="pe-ansPlayCorrect">🎧 聽正確演奏</button>
       <button class="action-btn" id="pe-ansPlayHeard" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽譜例上寫的</button>
-      <button class="action-btn" id="pe-ansTuning" style="display:none;" title="播放標準音 A（2 秒）">🎵 標準音 A</button>
+      <button class="action-btn" id="pe-ansTuning" style="display:none;" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
     </div>
 
-    <div class="review-label">題目譜例（含錯音）：綠色＝你找到的　｜　紅色＝漏掉的　｜　紅色虛線框＝圈錯的位置；音符上方標示正確的音高。</div>
+    <div class="review-label">題目譜例 (含錯音)：綠色＝你找到的　｜　紅色＝漏掉的　｜　紅色虛線框＝圈錯的位置；音符上方標示正確的音高。</div>
     <div class="review-staff"><div id="pe-ansScoreStaff"></div></div>
-    <div class="review-label" style="margin-top:8px;">正確演奏（藍色為對應的正確音）：</div>
+    <div class="review-label" style="margin-top:8px;">正確演奏 (藍色為對應的正確音)：</div>
     <div class="review-staff"><div id="pe-ansCorrectStaff"></div></div>
 
     <div class="pe-dbg" id="pe-ansDetail" style="margin-top:12px;"></div>
@@ -453,19 +453,19 @@
 <div class="help-modal" id="pe-helpModal" onclick="if(event.target===this) closeHelp('pe-helpModal')">
   <div class="help-box">
     <button class="help-close" onclick="closeHelp('pe-helpModal')" aria-label="關閉">×</button>
-    <h2>音高辨認（找錯音）— 玩法說明</h2>
+    <h2>音高辨認 (找錯音) — 玩法說明</h2>
     <p class="help-lead">聆聽旋律，並在題目的譜例上找出錯誤的音高。</p>
     <h3>玩法</h3>
     <p>播放的是<b>正確的演奏</b>，但譜例上有幾個音的<b>音高印錯了</b>。<b>節奏永遠正確</b>，只有音高會錯。你的任務是聽出哪幾個音跟聽到的不一樣，把譜上那幾個錯音圈起來。</p>
     <h3>設定</h3>
-    <p>可選<b>練習模式</b>（播放次數不限）或<b>測驗模式</b>（限制次數）；譜號、拍號、小節數、速度可自訂。<b>有調性</b>模式會顯示調號、旋律有和聲進行並收在主音上，可再指定調號範圍與大小調；<b>無調性</b>則全部使用臨時記號。<b>錯音數量</b>會隨小節數調整上限。</p>
+    <p>可選<b>練習模式</b> (播放次數不限)或<b>測驗模式</b> (限制次數)；譜號、拍號、小節數、速度可自訂。<b>有調性</b>模式會顯示調號、旋律有和聲進行並收在主音上，可再指定調號範圍與大小調；<b>無調性</b>則全部使用臨時記號。<b>錯音數量</b>會隨小節數調整上限。</p>
     <h3>作答</h3>
-    <p>按「<b>播放題目</b>」聆聽正確的演奏（先給預備拍）。<b>點一下</b>音符即可圈選，<b>再點一次</b>取消。譜例下方會顯示本題的錯音個數與你已圈選的數量。「<b>🎵 標準音 A</b>」隨時可按，不佔播放次數。</p>
+    <p>按「<b>播放題目</b>」聆聽正確的演奏 (先給預備拍)。<b>點一下</b>音符即可圈選，<b>再點一次</b>取消。譜例下方會顯示本題的錯音個數與你已圈選的數量。「<b>🎵 標準音 A</b>」隨時可按，不佔播放次數。</p>
     <h3>計分</h3>
-    <p>找到一個錯音得 1 分，<b>圈錯一個扣 1 分</b>（單題不會低於 0 分），漏掉的不計分。所以不要全部圈起來碰運氣。</p>
+    <p>找到一個錯音得 1 分，<b>圈錯一個扣 1 分</b> (單題不會低於 0 分)，漏掉的不計分。所以不要全部圈起來碰運氣。</p>
     <div class="help-common">
       <h3>錯題本</h3>
-      <p>沒有全部找出來的題目會自動收進「錯題本」，存在本機瀏覽器（重整或關閉都不會消失），可重播對照。每個練習最多保留最近 50 筆。</p>
+      <p>沒有全部找出來的題目會自動收進「錯題本」，存在本機瀏覽器 (重整或關閉都不會消失)，可重播對照。每個練習最多保留最近 50 筆。</p>
       <h3>回報問題</h3>
       <p style="margin-top:2px;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>
     </div>
@@ -1501,7 +1501,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
        否則 retry 會被自己剛設下的旗標擋掉。音符的時間是在 retry 裡才算的。 */
   try{
     if(window.PianoEngine && window.PianoEngine.enableMediaOutput)
-      window.PianoEngine.enableMediaOutput({ title: '音高辨認（找錯音）', artist: '音樂聽力練習',
+      window.PianoEngine.enableMediaOutput({ title: '音高辨認 (找錯音)', artist: '音樂聽力練習',
         onStop: function(){ try{ window.peStopAll(); }catch(e){} } });
   }catch(e){}
   function audioOut(c){ return (window.PianoEngine && window.PianoEngine.outputFor) ? window.PianoEngine.outputFor(c) : c.destination; }
@@ -2406,7 +2406,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         const left = maxPlays - used;
         if(self.isPlaying || self._examTuning){ pb.textContent = '🔊 播放中...'; pb.disabled = true; return; }
         pb.disabled = !pianoInst || left <= 0;
-        pb.textContent = left > 0 ? ('▶ 播放題目（剩餘 ' + left + ' 次）') : '▶ 已用完播放次數';
+        pb.textContent = left > 0 ? ('▶ 播放題目 (剩餘 ' + left + ' 次)') : '▶ 已用完播放次數';
         EXm.buildHeader(host, KEY, headText());
       }
       this.updatePlayBtn = function(){ refreshPlayBtn(); };
@@ -2434,7 +2434,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         if(firstTime){
           // 考試模式第一次播放前給標準音 A440（2 秒），再進預備拍
           self._examTuning = true; refreshPlayBtn();
-          document.getElementById('pe-playCaption').textContent = '🎵 標準音 A＝440Hz（2 秒）…';
+          document.getElementById('pe-playCaption').textContent = '🎵 標準音 A＝440Hz (2 秒)…';
           pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: 3.5 });
           pendingTimers.push(setTimeout(runSeq, 2600));
         } else {
@@ -2515,7 +2515,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           + '<button class="play-btn pe-rv-correct">🎧 聽正確演奏</button>'
           + '<button class="action-btn pe-rv-heard" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽譜例上寫的</button>'
           + '</div>'
-          + '<div class="review-label">題目譜例（含錯音）：綠＝你找到的　｜　紅＝漏掉的　｜　虛線框＝圈錯的；音符上方為正確的音高。</div>'
+          + '<div class="review-label">題目譜例 (含錯音)：綠＝你找到的　｜　紅＝漏掉的　｜　虛線框＝圈錯的；音符上方為正確的音高。</div>'
           + '<div class="review-staff"><div id="pe-rv-top-' + uid + '"></div></div>'
           + '<div class="review-label" style="margin-top:8px;">正確演奏：</div>'
           + '<div class="review-staff"><div id="pe-rv-bot-' + uid + '"></div></div>'
