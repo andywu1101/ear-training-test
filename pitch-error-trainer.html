@@ -16,6 +16,9 @@
 <script src="soundfont-player.min.js"></script>
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
+<script src="audio-export.js"></script>
+<script src="sheet-export.js"></script>
+<script src="export-menu.js"></script>
 <script src="vexflow-min.js"></script>
 <script>window.Vex||document.write('<script src="https://cdn.jsdelivr.net/npm/vexflow@3.0.9/releases/vexflow-min.js"><\/script>');</script>
 <style>
@@ -84,6 +87,7 @@
   .staff-scroll-container::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
 
   .unified-action-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .exp-btn{ flex:0 0 auto; min-width:52px; padding-left:12px; padding-right:12px; }
   .action-btn, .play-btn { font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 999px; cursor: pointer; transition: all 0.2s; }
   .action-btn { border: 1px solid var(--ink-soft); background: transparent; color: var(--ink); }
   .play-btn, .btn-submit { background: var(--accent); color: var(--panel); border: none; }
@@ -401,11 +405,12 @@
       <button class="play-btn" id="pe-ansPlayCorrect">🎧 聽正確演奏</button>
       <button class="action-btn" id="pe-ansPlayHeard" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽譜例上寫的</button>
       <button class="action-btn" id="pe-ansTuning" style="display:none;" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
+      <button class="action-btn exp-btn" id="pe-ansExport" title="導出">⬇️</button>
     </div>
 
     <div class="review-label">題目譜例 (含錯音)：綠色＝你找到的　｜　紅色＝漏掉的　｜　紅色虛線框＝圈錯的位置；音符上方標示正確的音高。</div>
     <div class="review-staff"><div id="pe-ansScoreStaff"></div></div>
-    <div class="review-label" style="margin-top:8px;">正確演奏 (藍色為對應的正確音)：</div>
+    <div class="review-label" style="margin-top:8px;">正確演奏 (綠色為對應的正確音)：</div>
     <div class="review-staff"><div id="pe-ansCorrectStaff"></div></div>
 
     <div class="pe-dbg" id="pe-ansDetail" style="margin-top:12px;"></div>
@@ -2193,11 +2198,31 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       });
     },
 
-    // 下方：正確演奏的譜例，對應位置用主色藍標出（與上方的綠／紅區隔）
+    // 下方：正確演奏的譜例，改正後的音用綠色音符＋綠框標出（v.98：原本是藍色、沒有框）。
+    // 綠框的大小與位置和上方的紅框相同；導出的「正確譜例」也是這個樣子。
     drawCorrectStaff(containerId, d){
+      const GREEN = '#4b7a5b';
       const marks = {};
-      d.errorGroups.forEach(g => { marks[d.groups[g].members[0]] = '#33415c'; });
-      drawStaff(containerId, d.seq, d.correctPitch, d.cfg, marks);
+      d.errorGroups.forEach(g => { marks[d.groups[g].members[0]] = GREEN; });
+      const notes = drawStaff(containerId, d.seq, d.correctPitch, d.cfg, marks);
+      const host = document.getElementById(containerId);
+      if(!host || !notes || !notes.length) return;
+      host.style.position = 'relative';
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:absolute; inset:0; pointer-events:none;';
+      host.appendChild(overlay);
+      d.errorGroups.forEach(g => {
+        const fn = notes[d.groups[g].members[0]]; if(!fn) return;
+        const stave = fn.getStave(); if(!stave) return;
+        const nx = (typeof fn.getAbsoluteX === 'function') ? fn.getAbsoluteX() : stave.getX();
+        const box = document.createElement('div');
+        box.style.cssText = 'position:absolute; border-radius:7px; border:1.5px solid var(--correct); background:rgba(75,122,91,0.10);';
+        box.style.left = (nx - 10) + 'px';
+        box.style.top = (stave.getYForLine(0) - 22) + 'px';
+        box.style.width = '26px';
+        box.style.height = '90px';
+        overlay.appendChild(box);
+      });
     },
 
     answerDetail(d){
@@ -2514,6 +2539,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           + '<div class="unified-action-row" style="margin:8px 0 12px;">'
           + '<button class="play-btn pe-rv-correct">🎧 聽正確演奏</button>'
           + '<button class="action-btn pe-rv-heard" style="color:var(--wrong); border-color:var(--wrong);">🎼 聽譜例上寫的</button>'
+          + '<button class="action-btn exp-btn pe-rv-export" title="導出">⬇️</button>'
           + '</div>'
           + '<div class="review-label">題目譜例 (含錯音)：綠＝你找到的　｜　紅＝漏掉的　｜　虛線框＝圈錯的；音符上方為正確的音高。</div>'
           + '<div class="review-staff"><div id="pe-rv-top-' + uid + '"></div></div>'
@@ -2524,6 +2550,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
         box.querySelector('.pe-rv-correct').onclick = () => this.playStatic(withReviewBpm(item), false);
         box.querySelector('.pe-rv-heard').onclick = () => this.playStatic(withReviewBpm(item), true);
+        box.querySelector('.pe-rv-export').onclick = (ev) => this.openExport(withReviewBpm(item), ev.currentTarget);   // 速度用錯題本的拉桿
 
         setTimeout(() => {
           this.drawAnswerSingle('pe-rv-top-' + uid, item);
@@ -2643,6 +2670,142 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       }, (time - ctx.currentTime) * 1000 + 150));
     },
 
+    /* ===== 導出（v.98，贊助者版）=====
+       三種：題目音檔（正確演奏）、題目譜例（含錯音、無標記）、正確譜例（正確的旋律，改正後的音綠色＋綠框）。
+       d 的欄位與錯題本的一筆相同：seq, correctPitch, errPitch, errorGroups, groups, cfg, bpm, meter, meterType。
+       ⚠ 譜例要另外畫一份乾淨的，不要抓畫面上那張（畫面上有使用者的圈選標記）。 */
+    exportData(){
+      return { seq: this.seq, correctPitch: this.correctPitch, errPitch: this.errPitch,
+        errorGroups: this.errorGroups, groups: this.info.groups, errorIdx: this.errorIdx,
+        cfg: this.staffCfg(), bpm: this.bpm, meter: this.meter, meterType: this.meterType };
+    },
+
+    openExport(d, btn){
+      if(!window.ExportMenu || !d) return;
+      const self = this;
+      ExportMenu.open({ subtitle: '這一題',
+        audioLabel: '🎵 下載題目音檔', sheetLabel: '🖼️ 下載題目譜例', sheet2Label: '🖼️ 下載正確譜例',
+        onAudio:  function(){ self.exportAudio(d, btn); },
+        onSheet:  function(){ self.exportSheet(d, false, btn); },
+        onSheet2: function(){ self.exportSheet(d, true, btn); } });
+    },
+
+    /* 音檔：標準音 A 2 秒 → 間隔 1 秒 → 預備拍 → 正確的演奏（比照單旋律） */
+    exportEvents(d){
+      const TUNING_SEC = 2.0, GAP_SEC = 1.0;
+      const secPerUnit = 60 / d.bpm;
+      const numerator = parseInt(d.meter.split('/')[0], 10);
+      const secPer16th = d.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
+      const ev = [{ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }];
+      let t = TUNING_SEC + GAP_SEC;
+      for(let i = 0; i < numerator; i++){
+        const strong = (d.meterType === 'simple') ? (i === 0) : (i % 3 === 0);
+        ev.push({ type: 'click', time: t + i * secPerUnit, freq: strong ? 1000 : 700, gain: 0.2 });
+      }
+      t += numerator * secPerUnit;
+      let noteIdx = 0;
+      d.seq.forEach(id => {
+        const block = ALL_BLOCKS[id];
+        const lens = block.lengths; const tn = block.tieNext || [];
+        let i = 0;
+        while(i < lens.length){
+          let total = lens[i]; let tied = tn[i]; let next = i + 1;
+          while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
+          const p = d.correctPitch[noteIdx + i];   // 正確的演奏
+          if(p) ev.push({ midi: midiOf(p), time: t, duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
+          t += total * secPer16th; i = next;
+        }
+        noteIdx += lens.length;
+      });
+      return ev;
+    },
+
+    /* 離屏畫一份譜。
+       withAnswer＝false：題目譜例，含錯音、全黑、不標示（可以直接當考題）。
+       withAnswer＝true ：正確譜例，畫正確的旋律，改正後的音用綠色音符＋綠框（同解答頁下方）。 */
+    exportShot(d, withAnswer){
+      this._shotSeq = (this._shotSeq || 0) + 1;
+      const id = '__peShot' + this._shotSeq;
+      const holder = document.createElement('div');
+      holder.id = id;
+      holder.style.cssText = 'position:absolute; left:-9999px; top:0;';
+      document.body.appendChild(holder);
+      const GREEN = '#4b7a5b';
+      const marks = {};
+      if(withAnswer) d.errorGroups.forEach(g => { marks[d.groups[g].members[0]] = GREEN; });
+      let notes = [];
+      try{ notes = drawStaff(id, d.seq, withAnswer ? d.correctPitch : d.errPitch, d.cfg, marks) || []; }catch(e){}
+      const out = { holder: holder, svg: holder.querySelector('svg'), overlays: [], titleX: 5 };
+      const first = notes.filter(Boolean)[0];
+      if(!out.svg || !first) return out;
+
+      // 標題的第一個字對齊譜號的左緣
+      const st = first.getStave();
+      if(st){
+        out.titleX = st.getX();
+        try{
+          const clef = st.getModifiers().filter(m => m.getCategory && m.getCategory() === 'clefs')[0];
+          if(clef && typeof clef.getX === 'function' && clef.getX() > 0) out.titleX = clef.getX();
+        }catch(e){}
+      }
+
+      if(withAnswer){
+        const NS = 'http://www.w3.org/2000/svg';
+        d.errorGroups.forEach(g => {
+          const fn = notes[d.groups[g].members[0]]; if(!fn) return;
+          const stave = fn.getStave(); if(!stave) return;
+          const nx = (typeof fn.getAbsoluteX === 'function') ? fn.getAbsoluteX() : stave.getX();
+          /* 與解答頁的綠框相同（寬 26、高 90、圓角 7）。
+             ⚠ 用 path 而不是 rect：SheetExport 依 path 的座標決定裁切範圍，rect 不會被算進去，框的下緣會被裁掉。 */
+          const x = nx - 10, y = stave.getYForLine(0) - 22, w = 26, h = 90, k = 7;
+          const r = document.createElementNS(NS, 'path');
+          r.setAttribute('d', 'M ' + (x + k) + ' ' + y + ' L ' + (x + w - k) + ' ' + y + ' A ' + k + ' ' + k + ' 0 0 1 ' + (x + w) + ' ' + (y + k)
+            + ' L ' + (x + w) + ' ' + (y + h - k) + ' A ' + k + ' ' + k + ' 0 0 1 ' + (x + w - k) + ' ' + (y + h)
+            + ' L ' + (x + k) + ' ' + (y + h) + ' A ' + k + ' ' + k + ' 0 0 1 ' + x + ' ' + (y + h - k)
+            + ' L ' + x + ' ' + (y + k) + ' A ' + k + ' ' + k + ' 0 0 1 ' + (x + k) + ' ' + y + ' Z');
+          r.setAttribute('fill', 'rgba(75,122,91,0.10)');
+          r.setAttribute('stroke', GREEN); r.setAttribute('stroke-width', 1.5);
+          out.svg.insertBefore(r, out.svg.firstChild);   // 放在最底層，不蓋住音符
+        });
+      }
+      return out;
+    },
+
+    async exportSheet(d, withAnswer, btn){
+      if(!btn || btn.disabled) return;
+      btn.disabled = true; const old = btn.textContent;
+      const made = this.exportShot(d, withAnswer);
+      try{
+        if(!made.svg) throw new Error('沒有譜例');
+        const n = (d.errorGroups || []).length;
+        await SheetExport.exportSheets([{
+          svg: made.svg, centre: false,
+          title: withAnswer ? '正確譜例' : ('題目：共 ' + n + ' 個錯音'), titleX: made.titleX,
+          overlays: made.overlays
+        }], withAnswer ? '找錯音_正確' : '找錯音_題目', {
+          onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+        });
+        btn.textContent = '✓';
+      }catch(e){ btn.textContent = '✗'; }
+      finally{ made.holder.remove(); }
+      setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+    },
+
+    async exportAudio(d, btn){
+      if(!btn || btn.disabled) return;
+      const ev = this.exportEvents(d);
+      if(!ev) return;
+      btn.disabled = true; const old = btn.textContent;
+      try{
+        await AudioExport.exportEvents(ev, '找錯音', {
+          onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
+          onProgress: function(pr){ btn.textContent = Math.round(pr * 100) + '%'; }
+        });
+        btn.textContent = '✓';
+      }catch(e){ btn.textContent = '✗'; }
+      setTimeout(function(){ btn.textContent = old; btn.disabled = false; }, 1600);
+    },
+
     playTuning(){
       if(!pianoInst) return;
       const __self = this;
@@ -2662,6 +2825,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     const paperId = _pp.get('paper'), paperSec = _pp.get('section');
     document.getElementById('pe-playBtn').onclick = () => peModule.play();
     document.getElementById('pe-tuningBtn').onclick = () => peModule.playTuning();
+    document.getElementById('pe-ansExport').onclick = function(){ peModule.openExport(peModule.exportData(), this); };
     document.getElementById('pe-clearBtn').onclick = () => peModule.clearPicks();
     document.getElementById('pe-submitBtn').onclick = () => peModule.submit();
     document.getElementById('pe-nextBtn').onclick = () => peModule.nextQuestion();

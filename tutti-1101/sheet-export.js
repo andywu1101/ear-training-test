@@ -19,13 +19,15 @@
   var PAD = 16;               // 外框留白
   var NUM_H = 22;             // 題號那一行的高度
   var ANS_H = 24;             // 答案那一行的高度
+  var TITLE_H = 24;           // 譜例上方標題那一行的高度（v.98，找錯音的「題目：共 N 個錯音」）
   var MAX_PIXELS = 40e6;      // Canvas 上限，避免手機記憶體爆掉
   var CREDIT_H = 22;          // 右下角來源標註的高度
   var CREDIT = '音樂聽力練習 · andywu1101.github.io/ear-training · Heng-Heng Wu';
 
   /* SVG 元素 → Image。
      先序列化成 blob URL，讓瀏覽器自己解碼，避免跨來源污染。 */
-  function svgToImage(svgEl) {
+  function svgToImage(svgEl, opt) {
+    opt = opt || {};
     return new Promise(function (resolve, reject) {
       var clone = svgEl.cloneNode(true);
       clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
@@ -76,6 +78,9 @@
          ⚠ 只動這份 clone，不影響畫面上的譜例。 */
       (function () {
         try {
+          /* 整段旋律（找錯音）不需要：它是給單一和絃置中用的，
+             平移後音符會和頁面另外疊上去的色框錯開。 */
+          if (opt.centre === false) return;
           if (box.headCentre == null) return;
           var HEAD_W = 13;
           var bMin = Infinity, bMax = -Infinity;
@@ -130,7 +135,7 @@
     var perRow = opts.perRow || PER_ROW;
     var shots = [];
     for (var i = 0; i < items.length; i++) {
-      shots.push(await svgToImage(items[i].svg));
+      shots.push(await svgToImage(items[i].svg, { centre: items[i].centre }));
     }
 
     /* 裁掉 SVG 上下的空白，題號與答案才不會離譜例太遠。
@@ -159,12 +164,13 @@
     var cellH = Math.max.apply(null, shots.map(function (s) { return s.cutH; }));
     var hasNum = items.some(function (it) { return it.num != null; });
     var hasAns = items.some(function (it) { return it.answer; });
+    var hasTitle = items.some(function (it) { return it.title; });
     /* overlays 是畫在譜例座標系上的標註（例如四部和聲的級數，
        它在 HTML overlay 裡、不在 SVG 中，而且位置在 SVG 下緣之外），
        所以要多留 extraH 的高度。 */
     var extraH = Math.max.apply(null, items.map(function (it) { return it.extraH || 0; }));
     var ROW_GAP = 40;           // 每排之間的間隔
-    var blockH = cellH + extraH + (hasNum ? NUM_H : 0) + (hasAns ? ANS_H : 0)
+    var blockH = cellH + extraH + (hasNum ? NUM_H : 0) + (hasAns ? ANS_H : 0) + (hasTitle ? TITLE_H : 0)
                + ((rowsCount(items, perRow) > 1) ? ROW_GAP : 0);
 
     var cols = Math.min(perRow, items.length);
@@ -194,9 +200,16 @@
         ctx.textAlign = 'left';
         ctx.fillText(it.num + '.', x + 4, y + NUM_H - 4);
       }
-      var sy = y + (hasNum ? NUM_H : 0);
+      var sy = y + (hasNum ? NUM_H : 0) + (hasTitle ? TITLE_H : 0);
       /* 譜例在格子裡置中（各頁的譜例寬度不一樣），並裁掉上下的空白 */
       var ox = x + (cellW - s.w) / 2;
+      /* 標題寫在譜例上方，第一個字對齊譜號（titleX 是譜例座標系裡譜號的左緣） */
+      if (it.title) {
+        ctx.fillStyle = INK;
+        ctx.font = 'bold 15px -apple-system, "PingFang TC", "Noto Sans TC", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(it.title, ox + (it.titleX || 0), sy - 7);
+      }
       ctx.drawImage(s.img, 0, s.cutTop, s.w, s.cutH, ox, sy, s.w, s.cutH);
 
       /* 標註用的是譜例自己的座標系，平移到圖片上對應的位置即可 */

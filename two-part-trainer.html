@@ -2621,14 +2621,16 @@ function showPage(pageId) {
     var btn = document.getElementById('tuningABtn'); if(!btn) return;
     // 考試模式已於第一次播放前自動給標準音，不需要這顆按鈕
     if(window.EXAM && window.EXAM.isExamMode()){ btn.style.display = 'none'; return; }
+    // 用固定的原文字還原：連按兩下時才不會停在「A 響起…」
+    var LABEL = btn.textContent, timer = null;
     btn.onclick = function tuningPlay(){
       try{
         if(!pianoInst) return;
         if(!audioReady(tuningPlay)) return;
         var ctx = ensureAudio();
         pianoInst.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
-        var t = btn.textContent; btn.textContent = '🎵 A 響起…';
-        setTimeout(function(){ btn.textContent = t; }, 2000);
+        btn.textContent = '🎵 A 響起…';
+        clearTimeout(timer); timer = setTimeout(function(){ btn.textContent = LABEL; }, 2000);
       }catch(e){}
     };
   })();
