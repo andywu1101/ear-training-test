@@ -78,14 +78,15 @@
          + '-' + p(d.getHours()) + p(d.getMinutes()) + '.mp3';
   }
 
-  /* 交付檔案：手機走系統分享面板，桌機走一般下載。
+  /* 交付檔案：iOS 走系統分享面板，安卓與桌機走一般下載。
+     v.98：安卓改成直接下載（存到 Download，相簿看得到）。安卓的分享面板沒有「存到相簿」，
+     只會列出 LINE、Gmail 等 App；iOS 仍走分享面板，選「儲存影像」才進得了相簿。
      ⚠ iOS 不能退回下載——它會靜默失敗，使用者會以為存好了。 */
   async function deliver(blob, name) {
     var ua = '';
     try { ua = navigator.userAgent || ''; } catch (e) {}
     var isIOS = /iPad|iPhone|iPod/.test(ua) ||
       (/Macintosh/.test(ua) && (function () { try { return (navigator.maxTouchPoints || 0) > 1; } catch (e) { return false; } })());
-    var isAndroid = /Android/.test(ua);
     var file = new File([blob], name, { type: 'audio/mpeg' });
 
     function download() {
@@ -99,7 +100,7 @@
       } catch (e) { return false; }
     }
 
-    if ((isIOS || isAndroid) && navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (isIOS && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: name });
         return { ok: true };
