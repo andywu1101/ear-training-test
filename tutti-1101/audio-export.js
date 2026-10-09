@@ -111,7 +111,11 @@
       }
     }
     if (isIOS) return { ok: false, reason: 'ios-no-share' };
-    return download() ? { ok: true } : { ok: false, reason: 'download' };
+    if (download()) {
+      if (global.ExportMenu && global.ExportMenu.notifyDownloaded) global.ExportMenu.notifyDownloaded();
+      return { ok: true };
+    }
+    return { ok: false, reason: 'download' };
   }
 
   /* 對外唯一入口。

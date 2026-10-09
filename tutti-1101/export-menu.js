@@ -86,5 +86,34 @@
     lock(false);
   }
 
-  global.ExportMenu = { open: open, close: close };
+  /* 下載完成的提示（v.98）：畫面下方的深色膠囊，顯示 1.5 秒後淡出。
+     安卓與電腦直接下載時沒有任何回饋（vivo 實測），所以補這一句。
+     iOS 走分享面板，有系統自己的畫面，不呼叫這裡。
+     ⚠ 網頁只知道「已把檔案交給瀏覽器下載」，無法確認真的存好；譜例與音檔都很小，實際上沒有落差。 */
+  var toastTimer = null;
+  function notifyDownloaded() {
+    var isAndroid = false;
+    try { isAndroid = /Android/.test(navigator.userAgent || ''); } catch (e) {}
+    var msg = isAndroid ? '✓ 下載完成，已存到 Download' : '✓ 下載完成';
+    var el = document.getElementById('exportDoneToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'exportDoneToast';
+      el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:2000;' +
+        'background:rgba(38,36,32,0.92);color:#fff;font-size:13.5px;line-height:1.4;' +
+        'padding:9px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,0.3);' +
+        'pointer-events:none;white-space:nowrap;transition:opacity .4s ease;';
+      document.body.appendChild(el);
+    }
+    clearTimeout(toastTimer);
+    el.textContent = msg;
+    el.style.display = '';
+    el.style.opacity = '1';
+    toastTimer = setTimeout(function () {
+      el.style.opacity = '0';                                   // 淡出 0.4 秒
+      toastTimer = setTimeout(function () { el.style.display = 'none'; }, 400);
+    }, 1500);
+  }
+
+  global.ExportMenu = { open: open, close: close, notifyDownloaded: notifyDownloaded };
 })(window);
