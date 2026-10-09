@@ -950,7 +950,10 @@ function showPage(pageId) {
 
       let globalIdx = 0;
       let beatFirstNotes = [];
-      let pitchState = { isDual: cfg.pitchMode === 'dual', currentPitch: startPitch };
+      /* v.98.9：起始音（A 或 E）只有雙音模式才用；單音模式一律畫在 A（第二間）。
+         ⚠ 出題時不分模式都會隨機抽起始音，原本單音模式抽到 E 就整條畫在第一線（播放端一直是對的）。
+           改在這裡判斷，錯題本裡已存的舊紀錄也會一起畫對。 */
+      let pitchState = { isDual: cfg.pitchMode === 'dual', currentPitch: cfg.pitchMode === 'dual' ? startPitch : 69 };
 
       for (let b = 0; b < cfg.barsCount; b++) {
         const isFirst = (b === 0);

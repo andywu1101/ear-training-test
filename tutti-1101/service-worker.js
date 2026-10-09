@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v98-9'; // v.98：Android／Windows 中文字體改用思源黑體、括號改半形
+const CACHE_NAME = 'ear-training-shell-v98-10'; // v.98：Android／Windows 中文字體改用思源黑體、括號改半形
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
