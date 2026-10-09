@@ -107,7 +107,8 @@
   .score-box .label{ font-size: 11px; color: var(--ink-soft); letter-spacing: 0.03em; }
   .card{ background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 28px 20px; margin-bottom: 24px; box-shadow: 0 1px 2px rgba(38,36,32,0.04), 0 10px 28px rgba(38,36,32,0.035); }
   .play-area{ display:flex; flex-direction:column; align-items:center; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--hairline); }
-  .play-btn{ font-family: var(--font-body); font-weight: 600; font-size: 15px; padding: 14px 28px; border-radius: 999px; background: var(--accent); color: var(--panel); border: none; cursor:pointer; display:flex; align-items:center; gap: 8px; transition: filter 0.12s ease, transform 0.1s ease; box-shadow: 0 4px 12px rgba(51,65,92,0.18); touch-action: manipulation; }
+  .play-row{ display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; }
+  .play-btn{ font-family: var(--font-body); font-weight: 600; font-size: 15px; padding: 12px 20px; border-radius: 999px; background: var(--accent); color: var(--panel); border: none; cursor:pointer; display:flex; align-items:center; gap: 8px; transition: filter 0.12s ease, transform 0.1s ease; box-shadow: 0 4px 12px rgba(51,65,92,0.18); touch-action: manipulation; }
   .play-btn:hover{ filter: brightness(1.12); }
   .play-btn:active{ transform: scale(0.98); }
   .play-btn:disabled{ opacity: 0.5; cursor: wait; box-shadow: none; }
@@ -355,7 +356,7 @@
       <div id="int-dictPanel" style="display:none;">
         <div class="dictation-progress" id="int-dictDots"></div>
         <div class="play-area" style="border-bottom:none; padding-bottom: 8px; margin-bottom: 8px;">
-          <button class="play-btn" id="int-dictPlayBtn" disabled>▶ 播放整段和聲音程</button>
+          <div class="play-row"><button class="play-btn" id="int-dictPlayBtn" disabled>▶ 播放整段</button><button class="icon-btn" id="int-dictTuningBtn" title="播放標準音 A (2 秒)">🎵 標準音 A</button></div>
         </div>
         <p class="dictation-hint">點擊選中欲作答的題號格子，接著點擊下方選項即可填入答案，系統會自動跳至下一題！若要修改，可點擊格子內的選項清除，或直接點選新題號。</p>
         <div class="dictation-slots" id="int-dictSlots"></div>
@@ -378,7 +379,7 @@
 
       <div id="int-questionPanel">
         <div class="play-area">
-          <button class="play-btn" id="int-playBtn" disabled>▶ 播放和聲音程 (連續 3 遍)</button>
+          <div class="play-row"><button class="play-btn" id="int-playBtn" disabled>▶ 播放音程</button><button class="icon-btn" id="int-tuningBtn" title="播放標準音 A (2 秒)">🎵 標準音 A</button></div>
           <div class="play-caption" id="int-playCaption"></div>
           <div class="question-count" id="int-questionCount">第 1 題</div>
         </div>
@@ -1358,8 +1359,8 @@ function updateStaffHeader(pageId){
       const btn = document.getElementById('int-playBtn');
       if(mode === 'test' && testSession && !testSession.finished){
         const rm = testSession.replaysLeft === Infinity ? '不限' : testSession.replaysLeft;
-        btn.textContent = `▶ 播放和聲音程 (剩餘 ${rm} 次)`; btn.disabled = !pianoInstrument || testSession.replaysLeft <= 0;
-      } else { btn.textContent = '▶ 播放和聲音程 (連續 3 遍)'; btn.disabled = !pianoInstrument; }
+        btn.textContent = (rm === '不限') ? '▶ 播放音程' : `▶ 播放音程 (剩 ${rm} 次)`; btn.disabled = !pianoInstrument || testSession.replaysLeft <= 0;
+      } else { btn.textContent = '▶ 播放音程'; btn.disabled = !pianoInstrument; }
     }
 
     function addToRev(q, userKey, qNum){
@@ -1535,7 +1536,7 @@ function updateStaffHeader(pageId){
     function updateDictCaption(){
       const btn = document.getElementById('int-dictPlayBtn'); if(!dictSession){ btn.disabled=true; return; }
       const rm = dictSession.replaysLeft === Infinity ? '不限' : dictSession.replaysLeft;
-      btn.textContent = `▶ 播放整段和聲音程 (共 ${dictSession.questions.length} 題，剩餘 ${rm} 次)`;
+      btn.textContent = (rm === '不限') ? '▶ 播放整段' : `▶ 播放整段 (剩 ${rm} 次)`;
       btn.disabled = !pianoInstrument || dictSession.submitted || dictSession.replaysLeft <= 0;
     }
 
@@ -1869,12 +1870,12 @@ function updateStaffHeader(pageId){
           document.getElementById('int-dictSlots').classList.remove('locked-pending');
         }
         var pb = document.getElementById('int-dictPlayBtn');
-        function lockPlayBtn(){ pb.disabled = true; pb.textContent = '▶ 已播放 (本段不再重播)'; }
+        function lockPlayBtn(){ pb.disabled = true; pb.textContent = '▶ 已播放'; }
         if(sd.played){ unlockAnswering(); lockPlayBtn(); }
 
         function readyPlayBtn(){
           if(sd.played) { lockPlayBtn(); return true; }
-          if(pianoInstrument){ pb.disabled=false; pb.textContent = '▶ 播放整段 ('+(playM==='A'?'逐題三連':'整段三輪')+'，僅一次)'; return true; }
+          if(pianoInstrument){ pb.disabled=false; pb.textContent = '▶ 播放整段 (剩 1 次)'; return true; }
           return false;
         }
         if(!readyPlayBtn()){
@@ -1890,7 +1891,13 @@ function updateStaffHeader(pageId){
           unlockAnswering(); lockPlayBtn();
           EXm.setPlaying(true);
           var _tt = (typeof trackTimeout==='function') ? trackTimeout : function(fn,ms){ return setTimeout(fn,ms); };
-          var ctx = audioCtx; var t = ctx.currentTime + 0.08; var evs = [];
+          var ctx = audioCtx; var evs = [];
+          /* 比照單旋律的考試：先給標準音 A440（2 秒），2.6 秒後才開始第一題 */
+          var tA = ctx.currentTime + 0.08;
+          pianoInstrument.play(69, tA, { duration: 2.0, gain: 3.5 });
+          pb.textContent = '🎵 標準音 A…';
+          _tt(lockPlayBtn, 2600);
+          var t = tA + 2.6;
           var G = EXm.GAPS; var hold = CHORD_HOLD_SEC;
           var repGap=G.repGap/1000, qGap=G.questionGap/1000, iGap=G.interleaveGap/1000, rGap=G.roundGap/1000;
           function playOne(q){ q.intervals.forEach(function(iv){ pianoInstrument.play(q.root+iv, t, {duration:hold, gain:gainFor(q.root+iv, q.intervals.length)}); }); }
@@ -1911,7 +1918,7 @@ function updateStaffHeader(pageId){
           _tt(function(){ EXm.setPlaying(false); }, (t-ctx.currentTime)*1000 + 120);
         };
 
-        EXm.guardVisibility(KEY, function(){ window.stopAllPlayback(); EXm.setPlaying(false); });
+        EXm.guardVisibility(KEY, function(){ window.stopAllPlayback(); EXm.setPlaying(false); lockPlayBtn(); });
         EXm.buildBar(host, saveAns);
         ensureAudio();
       },
@@ -1925,6 +1932,24 @@ function updateStaffHeader(pageId){
   window.intModule = intModule;
   intModule.init();
   loadPiano();
+  /* 「🎵 標準音 A」按鈕（單題作答與連續聽寫）：隨時可按，播放 A4（440Hz）2 秒，不影響題目播放次數。
+     考試模式在播放前會自動給標準音，所以隱藏。
+     按鈕文字用固定的原文字還原，連按兩下時才不會停在「A 響起…」。 */
+  ['int-tuningBtn', 'int-dictTuningBtn'].forEach(function(id){
+    var btn = document.getElementById(id); if(!btn) return;
+    if(window.EXAM && window.EXAM.isExamMode()){ btn.style.display = 'none'; return; }
+    var LABEL = btn.textContent, timer = null;
+    btn.onclick = function tuningPlay(){
+      try{
+        if(!pianoInstrument) return;
+        if(!audioReady(tuningPlay)) return;
+        var ctx = ensureAudio();
+        pianoInstrument.play(69, ctx.currentTime + 0.02, { duration: 2.0, gain: 3.5 });
+        btn.textContent = '🎵 A 響起…';
+        clearTimeout(timer); timer = setTimeout(function(){ btn.textContent = LABEL; }, 2000);
+      }catch(e){}
+    };
+  });
   (function(){
     var _q = new URLSearchParams(location.search);
     var _pid = _q.get('paper'), _sec = _q.get('section');
