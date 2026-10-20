@@ -272,9 +272,15 @@
   /* v.99：5 秒 → 60 秒。媒體元素每次「叫醒」都有機會取樣率沒對好（推論，見手冊第二十一部），
      練習時一題接一題，60 秒內不暫停就幾乎不用重新叫醒。代價：播完後動態島多顯示最多約 60 秒。 */
   var MEDIA_IDLE_SEC = 60;        // 最後一個音結束後多久暫停媒體元素（不要一直佔著「播放中」）
+  /* v.99：開頁後第一次叫醒媒體元素，先讓它安靜跑 0.8 秒才放行第一個音。
+     實機（iPhone）遇過：剛打開頁面的第一次播放先偏低、不到 1 秒恢復，而媒體元素的時鐘比例仍是 1.0
+     → 推測是 iOS 開始出聲時底層切換取樣率的過渡，讓過渡期間只播到無聲。
+     只套用在「這一頁的第一次」；閒置 60 秒後或切回來的叫醒不等。頁面的 audioReady 閘門會等 mediaSettled()，
+     最多等 3 秒（AUDIO_PROBE_MAX），0.8 秒在範圍內。效果待上線觀察（太少見，無法用測試證明）。 */
+  var MEDIA_FIRST_WARMUP_MS = 800;
   var MEDIA_CLAIM_TIMEOUT = 1500; // 媒體元素多久沒播起來就當作失敗
   var MEDIA_MAX_FAILS = 2;        // 連續失敗幾次就整個停用，退回原本的做法
-  var mediaOut = { enabled: false, meta: null, fails: 0 };
+  var mediaOut = { enabled: false, meta: null, fails: 0, warmed: false };
 
   function isRealtime(ctx) {
     return !!(ctx && typeof ctx.createMediaStreamDestination === 'function');
@@ -363,11 +369,17 @@
     var done = false;
     function ok() {
       if (done) return; done = true;
-      mo.state = 'ready'; mediaOut.fails = 0;
       routeTo(ctx, mo, 'media');
       setNowPlaying('playing');
       startIdleWatch(ctx, mo);
       measureWake(ctx, mo);
+      var ready = function () {
+        mo.state = 'ready'; mediaOut.fails = 0;
+        if (mo.el.paused) routeTo(ctx, mo, 'direct');   // 暖機期間被系統暫停：改走 direct，不要送進暫停中的元素
+      };
+      if (mediaOut.warmed) { ready(); return; }
+      mediaOut.warmed = true;
+      setTimeout(ready, MEDIA_FIRST_WARMUP_MS);   // 暖機期間 state 維持 'claiming'，閘門會等
     }
     function fail() {
       if (done) return; done = true;
