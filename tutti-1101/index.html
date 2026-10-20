@@ -530,7 +530,7 @@ window.addEventListener('appinstalled', function(){
     <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
     <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.98　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.99　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -1280,7 +1280,8 @@ window.CHANGELOG = [
   { v: 'v.93', items: ['新增「高音質鋼琴音色」：改用 Yamaha C5 Grand Piano，音色更清晰、延音更自然', '新增「設定」頁面（選單頁最下方），可自由切換高音質音色與原本的標準音色；預設為高音質，若網路較慢或想要較快載入，可切換回原本的音色'] },
   { v: 'v.96', items: ['音程練習與和絃辨認的「連續聽寫」提交後，會逐題顯示譜例與正解，可直接重播對照', '音程練習與和絃辨認的錯題本改為分類顯示：「單題作答」與「連續聽寫」分開，連續聽寫再依每一次的日期分組；錯題本總覽的題數改為計算實際題目數量', '錯題本新增播放速度拉桿（節奏、單旋律、兩聲部、四部和聲、音高辨認五項），整頁共用一個速度，設定會自動記住', '四部和聲的譜例優化：全音符置中並與級數對齊、調名加上冒號', '!!贊助者可獲得專屬版本，將題目導出為音檔與譜例圖檔，方便備課與出題（請透過贊助頁的 LINE 與我聯繫）'] },
   { v: 'v.97', items: ['音程練習與和絃辨認的設定頁，選擇難度時會列出該難度包含哪些音程／和絃，方便確認練習範圍', '修正節奏聽寫在「雙音」模式下，跨越小節線的連結線會出現音高錯誤的問題', '修正在 iPhone／iPad 將 App 切到背景後再切回來，聲音會失效的問題', '!!優化贊助者版，音程、和絃辨認的連續聽寫譜例導出版面'] },
-  { v: 'v.98', items: ['優化 Android 手機與 Windows 電腦的中文字體，使介面更美觀', '音程練習與和絃辨認，新增標準音A按鈕', '修正單音節奏練習譜例出現音高錯誤的問題', '!!贊助者版新增「音高辨認 (找錯音)」的導出：可下載題目音檔、題目譜例與正確譜例'] }
+  { v: 'v.98', items: ['優化 Android 手機與 Windows 電腦的中文字體，使介面更美觀', '音程練習與和絃辨認，新增標準音A按鈕', '修正單音節奏練習譜例出現音高錯誤的問題', '!!贊助者版新增「音高辨認 (找錯音)」的導出：可下載題目音檔、題目譜例與正確譜例'] },
+  { v: 'v.99', items: ['修正電腦與 Android 手機偶爾出現播放音高偏移的問題'] }
 ];
 
 function showChangelog(){
@@ -1308,6 +1309,24 @@ function showChangelog(){
   if(m2){ m2.classList.add('open'); syncBodyLock(); if(box) setTimeout(function(){ box.scrollTop = box.scrollHeight; }, 30); }
 }
 function closeChangelog(){ var m=document.getElementById('logModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
+/* 音訊除錯模式的隱藏開關（v.99）：更新日誌裡的「目前版本 v.XX」連點 5 下（2 秒內）切換開／關。
+   主畫面 App 沒有網址列，不能加 ?debug=audio，所以另外給這個入口。
+   ⚠ 鍵名要與 piano-engine.js 的 DEBUG_KEY 一致；面板顯示在各練習頁的左下角。 */
+(function(){
+  var el = document.getElementById('logCurrent'); if(!el) return;
+  var KEY = 'earTrainer.debug.audio', taps = [], timer = null;
+  el.addEventListener('click', function(){
+    var now = Date.now();
+    taps = taps.filter(function(t){ return now - t < 2000; }); taps.push(now);
+    if(taps.length < 5) return;
+    taps = [];
+    var on = false;
+    try{ on = localStorage.getItem(KEY) === '1'; if(on) localStorage.removeItem(KEY); else localStorage.setItem(KEY, '1'); }catch(e){ return; }
+    var keep = el.textContent;
+    el.textContent = on ? '🔧 音訊除錯模式：已關閉' : '🔧 音訊除錯模式：已開啟（練習頁左下角會顯示）';
+    clearTimeout(timer); timer = setTimeout(function(){ el.textContent = keep; }, 2000);
+  });
+})();
 
 /* 彈窗開啟時鎖住背景捲動，避免手指滑到下層頁面 */
 

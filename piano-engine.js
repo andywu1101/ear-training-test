@@ -261,7 +261,17 @@
      ＝ 媒體輸出對恢復聲音確實有幫助（解答了手冊 19.7 的疑問），必須與換取樣率一起保留。
      ⚠ 不要再關掉它。詳見手冊第二十部。 */
   var MEDIA_OUTPUT_ON = true;
-  var MEDIA_IDLE_SEC = 5;         // 最後一個音結束後多久暫停媒體元素（不要一直佔著「播放中」）
+  /* v.99：只有 iPhone／iPad 走媒體元素，電腦與安卓改回直接輸出。
+     原因：少數時候音高偏約 1.5 個半音（44.1k／48k 的比例），學校電腦、作者的電腦也遇過，
+     共通點是都經過媒體元素轉送；而電腦與安卓本來就沒有「切回來沒聲音」的問題，不需要它。
+     ⚠ iPad 的 Safari 預設自稱 Macintosh，要用「Mac＋觸控螢幕」認出來，否則 iPad 會被拿掉媒體元素。 */
+  function isIOSDevice() {
+    var n = global.navigator || {}, ua = n.userAgent || '';
+    return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (n.maxTouchPoints || 0) > 1);
+  }
+  /* v.99：5 秒 → 60 秒。媒體元素每次「叫醒」都有機會取樣率沒對好（推論，見手冊第二十一部），
+     練習時一題接一題，60 秒內不暫停就幾乎不用重新叫醒。代價：播完後動態島多顯示最多約 60 秒。 */
+  var MEDIA_IDLE_SEC = 60;        // 最後一個音結束後多久暫停媒體元素（不要一直佔著「播放中」）
   var MEDIA_CLAIM_TIMEOUT = 1500; // 媒體元素多久沒播起來就當作失敗
   var MEDIA_MAX_FAILS = 2;        // 連續失敗幾次就整個停用，退回原本的做法
   var mediaOut = { enabled: false, meta: null, fails: 0 };
@@ -271,7 +281,7 @@
   }
   function enableMediaOutput(meta) {
     var C = global.AudioContext || global.webkitAudioContext;
-    mediaOut.enabled = MEDIA_OUTPUT_ON && !!(C && C.prototype && C.prototype.createMediaStreamDestination);
+    mediaOut.enabled = MEDIA_OUTPUT_ON && isIOSDevice() && !!(C && C.prototype && C.prototype.createMediaStreamDestination);
     mediaOut.meta = meta || null;
     return mediaOut.enabled;
   }
@@ -357,6 +367,7 @@
       routeTo(ctx, mo, 'media');
       setNowPlaying('playing');
       startIdleWatch(ctx, mo);
+      measureWake(ctx, mo);
     }
     function fail() {
       if (done) return; done = true;
@@ -400,7 +411,7 @@
   function rebind(inst, ctx) {
     if (!inst || !ctx || !(inst instanceof SalamanderPiano)) return false;
     try { inst.stop(0); } catch (e) {}    // 舊 context 上凍住的音符一併取消（立刻停止，不淡出）
-    inst.ctx = ctx;
+    inst.ctx = ctx; dbg.ctx = ctx;
     return true;
   }
 
@@ -414,6 +425,7 @@
       try {
         var inst = await buildSalamander(ctx, opts.onProgress);
         inst.__kit = 'salamander';
+        if (isRealtime(ctx)) { dbg.ctx = ctx; dbg.kit = 'Yamaha C5'; }
         return inst;
       } catch (e) {
         if (opts.onFallback) opts.onFallback(e);
@@ -421,6 +433,7 @@
     }
     var m = await buildMusyng(ctx);
     m.__kit = 'musyng';
+    if (isRealtime(ctx)) { dbg.ctx = ctx; dbg.kit = '標準音色'; }
     /* soundfont 音色的發聲在套件內部，這裡記下每個音的結束時間，閒置判斷才準 */
     var mPlay = m.play;
     m.play = function (midi, when, o) {
@@ -565,6 +578,66 @@
     }
     return await ctx.startRendering();
   }
+
+  /* ---------- 除錯模式（v.99） ----------
+     開啟：練習頁網址加 ?debug=audio；關閉：?debug=off。
+     主畫面 App 沒有網址列 → 選單頁連點版本號 5 下也能開關（同一個 localStorage 鍵）。
+     面板只「看」，不改變任何播放行為。 */
+  var DEBUG_KEY = 'earTrainer.debug.audio';
+  var dbg = { ctx: null, kit: '', wakes: 0, ratio: null, measuring: false };
+  /* 媒體元素叫醒後，比對它的時鐘與 context 的時鐘各走了多少（約 0.3 秒）。
+     正常＝1.000；取樣率對錯時推測會是 0.919（44.1k 當 48k）或 1.088（48k 當 44.1k）。
+     ⚠ 只量、不等：不影響第一個音出來的時間。量不到（媒體元素時鐘沒動）就記成 null。 */
+  function measureWake(ctx, mo) {
+    dbg.wakes++; dbg.ratio = null; dbg.measuring = true;
+    var e0, c0;
+    try { e0 = mo.el.currentTime; c0 = ctx.currentTime; } catch (e) { dbg.measuring = false; return; }
+    setTimeout(function () {
+      dbg.measuring = false;
+      try {
+        var de = mo.el.currentTime - e0, dc = ctx.currentTime - c0;
+        dbg.ratio = (de > 0 && dc > 0.1) ? de / dc : null;
+      } catch (e) {}
+    }, 300);
+  }
+  function debugOn() {
+    try {
+      var q = new URLSearchParams(global.location.search).get('debug');
+      if (q === 'audio') localStorage.setItem(DEBUG_KEY, '1');
+      else if (q === 'off') localStorage.removeItem(DEBUG_KEY);
+      return localStorage.getItem(DEBUG_KEY) === '1';
+    } catch (e) { return false; }
+  }
+  function debugText() {
+    var c = dbg.ctx, mo = c && c.__mo;
+    var route = (mediaOut.enabled && mo && mo.route === 'media') ? '播放器' : '直接';
+    var el = !mediaOut.enabled ? '不使用' : (!mo || !mo.el) ? '未叫醒' : (mo.el.paused ? '暫停' : '播放中');
+    var ratio = dbg.measuring ? '量測中…' : (dbg.ratio == null ? (dbg.wakes ? '無法量測' : '—') : dbg.ratio.toFixed(3));
+    return '🔧 音訊除錯\n' +
+      '裝置　　' + (isIOSDevice() ? 'iOS' : '其他') + '\n' +
+      '輸出　　' + route + '\n' +
+      '取樣率　' + (c ? Math.round(c.sampleRate) : '—') + '\n' +
+      '狀態　　' + (c ? c.state : '—') + '\n' +
+      '播放器　' + el + '\n' +
+      '時鐘比例 ' + ratio + '\n' +
+      '叫醒次數 ' + dbg.wakes + '\n' +
+      '音色　　' + (dbg.kit || '—');
+  }
+  function startDebugPanel() {
+    if (!debugOn() || !global.document) return;
+    var show = function () {
+      if (document.getElementById('audioDebugPanel')) return;
+      var p = document.createElement('div'); p.id = 'audioDebugPanel';
+      p.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:3000;pointer-events:none;' +
+        'background:rgba(20,20,20,0.78);color:#fff;font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;' +
+        'white-space:pre;padding:6px 8px;border-radius:8px;';
+      document.body.appendChild(p);
+      var tick = function () { try { p.textContent = debugText(); } catch (e) {} };
+      tick(); setInterval(tick, 500);
+    };
+    if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+  }
+  startDebugPanel();
 
   global.PianoEngine = {
     load: load,
