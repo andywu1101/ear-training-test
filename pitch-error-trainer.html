@@ -224,6 +224,28 @@
   /* v.99.5：整個 App 不能選取文字——長按按鈕不會選到字、也不會跳出放大鏡與選單（像原生 App）；輸入框除外 */
   html, body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
   input, textarea, [contenteditable="true"]{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+
+  /* ===== v.100：統一版面風格＋電腦／iPad 橫式放寬譜例 =====
+     ① 拿掉整頁外框與上半部陰影，上下之間只留一條線（比照四部和聲）；下方按鈕區維持淺色、而且左右滿版。
+        滿版淺色用「box-shadow 往左右下延伸＋clip-path 只露出左右下方」，不必改 HTML 結構。
+     ② 顯示寬度 ≥1000（電腦、iPad 橫式；瀏覽器放大到 1000 以下就維持原版面）：
+        上半部（返回鍵、題目資訊、譜例、播放鈕）放寬到最多 1400、左右各留 24；下方鍵盤維持原寬置中。
+        解答頁與錯題本：譜例（與其標題）一起放寬，其餘按鈕、文字維持原寬置中。
+     ⚠ 用到 :has()（iOS 15.4／Chrome 105 起）；更舊的瀏覽器只是不放寬，版面不會壞。 */
+  .wrap{ border-left:none; border-right:none; box-shadow:none; }
+  .practice-top-fixed{ background:transparent; box-shadow:none; border-bottom:1px solid var(--panel-border); }
+  .practice-bottom-scroll{ box-shadow:0 0 0 100vmax var(--panel); clip-path:inset(0 -100vmax -100vmax -100vmax); }
+  /* 放寬後譜例置中（比照其他頁）。⚠ 置中的是「放譜的容器」不是 svg：找錯音的點擊區與對錯框是疊在容器上的
+     絕對定位層，座標以容器左上角為準；只移動 svg 會讓框和音符錯開（v.100 實測過）。 */
+  #pe-staff{ width:max-content !important; display:block !important; margin-left:auto; margin-right:auto; }
+  @media (min-width:1000px){
+    .practice-top-fixed{ width:min(1400px, calc(100vw - 48px)); max-width:none;
+      margin-left:calc(50% - min(700px, 50vw - 24px)); margin-right:0; box-sizing:border-box; }
+    .wrap:has(#pagePEAnswer.active), .wrap:has(#pagePEReview.active){ max-width:min(1400px, calc(100vw - 48px)); }
+    #pagePEAnswer > *, #pagePEReview > *{ max-width:820px; margin-left:auto; margin-right:auto; width:100%; box-sizing:border-box; }
+    #pagePEAnswer > :is(.review-label, .review-staff), #pagePEReview > #pe-reviewList{ max-width:none; }
+    #pagePEAnswer .review-staff > div, #pagePEReview .review-staff > div{ width:max-content; margin-left:auto; margin-right:auto; position:relative; }   /* 同上：置中容器，對錯框才會跟著走 */
+  }
 </style>
 <style>
   /* ===== 07 音高辨認 專屬 ===== */

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v99-6'; // v.99：電腦與安卓改直接輸出（修正偶爾音高偏移）、iOS 播放器閒置 60 秒、音訊除錯模式
+const CACHE_NAME = 'ear-training-shell-v100'; // v.100：統一各練習頁版面風格、電腦與 iPad 橫式放寬譜例
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

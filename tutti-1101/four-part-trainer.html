@@ -226,6 +226,38 @@
   /* v.99.5：整個 App 不能選取文字——長按按鈕不會選到字、也不會跳出放大鏡與選單（像原生 App）；輸入框除外 */
   html, body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
   input, textarea, [contenteditable="true"]{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+
+  /* ===== v.100：統一版面風格＋電腦／iPad 橫式放寬譜例 =====
+     ① 拿掉整頁外框與上半部陰影，上下之間只留一條線（比照四部和聲）；下方按鈕區維持淺色、而且左右滿版。
+        滿版淺色用「box-shadow 往左右下延伸＋clip-path 只露出左右下方」，不必改 HTML 結構。
+     ② 顯示寬度 ≥1000（電腦、iPad 橫式；瀏覽器放大到 1000 以下就維持原版面）：
+        上半部（返回鍵、題目資訊、譜例、播放鈕）放寬到最多 1400、左右各留 24；下方鍵盤維持原寬置中。
+        解答頁與錯題本：譜例（與其標題）一起放寬，其餘按鈕、文字維持原寬置中。
+     ⚠ 用到 :has()（iOS 15.4／Chrome 105 起）；更舊的瀏覽器只是不放寬，版面不會壞。 */
+  /* 四部和聲的作答頁鎖定成一個視窗高、overflow:hidden（見上方 .fpt-practice-layout），
+     往外延伸的底色會被它裁掉，所以改成讓作答頁本身左右滿版，裡面再各自限制寬度。 */
+  body:has(#pageFptPractice.active){ overflow-x:hidden; }
+  #pageFptPractice.active{ width:100vw; margin-left:calc(50% - 50vw); padding-left:16px; padding-right:16px;
+    box-sizing:border-box; background:var(--panel); }
+  #pageFptPractice .fpt-staff-area{ width:100%; max-width:820px; margin-left:auto; margin-right:auto; margin-bottom:0;
+    box-shadow:0 0 0 100vmax var(--paper); clip-path:inset(-100vmax -100vmax 0 -100vmax); }
+  #pageFptPractice > *:not(.fpt-staff-area){ width:100%; max-width:820px; margin-left:auto; margin-right:auto; box-sizing:border-box; }
+  #pageFptPractice .fpt-keyboard-area{ padding-top:16px !important; }   /* HTML 上有 inline padding */
+  #pageFptPractice .fpt-play-sticky{ background:var(--panel); }
+  @media (min-width:1000px){
+    #pageFptPractice.active{ padding-left:24px; padding-right:24px; }   /* 比照其他頁：左右各留 24 */
+  }
+  @media (min-width:1024px){
+    /* 電腦版作答頁不鎖視窗高（見上方「電腦版」區塊），內容不夠高時下方會露出頁面底色：補滿到視窗底，
+       body 底部留白改由作答頁自己留，淺色才會一路到底 */
+    body:has(#pageFptPractice.active){ padding-bottom:0; }
+    #pageFptPractice.active{ min-height:100vh; padding-bottom:64px; }
+    #pageFptPractice .fpt-staff-area{ max-width:1400px; }
+    .wrap:has(#pageFptAnswer.active), .wrap:has(#pageFptReview.active){ max-width:min(1400px, calc(100vw - 48px)); }
+    #pageFptAnswer > *, #pageFptReview > *{ max-width:820px; margin-left:auto; margin-right:auto; width:100%; box-sizing:border-box; }
+    #pageFptAnswer > :is(.review-label, .staff-scroll-container), #pageFptReview > #fpt-reviewSection{ max-width:none; }
+    #fpt-reviewSection > :not(#fpt-reviewList){ max-width:820px; margin-left:auto; margin-right:auto; }   /* 錯題本多包一層容器 */
+  }
 </style>
 </head>
 <body>
