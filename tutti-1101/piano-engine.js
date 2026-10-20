@@ -302,6 +302,12 @@
      只聽 pagehide：切到別的 App 觸發的是 visibilitychange，不會走到這裡，背景繼續播完不受影響。
      暫停後 pause 事件會把出口切回 direct；回到這一頁時，下次播放照原本的流程重新要回媒體播放。 */
   var allMO = [];
+  /* v.99.5：切到背景或鎖螢幕 → 標記所有媒體元素「回來後要重新要回」（見 claimMedia 的 stale） */
+  if (global.document && global.document.addEventListener) {
+    global.document.addEventListener('visibilitychange', function () {
+      if (global.document.hidden) allMO.forEach(function (mo) { mo.stale = true; });
+    });
+  }
   if (global.addEventListener) {
     global.addEventListener('pagehide', function () {
       allMO.forEach(function (mo) {
@@ -323,7 +329,7 @@
       /* iOS 自己把媒體元素暫停時（例如被別的 App 搶走），出口立刻切回 direct，
          否則之後的聲音會送進一個暫停中的元素，什麼都聽不到 */
       mo.el.addEventListener('pause', function () {
-        if (mo.state !== 'claiming') routeTo(ctx, mo, 'direct');
+        if (mo.state !== 'claiming' && mo.el.paused) routeTo(ctx, mo, 'direct');   // v.99.5：事件晚到時已重新播起來就不動
       });
     } catch (e) { mo.dest = null; mo.el = null; }
     mo.bus.connect(ctx.destination);
@@ -334,11 +340,15 @@
   function routeTo(ctx, mo, which) {
     if (mo.route === which) return;
     try { mo.bus.disconnect(); } catch (e) {}
-    /* v.99.4 實驗（除錯模式的開關）：媒體元素照樣叫醒、照樣在播（佔住 iOS 的聲音通道與鎖定畫面），
-       但聲音本身直接接 destination，不經過媒體元素轉送——媒體元素播的是沒有任何輸入的無聲串流。
-       目的：確認 iPhone「A 之後馬上播題目，開頭偏低約 80 音分、0.3 秒後瞬間跳回」是不是轉送造成的。 */
-    mo.expApplied = (which === 'media' && expDirect());   // 給除錯面板顯示「實際」接到哪裡
-    mo.bus.connect(which === 'media' && !mo.expApplied ? mo.dest : ctx.destination);
+    /* v.99.5 正式做法：媒體元素「只佔通道」——照樣叫醒、照樣在播（讓 iOS 承認這是正在播放的 App：
+       切回來要得回聲音、動態島與鎖定畫面照常顯示），但播的是沒有任何輸入的無聲串流；
+       聲音本身一律直接接 destination，不經過媒體元素轉送。
+       ⚠ 原因：經過媒體元素轉送時，iPhone 偶爾會「暫時放慢播放速度」補緩衝——
+         實測標準音 A 之後馬上播題目，開頭偏低約 80 音分、0.3 秒後瞬間跳回（v.99.4 實驗證實，見手冊 21.7）。
+       除錯模式的「實驗：經過播放器」開關可以切回舊做法對照（viaPlayer）。
+       mo.route 仍叫 'media'：代表「媒體元素已要回、正在佔通道」，其他判斷照舊。 */
+    mo.viaPlayer = (which === 'media' && viaPlayer());   // 給除錯面板顯示「實際」接到哪裡
+    mo.bus.connect(mo.viaPlayer ? mo.dest : ctx.destination);
     mo.route = which;
   }
   /* 所有聲音的出口 */
@@ -386,7 +396,7 @@
     var mo = ctx.__mo;
     if (!mo) return true;
     if (!mo.el) return false;                       // 這台不支援媒體元素輸出，走 direct
-    return mo.state !== 'claiming' && (mo.route !== 'media' || mo.el.paused);
+    return mo.state !== 'claiming' && (mo.route !== 'media' || mo.el.paused || !!mo.stale);
   }
   function mediaSettled(ctx) {
     return !(ctx && ctx.__mo && ctx.__mo.state === 'claiming');
@@ -397,8 +407,13 @@
     var mo;
     try { mo = busOf(ctx); } catch (e) { return; }
     if (!mo.el || mo.state === 'claiming') return;
-    if (mo.route === 'media' && !mo.el.paused) return;
+    if (mo.route === 'media' && !mo.el.paused && !mo.stale) return;
     mo.state = 'claiming';
+    /* v.99.5：從背景／鎖螢幕回來（stale）而媒體元素看起來還在播：先停再播，重新向 iOS 登記「正在播放」。
+       媒體元素只播無聲時，iOS 鎖螢幕後可能把它從「正在播放」移除（動態島消失），但 paused 仍是 false，
+       不重新要回就一直回不來。state 已是 'claiming'，pause 事件不會把出口切回 direct。 */
+    mo.stale = false;
+    if (!mo.el.paused) { try { mo.el.pause(); } catch (e) {} }
     var done = false;
     function ok() {
       if (done) return; done = true;
@@ -631,9 +646,10 @@
      主畫面 App 沒有網址列 → 選單頁連點版本號 5 下也能開關（同一個 localStorage 鍵）。
      面板只「看」，不改變任何播放行為。 */
   var DEBUG_KEY = 'earTrainer.debug.audio';
-  var EXP_DIRECT_KEY = 'earTrainer.debug.expDirect';   // v.99.4 實驗：iOS 媒體元素只佔通道、聲音直接輸出
-  function expDirect() {
-    try { return localStorage.getItem(DEBUG_KEY) === '1' && localStorage.getItem(EXP_DIRECT_KEY) === '1'; }
+  /* v.99.5：實驗開關改成反向——預設已是「直接輸出」，開關打開才改回 v.99.4 以前的「經過播放器」做對照 */
+  var EXP_VIA_KEY = 'earTrainer.debug.expViaPlayer';
+  function viaPlayer() {
+    try { return localStorage.getItem(DEBUG_KEY) === '1' && localStorage.getItem(EXP_VIA_KEY) === '1'; }
     catch (e) { return false; }
   }
   var dbg = { ctx: null, kit: '', wakes: 0, ratio: null, measuring: false };
@@ -663,7 +679,7 @@
   function debugText() {
     var c = dbg.ctx, mo = c && c.__mo;
     var route = (mediaOut.enabled && mo && mo.route === 'media')
-      ? (mo.expApplied ? '直接（播放器只佔通道）' : '播放器') : '直接';
+      ? (mo.viaPlayer ? '經過播放器（實驗）' : '直接（播放器只佔通道）') : '直接';
     var el = !mediaOut.enabled ? '不使用' : (!mo || !mo.el) ? '未叫醒' : (mo.el.paused ? '暫停' : '播放中');
     var ratio = dbg.measuring ? '量測中…' : (dbg.ratio == null ? (dbg.wakes ? '無法量測' : '—') : dbg.ratio.toFixed(3));
     return '🔧 音訊除錯\n' +
@@ -691,8 +707,8 @@
         'color:#fff;background:#555;border:1px solid #999;border-radius:6px;padding:3px 6px;';
       exp.onclick = function () {
         try {
-          if (localStorage.getItem(EXP_DIRECT_KEY) === '1') localStorage.removeItem(EXP_DIRECT_KEY);
-          else localStorage.setItem(EXP_DIRECT_KEY, '1');
+          if (localStorage.getItem(EXP_VIA_KEY) === '1') localStorage.removeItem(EXP_VIA_KEY);
+          else localStorage.setItem(EXP_VIA_KEY, '1');
         } catch (e) {}
         tick();
       };
@@ -701,8 +717,8 @@
       var tick = function () {
         try {
           info.textContent = debugText();
-          var on = expDirect();
-          exp.textContent = '實驗：直接輸出　' + (on ? '開' : '關');
+          var on = viaPlayer();
+          exp.textContent = '實驗：經過播放器　' + (on ? '開' : '關');
           exp.style.background = on ? '#2f6b45' : '#555';
         } catch (e) {}
       };

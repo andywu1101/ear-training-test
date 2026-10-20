@@ -130,6 +130,9 @@
   .hist-pct small{ color:var(--ink-soft); font-weight:500; }
   .danger-btn{ font-family:var(--font-body); font-size:12px; font-weight:600; color:#8a3b2f; background:#fff; border:1px solid rgba(166,73,59,0.4); padding:8px 14px; border-radius:999px; cursor:pointer; }
   @media (max-width:480px){ .score-hero .pct{ font-size:52px; } h1{ font-size:26px; } }
+  /* v.99.5：整個 App 不能選取文字——長按按鈕不會選到字、也不會跳出放大鏡與選單（像原生 App）；輸入框除外 */
+  html, body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  input, textarea, [contenteditable="true"]{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
 </style>
 </head>
 <body>

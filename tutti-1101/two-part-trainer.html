@@ -223,6 +223,9 @@
 
   /* 左緣 24px 是防返回手勢的攔截區，作答頁的返回鍵往右挪一點避開 */
   #pageTpPractice .nav-back-btn { margin-left: 18px; }
+  /* v.99.5：整個 App 不能選取文字——長按按鈕不會選到字、也不會跳出放大鏡與選單（像原生 App）；輸入框除外 */
+  html, body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  input, textarea, [contenteditable="true"]{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
 </style>
 </head>
 <body>
