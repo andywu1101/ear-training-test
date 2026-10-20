@@ -334,7 +334,11 @@
   function routeTo(ctx, mo, which) {
     if (mo.route === which) return;
     try { mo.bus.disconnect(); } catch (e) {}
-    mo.bus.connect(which === 'media' ? mo.dest : ctx.destination);
+    /* v.99.4 實驗（除錯模式的開關）：媒體元素照樣叫醒、照樣在播（佔住 iOS 的聲音通道與鎖定畫面），
+       但聲音本身直接接 destination，不經過媒體元素轉送——媒體元素播的是沒有任何輸入的無聲串流。
+       目的：確認 iPhone「A 之後馬上播題目，開頭偏低約 80 音分、0.3 秒後瞬間跳回」是不是轉送造成的。 */
+    mo.expApplied = (which === 'media' && expDirect());   // 給除錯面板顯示「實際」接到哪裡
+    mo.bus.connect(which === 'media' && !mo.expApplied ? mo.dest : ctx.destination);
     mo.route = which;
   }
   /* 所有聲音的出口 */
@@ -627,6 +631,11 @@
      主畫面 App 沒有網址列 → 選單頁連點版本號 5 下也能開關（同一個 localStorage 鍵）。
      面板只「看」，不改變任何播放行為。 */
   var DEBUG_KEY = 'earTrainer.debug.audio';
+  var EXP_DIRECT_KEY = 'earTrainer.debug.expDirect';   // v.99.4 實驗：iOS 媒體元素只佔通道、聲音直接輸出
+  function expDirect() {
+    try { return localStorage.getItem(DEBUG_KEY) === '1' && localStorage.getItem(EXP_DIRECT_KEY) === '1'; }
+    catch (e) { return false; }
+  }
   var dbg = { ctx: null, kit: '', wakes: 0, ratio: null, measuring: false };
   /* 媒體元素叫醒後，比對它的時鐘與 context 的時鐘各走了多少（約 0.3 秒）。
      正常＝1.000；取樣率對錯時推測會是 0.919（44.1k 當 48k）或 1.088（48k 當 44.1k）。
@@ -653,7 +662,8 @@
   }
   function debugText() {
     var c = dbg.ctx, mo = c && c.__mo;
-    var route = (mediaOut.enabled && mo && mo.route === 'media') ? '播放器' : '直接';
+    var route = (mediaOut.enabled && mo && mo.route === 'media')
+      ? (mo.expApplied ? '直接（播放器只佔通道）' : '播放器') : '直接';
     var el = !mediaOut.enabled ? '不使用' : (!mo || !mo.el) ? '未叫醒' : (mo.el.paused ? '暫停' : '播放中');
     var ratio = dbg.measuring ? '量測中…' : (dbg.ratio == null ? (dbg.wakes ? '無法量測' : '—') : dbg.ratio.toFixed(3));
     return '🔧 音訊除錯\n' +
@@ -673,9 +683,29 @@
       var p = document.createElement('div'); p.id = 'audioDebugPanel';
       p.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:3000;pointer-events:none;' +
         'background:rgba(20,20,20,0.78);color:#fff;font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;' +
-        'white-space:pre;padding:6px 8px;border-radius:8px;';
+        'padding:6px 8px;border-radius:8px;';
+      var info = document.createElement('div'); info.style.whiteSpace = 'pre';
+      /* v.99.4：實驗開關（面板本身不擋點擊，只有這顆按鈕可以按）。設定記住，滑掉 App 重開也維持 */
+      var exp = document.createElement('button'); exp.type = 'button'; exp.id = 'audioExpDirectBtn';
+      exp.style.cssText = 'pointer-events:auto;margin-top:5px;font:11px ui-monospace,Menlo,Consolas,monospace;' +
+        'color:#fff;background:#555;border:1px solid #999;border-radius:6px;padding:3px 6px;';
+      exp.onclick = function () {
+        try {
+          if (localStorage.getItem(EXP_DIRECT_KEY) === '1') localStorage.removeItem(EXP_DIRECT_KEY);
+          else localStorage.setItem(EXP_DIRECT_KEY, '1');
+        } catch (e) {}
+        tick();
+      };
+      p.appendChild(info); p.appendChild(exp);
       document.body.appendChild(p);
-      var tick = function () { try { p.textContent = debugText(); } catch (e) {} };
+      var tick = function () {
+        try {
+          info.textContent = debugText();
+          var on = expDirect();
+          exp.textContent = '實驗：直接輸出　' + (on ? '開' : '關');
+          exp.style.background = on ? '#2f6b45' : '#555';
+        } catch (e) {}
+      };
       tick(); setInterval(tick, 500);
     };
     if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
