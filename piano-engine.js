@@ -111,6 +111,7 @@
     out.connect(g); g.connect(fg); fg.connect(outputFor(ctx));
     node.__fg = fg; node.__t = t;
     markBusy(ctx, t + dur + RELEASE);
+    noteEnd(ctx, t + dur + RELEASE);
     node.start(t); node.stop(t + dur + RELEASE + 0.02);
 
     var self = this;
@@ -138,6 +139,7 @@
       } catch (e) {}
     });
     this.playing = [];
+    this.ctx.__noteEnd = 0;                 // 已經停掉，不算還沒播完（v.99.3）
     if (fade > 0) lockRelease(fade);
   };
 
@@ -293,6 +295,21 @@
     mediaOut.meta = meta || null;
     return mediaOut.enabled;
   }
+  /* v.99.3：離開練習頁（換頁、回選單、上一頁）時，把這一頁的媒體元素暫停。
+     ⚠ 原因：iOS 會把舊頁面整個暫存（上一頁快取），連同還開著的媒體元素（v.99 起閒置 60 秒才暫停）。
+       新頁面再開自己的媒體元素，iOS 同時有兩個播放器，背景重新協調時，剛出聲的那一小段音高會偏低
+       （作者實測：播單旋律 → 切到兩聲部 → 按標準音 A → 馬上播題目，預備拍偏低）。
+     只聽 pagehide：切到別的 App 觸發的是 visibilitychange，不會走到這裡，背景繼續播完不受影響。
+     暫停後 pause 事件會把出口切回 direct；回到這一頁時，下次播放照原本的流程重新要回媒體播放。 */
+  var allMO = [];
+  if (global.addEventListener) {
+    global.addEventListener('pagehide', function () {
+      allMO.forEach(function (mo) {
+        try { if (mo.el && !mo.el.paused) mo.el.pause(); } catch (e) {}
+      });
+      setNowPlaying('none');
+    });
+  }
   /* 總線：第一次用到時建立，先接 direct */
   function busOf(ctx) {
     if (ctx.__mo) return ctx.__mo;
@@ -311,6 +328,7 @@
     } catch (e) { mo.dest = null; mo.el = null; }
     mo.bus.connect(ctx.destination);
     ctx.__mo = mo;
+    allMO.push(mo);
     return mo;
   }
   function routeTo(ctx, mo, which) {
@@ -323,6 +341,15 @@
   function outputFor(ctx) {
     if (!mediaOut.enabled || !isRealtime(ctx)) return ctx.destination;
     try { return busOf(ctx).bus; } catch (e) { return ctx.destination; }
+  }
+  /* v.99.3：記下這個 context 排定的最後一個音「在音訊時間上」何時結束。
+     頁面切回來時用它判斷「題目被打斷、還沒播完」（見各頁 wakeAudioOnReturn）。
+     與 markBusy 不同：markBusy 只給媒體元素的閒置判斷用，沒開媒體輸出時不會記。 */
+  function noteEnd(ctx, endTime) {
+    if (ctx && !(endTime <= ctx.__noteEnd)) ctx.__noteEnd = endTime;
+  }
+  function pendingAudio(ctx) {
+    return !!(ctx && ctx.__noteEnd && ctx.currentTime < ctx.__noteEnd);
   }
   function markBusy(ctx, endTime) {
     var mo = ctx && ctx.__mo;
@@ -453,11 +480,13 @@
     m.play = function (midi, when, o) {
       var t = (when == null) ? ctx.currentTime : when;
       markBusy(ctx, t + ((o && o.duration) || 3.3) + RELEASE);
+      noteEnd(ctx, t + ((o && o.duration) || 3.3) + RELEASE);
       return mPlay.apply(this, arguments);
     };
     /* 標準音色停止時自帶 0.3 秒 release；播放鎖等它放完才解開 */
     var mStop = m.stop;
     m.stop = function () {
+      ctx.__noteEnd = 0;                    // 已經停掉，不算還沒播完（v.99.3）
       var r = mStop.apply(this, arguments);
       lockRelease(RELEASE);
       return r;
@@ -670,6 +699,7 @@
     params: SAL,
     STOP_FADE: STOP_FADE,
     holdUntil: holdUntil,
+    pendingAudio: pendingAudio,
     isLocked: isLocked,
     onLockChange: onLockChange
   };

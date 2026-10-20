@@ -1361,9 +1361,12 @@ function showPage(pageId) {
 
   /* 切出去：練習模式讓它繼續播完，只取消「還在檢查中」的請求。
      （考試模式由 exam-common 的 guardVisibility 自己停止） */
+  /* v.99.3：記下切出去的那一刻（手錶時間與音訊時間），回來時用來判斷題目有沒有被打斷 */
+  var audioLeftAt = null;
   function sleepAudioOnLeave(){
     audioWasHidden = true;
     cancelAudioWait();
+    try{ audioLeftAt = audioCtx ? { wall: Date.now(), t: audioCtx.currentTime } : null; }catch(e){ audioLeftAt = null; }
   }
   /* 回來：先假設通道可能斷了（這段時間內按播放會先檢查），
      再實測時間有沒有在走——有就不打擾，沒有才停止並清掉凍住的音符。 */
@@ -1378,7 +1381,21 @@ function showPage(pageId) {
     setTimeout(function(){
       if(audioCtx !== c) return;            // 已經換過 context 了
       var alive = c.state === 'running' && (c.currentTime - t0) >= AUDIO_MIN_ADV;
-      if(alive){ audioSuspect = false; return; }   // 背景播放還在走、或已正常播完
+      if(alive){
+        audioSuspect = false;
+        /* v.99.3：題目在背景被別的聲音打斷（例如在別的 App 播音樂，iOS 把這裡的音訊凍住），
+           回來時會從中間接著播，但播放鈕的鎖是用手錶時間算的、已經解開，再按就會兩層疊在一起。
+           判斷：出去的時間比音訊時間多走 1 秒以上（＝被凍住過），而且題目還沒播完 → 淡出停掉，請使用者重新播放。
+           只是切出去、題目在背景正常播完：音訊時間跟著走，不會觸發。 */
+        try{
+          var L = audioLeftAt;
+          var lag = L ? (Date.now() - L.wall) / 1000 - (t0 - L.t) : 0;
+          if(lag > 1 && window.PianoEngine && PianoEngine.pendingAudio && PianoEngine.pendingAudio(c)){
+            if(typeof window.melStopAll === 'function') window.melStopAll();
+          }
+        }catch(e){}
+        return;
+      }   // 背景播放還在走、或已正常播完
       try{ if(typeof window.melStopAll === 'function') window.melStopAll(); }catch(e){}
     }, 300);
   }
