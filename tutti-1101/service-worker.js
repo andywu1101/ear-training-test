@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v100-3'; // v.100：統一各練習頁版面風格、電腦與 iPad 橫式放寬譜例、修正四部和聲的和聲進行
+const CACHE_NAME = 'ear-training-shell-v100-5'; // v.100：統一各練習頁版面風格、電腦與 iPad 橫式放寬譜例、修正四部和聲的和聲進行
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

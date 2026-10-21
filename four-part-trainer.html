@@ -1276,6 +1276,11 @@ window.addEventListener('resize', setVH); setVH();
         // v.100：V 類接 vi64／VI64 不出（第二轉位不在經過、輔助、終止六四的用法裡）
         if (i > 0 && /^V/.test(seq[i - 1]) && !seq[i - 1].includes('/') && (seq[i] === 'vi64' || seq[i] === 'VI64')) return false;
       }
+      // v.100：六四和絃只用在三種地方，其他一律不出
+      for (let i = 0; i < n; i++) {
+        if (!/64$/.test(seq[i]) || seq[i].includes('/')) continue;
+        if (!this.sixFourKind(seq[i], seq[i - 1], seq[i + 1])) return false;
+      }
       if (levelId === 1) {
         for (let i = 0; i < n; i++) {
           if (/[0-9\/N]/.test(seq[i])) return false;           // 只有原位三和絃
@@ -1296,6 +1301,19 @@ window.addEventListener('resize', setVH); setVH();
         if (!hasAug) return false;
       }
       return true;
+    },
+
+    // v.100：判斷六四和絃的用法——'cad' 終止（I64→V／V7）、'pass' 經過（I–V64–I6、IV–I64–IV6 及反向）、
+    //   'pedal' 持續（I–IV64–I）；都不是就回傳 null（＝不該出現的單獨六四）
+    sixFourKind: function(sym, prevSym, nextSym) {
+      prevSym = prevSym || ''; nextSym = nextSym || '';
+      if (/^(I|i)64$/.test(sym) && /^V7?$/.test(nextSym)) return 'cad';
+      let pair = function (a, b) { return (prevSym === a && nextSym === b) || (prevSym === b && nextSym === a); };
+      if (sym === 'V64' && (pair('I', 'I6') || pair('i', 'i6'))) return 'pass';
+      if (sym === 'I64' && pair('IV', 'IV6')) return 'pass';
+      if (sym === 'i64' && pair('iv', 'iv6')) return 'pass';
+      if ((sym === 'IV64' && prevSym === 'I' && nextSym === 'I') || (sym === 'iv64' && prevSym === 'i' && nextSym === 'i')) return 'pedal';
+      return null;
     },
 
     generateSkeletonOnce: function(bars, isMinor, levelId, densityScale) {
@@ -1383,7 +1401,7 @@ window.addEventListener('resize', setVH); setVH();
         } else {
           // 三和絃：換一個不同的轉位（原位/6/64）
           let cur = seq[i].replace(base, '');
-          let opts = (levelId >= 2 ? ['', '6', '64'] : ['']).filter(x => x !== cur);
+          let opts = (levelId >= 2 ? ['', '6'] : ['']).filter(x => x !== cur); // v.100：不再改成六四（六四只用在終止、經過、持續）
           if (opts.length === 0) opts = ['6'];
           alt = base + opts[Math.floor(Math.random() * opts.length)];
         }
@@ -1421,10 +1439,12 @@ window.addEventListener('resize', setVH); setVH();
       // ---------- Lv.2：三和絃所有轉位 + 四組固定套組 ----------
       const BUNDLES = isMinor ? [
         ['i','V64','i6'], ['i6','V64','i'], ['i64','V','i'], ['i','iv64','i'],
-        ['i','vii°6','i6'], ['i6','vii°6','i']
+        ['i','vii°6','i6'], ['i6','vii°6','i'],
+        ['iv','i64','iv6'], ['iv6','i64','iv']   // v.100：經過六四（下屬和絃的兩個位置之間）
       ] : [
         ['I','V64','I6'], ['I6','V64','I'], ['I64','V','I'], ['I','IV64','I'],
-        ['I','vii°6','I6'], ['I6','vii°6','I']
+        ['I','vii°6','I6'], ['I6','vii°6','I'],
+        ['IV','I64','IV6'], ['IV6','I64','IV']   // v.100：經過六四（下屬和絃的兩個位置之間）
       ];
       let hasLv2Feature = false;
       if (n - 3 >= 3) {
@@ -1443,7 +1463,6 @@ window.addEventListener('resize', setVH); setVH();
         if (seq[i].replace(/[0-9]/g, '') === 'vii°') continue;
         let r = Math.random();
         if (r < 0.58) { seq[i] = seq[i] + '6'; hasLv2Feature = true; }
-        else if (r < 0.60) { seq[i] = seq[i] + '64'; hasLv2Feature = true; }
       }
       // 保底：Lv.2 至少要有一個轉位或固定套組
       if (!hasLv2Feature) {
@@ -1480,7 +1499,7 @@ window.addEventListener('resize', setVH); setVH();
         } else if (r < invProb) {
           // 保留三和絃但加轉位（Lv.4 幾乎一定加轉位，減少原位三和絃）。
           // 以第一轉位 6 為主，大幅降低第二轉位 64（64 是「經過六四」等假套組特徵的主因）。
-          if (!hadInv) seq[i] = base + (Math.random() < 0.94 ? '6' : '64');
+          if (!hadInv) seq[i] = base + '6'; // v.100：不再隨機改成六四
         }
       }
       if (!hasLv3Feature) {
@@ -1919,6 +1938,9 @@ window.addEventListener('resize', setVH); setVH();
         let rtPrevPcs = this.getChordPcs(prevSym, isMinor).map(x => (x + keyOffset) % 12);
         let rtCommon = rtPrevPcs.filter(x => this.getChordPcs(currSym, isMinor).map(y => (y + keyOffset) % 12).includes(x));
         let keyLeadingTone = (keyOffset + 11) % 12;
+        // v.100：經過／持續六四的低音（終止六四沿用原本的「可原音或往下跳八度」）
+        let k64Curr = /64$/.test(currSym) && !currSym.includes('/') ? this.sixFourKind(currSym, prevSym, degSeq[i + 1]) : null;
+        let k64Prev = /64$/.test(prevSym) && !prevSym.includes('/') ? this.sixFourKind(prevSym, degSeq[i - 2], currSym) : null;
         let meta = this.getResolutionMeta(prevSym, isMinor, keyOffset);
         // 當前和絃「優先重複」的音級（首選/次選）
         let prefDbl = this.getPreferredDoublePc(currSym, isMinor, keyOffset);
@@ -2112,6 +2134,18 @@ window.addEventListener('resize', setVH); setVH();
               if (aug6Violation) continue;
             }
 
+            // v.100：經過六四低音級進同向、持續六四低音原音高不動
+            {
+              let bm = tv[3] - pv[3];
+              if (k64Curr === 'pedal' && bm !== 0) continue;
+              if (k64Curr === 'pass' && !(Math.abs(bm) === 1 || Math.abs(bm) === 2)) continue;
+              if (k64Prev === 'pedal' && bm !== 0) continue;
+              if (k64Prev === 'pass') {
+                let pbm = prevPrev ? pv[3] - prevPrev[3] : 0;
+                if (!((Math.abs(bm) === 1 || Math.abs(bm) === 2) && Math.sign(bm) === Math.sign(pbm))) continue;
+              }
+            }
+
             // v.100 規則 1、2、4、5（上方三聲部）
             {
               let bd = Math.sign(tv[3] - pv[3]);
@@ -2175,6 +2209,7 @@ window.addEventListener('resize', setVH); setVH();
 
             let sig = '';
             for (let v = 0; v < 4; v++) { let m = tv[v] - pv[v], am = Math.abs(m); sig += (am === 5 || am === 7) ? m + ',' : '0,'; }
+            if (k64Curr === 'pass') sig += 'b' + Math.sign(tv[3] - pv[3]); // 經過六四：下一步要同方向，方向不同的路徑分開留
             let cand = prevNode.cost + dist;
             if (!bestBySig[sig] || cand < bestBySig[sig].cost) bestBySig[sig] = { cost: cand, path: prevNode.path.concat([tv]) };
           }
@@ -2459,9 +2494,10 @@ window.addEventListener('resize', setVH); setVH();
       // 逐步降低七和絃密度；仍無解則短暫降一級難度求解，確保永遠出得了題。
       let attempts = 0; let seq = null; let voicings = null;
       let effLevel = this.curLevel.id;
-      // v.100：Lv.4／Lv.5 必定要有副屬（Lv.5 還要有增六），降級會讓它們消失，所以到第 500 次才降級（實測 99% 在 200 次內、最多約 350 次）
-      let downgradeAt = (this.curLevel.id >= 4) ? 500 : 90;
-      while (attempts < 700 && !voicings) {
+      // v.100：重出到合規為止，每題都照所選難度出（降級會讓 Lv.3 少了七和絃、Lv.4／5 少了副屬或增六）。
+      //   實測最多約 450 次（Lv.3，電腦上約 0.4 秒）；第 1000 次才降級，只當最後保險，避免極端情況卡住畫面
+      let downgradeAt = 1000;
+      while (attempts < 1200 && !voicings) {
         let densityScale = attempts < 40 ? 1.0 : (attempts < 80 ? 0.6 : (attempts < 120 ? 0.35 : 0.15));
         seq = HARMONY_ENGINE.generateSkeleton(this.bars, this.keyObj.isMin, effLevel, densityScale);
         voicings = HARMONY_ENGINE.solveVoiceLeading(seq, this.keyObj.isMin, this.keyObj.off);
