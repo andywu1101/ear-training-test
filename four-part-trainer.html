@@ -1919,7 +1919,10 @@ window.addEventListener('resize', setVH); setVH();
       allVoicings = allVoicings.map((vs, i) => vs.filter(v => this.rootTriadDoublingOK(v, degSeq[i], degSeq[i - 1], isMinor, keyOffset)
                                                         && this.dominantSeventhOK(v, degSeq[i], degSeq[i + 1], isMinor, keyOffset)));
       if (allVoicings.some(v => v.length === 0)) return null; // 有和絃完全找不到可用聲位
-      let dp = allVoicings[0].map(v => ({ cost: 0, path: [v], last: v }));
+      // v.100：音域偏好（軟性）——高音聲部低於 A4（69）時，每低一個半音加成本，避免整題貼著 C4 寫
+      const REG_W = 2.0;
+      const regPen = v => REG_W * Math.max(0, 69 - v[0]);
+      let dp = allVoicings[0].map(v => ({ cost: regPen(v), path: [v], last: v }));
       // 供增二度偵測用：此調的名稱與主音字母索引
       let _keyObj = (typeof ALL_KEYS !== 'undefined') ? ALL_KEYS.find(k => k.off === keyOffset && k.isMin === isMinor) : null;
       let _keyName = _keyObj ? _keyObj.name : 'C 大調';
@@ -2178,6 +2181,7 @@ window.addEventListener('resize', setVH); setVH();
             let dist = Math.abs(tv[0]-pv[0]) + Math.abs(tv[1]-pv[1]) + Math.abs(tv[2]-pv[2]) + Math.abs(tv[3]-pv[3]) * 0.5;
             if (tv[0] === pv[0] || tv[1] === pv[1]) dist -= 2;
             dist += doublingPenalty; // 重複音偏好
+            dist += regPen(tv);      // v.100：音域偏好
 
             // V7→I 省五重根優先（軟性）：若前一格 V7 省略五音、重複根音，給成本優惠。
             // 這會讓 V7 傾向省五重根配置，使 ii→V7 共同音自然保持、V7→I 無跳進。
@@ -3120,9 +3124,14 @@ window.addEventListener('resize', setVH); setVH();
             if (info.length) {
               const HEAD_W = 13;                       // 全音符符頭的視覺寬度（實測）
               /* ① 依符頭的垂直位置分成上下兩行（中間那條線取兩行譜表的中點） */
-              const midY = (TREBLE_TOP + BASS_TOP) / 2 + 40;
+              /* v.100：分行改用畫譜順序（每小節依序畫 S、A、T、B）。舊寫法用固定的中線分，
+                 高音譜表下加線的 C4、B3 會落到中線下方、被當成低音譜表的音。
+                 只有不是四個音符時（例如作答頁只有低音）才用垂直位置分；界線取兩個譜表之間。 */
+              const midY = (sT && sB) ? (sT.getYForLine(4) + sB.getYForLine(0)) / 2 - 5 : (TREBLE_TOP + BASS_TOP) / 2 + 40;
               const rows = { top: [], bottom: [] };
-              info.forEach(function (o) { (o.y < midY ? rows.top : rows.bottom).push(o); });
+              if (info.length === 4 && sT) info.forEach(function (o, i) { o.row = i < 2 ? 'top' : 'bottom'; });
+              else info.forEach(function (o) { o.row = o.y < midY ? 'top' : 'bottom'; });
+              info.forEach(function (o) { rows[o.row].push(o); });
               const headOf = function (arr) {
                 return arr.length ? Math.min.apply(null, arr.map(function (o) { return o.head; })) : null;
               };
@@ -3132,7 +3141,7 @@ window.addEventListener('resize', setVH); setVH();
                  例外：同一行兩聲部相距二度或同音（符頭垂直距離 < 一線間），兩個符頭本來就要左右錯開，
                  這時兩個一起當成一組，以左邊那個符頭對齊（與音堆的和絃畫法相同）。 */
               const baseOf = function (o) {
-                const row = (o.y < midY) ? rows.top : rows.bottom;
+                const row = rows[o.row];
                 const close = row.length === 2 && Math.abs(row[0].y - row[1].y) < 7;
                 return close ? headOf(row) : o.head;
               };
@@ -3140,11 +3149,28 @@ window.addEventListener('resize', setVH); setVH();
               info.forEach(function (o) { const bse = baseOf(o); if (target === null || bse > target) target = bse; });
               info.forEach(function (o) { o.align = (target !== null) ? (target - baseOf(o)) : 0; });
 
+              /* v.100：二度擠在一起的補正。VexFlow 判斷兩聲部是否太近時把加線也算進去，
+                 二度落在高音譜表下加線附近（D4、C4 以下）或低音譜表上方時，不會把符頭錯開。
+                 這時照它正常的做法：下方聲部（符桿朝下的 A／B）的符頭往右移一格；
+                 臨時記號不動（VexFlow 自己錯開時也只移符頭），加線另外延長到移過去的符頭下。 */
+              const DISP = 17.1;
+              const dispPairs = [];
+              [[rows.top, sT], [rows.bottom, sB]].forEach(function (rs) {
+                const row = rs[0], stave = rs[1];
+                if (row.length !== 2 || !stave) return;
+                const dy = Math.abs(row[0].y - row[1].y);
+                if (dy < 3 || dy > 7) return;                                  // 只處理二度（同音維持原樣）
+                if (Math.abs((row[0].head + row[0].align) - (row[1].head + row[1].align)) > 8) return; // 已經錯開
+                const lower = row[0].y > row[1].y ? row[0] : row[1];           // y 越大音越低
+                lower.disp = DISP;
+                dispPairs.push({ lower: lower, x0: lower.head, top: stave.getYForLine(0), bottom: stave.getYForLine(4) });
+              });
+
               /* ② 對齊之後，以符頭的整體範圍置中到小節中央 */
               let headMin = Infinity, headMax = -Infinity, boxMin = Infinity, boxMax = -Infinity;
               info.forEach(function (o) {
                 headMin = Math.min(headMin, o.head + o.align);
-                headMax = Math.max(headMax, o.headMax + o.align);
+                headMax = Math.max(headMax, o.headMax + o.align + (o.disp || 0));
                 boxMin = Math.min(boxMin, o.left + o.align);
                 boxMax = Math.max(boxMax, o.right + o.align);
               });
@@ -3159,7 +3185,11 @@ window.addEventListener('resize', setVH); setVH();
                 if (Math.abs(o.total) > 0.05) {
                   o.g.setAttribute('transform', 'translate(' + o.total.toFixed(2) + ',0)');
                 }
+                if (o.disp) Array.prototype.forEach.call(o.g.querySelectorAll('.vf-notehead'), function (h) {
+                  h.setAttribute('transform', 'translate(' + o.disp + ',0)');
+                });
               });
+              const ledgerClones = [];
 
               /* ③ 加線不在音符群組裡，要依垂直位置判斷屬於哪一行，跟著同樣的位移走 */
               Array.prototype.forEach.call(__svgEl.querySelectorAll('path'), function (pth) {
@@ -3175,14 +3205,28 @@ window.addEventListener('resize', setVH); setVH();
                 if (len > 40 || len < 4) return;                 // 譜線很長、加線很短
                 if (x1 < startX - 2 || x2 > endX + 2) return;     // 只處理本小節範圍內的
                 let best = null, bestD = Infinity;
+                const ledgerRow = y1 < midY ? 'top' : 'bottom';   // v.100：加線只配給同一個譜表的音符
                 info.forEach(function (o) {
+                  if (o.row !== ledgerRow && info.some(function (q) { return q.row === ledgerRow; })) return;
                   const dd = Math.abs(o.y - y1);
                   if (dd < bestD) { bestD = dd; best = o; }
                 });
                 if (best && Math.abs(best.total) > 0.05) {
                   pth.setAttribute('transform', 'translate(' + best.total.toFixed(2) + ',0)');
                 }
+                /* 錯開的二度：移過去的符頭需要的加線（在譜表與符頭之間）複製一條過去 */
+                dispPairs.forEach(function (dp) {
+                  const lo = dp.lower;
+                  if (Math.abs(x1 - dp.x0) > 12) return;
+                  const below = lo.y > dp.bottom, above = lo.y < dp.top;
+                  const need = (below && y1 > dp.bottom && y1 <= lo.y + 1) || (above && y1 < dp.top && y1 >= lo.y - 1);
+                  if (!need) return;
+                  const c = pth.cloneNode(true);
+                  c.setAttribute('transform', 'translate(' + (lo.total + lo.disp).toFixed(2) + ',0)');
+                  ledgerClones.push([pth, c]);
+                });
               });
+              ledgerClones.forEach(function (pc) { pc[0].parentNode.insertBefore(pc[1], pc[0].nextSibling); });
             }
           }
         }
