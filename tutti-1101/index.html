@@ -194,6 +194,33 @@ window.addEventListener('appinstalled', function(){
   .cover-intro-wrap{ margin-top: 10px; }
   .intro-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:11px 26px; border-radius:999px; background:transparent; color:var(--accent); border:1px solid var(--accent-line); cursor:pointer; text-decoration:none; transition:all .15s ease; touch-action:manipulation; }
   .intro-btn:hover, .intro-btn:active{ background:var(--accent); color:var(--panel); border-color:var(--accent); transform:translateY(-1px); }
+  /* v.101：封面「全新登場」對話框——伍線譜樂譜掃描 App 的連結。
+     放在高音譜號右側、斜 5 度、尾巴朝左指向譜號；手機縮小字、360 以下拿掉相機圖示。
+     位置用「封面卡片中線＋位移」算，不會遮到譜號與標題（v.101 實測 320～1440 寬）。 */
+  .scan-bubble-wrap{ position:absolute; top:0; left:calc(50% + 36px); transform:rotate(5deg); transform-origin:left center; z-index:2; white-space:nowrap; }
+  .scan-bubble{ position:relative; display:inline-flex; flex-direction:column; align-items:center; gap:2px; text-decoration:none;
+    background:#fff; color:var(--ink); border:2px solid var(--accent); border-radius:18px; padding:9px 18px 10px;
+    box-shadow:0 6px 18px rgba(51,65,92,0.16); font-family:var(--font-body); line-height:1.25; touch-action:manipulation;
+    animation: scanBubbleHop 5s ease-in-out 1.2s infinite; }
+  .scan-bubble:hover, .scan-bubble:active{ box-shadow:0 8px 22px rgba(51,65,92,0.28); }
+  .scan-bubble .sb-new{ font-size:12.5px; font-weight:800; color:var(--wrong); letter-spacing:.06em; }
+  .scan-bubble .sb-name{ font-size:15.5px; font-weight:800; color:var(--accent); }
+  .scan-bubble .sb-go{ font-size:11.5px; color:var(--ink-soft); }
+  .scan-bubble::before, .scan-bubble::after{ content:''; position:absolute; width:0; height:0; border-style:solid; }
+  .scan-bubble::before{ left:-12px; top:50%; margin-top:-9px; border-width:9px 12px 9px 0; border-color:transparent var(--accent) transparent transparent; }
+  .scan-bubble::after{ left:-8px; top:50%; margin-top:-6.5px; border-width:6.5px 9px 6.5px 0; border-color:transparent #fff transparent transparent; }
+  /* 每隔約 5 秒輕輕彈兩下；系統開「減少動態」時不動 */
+  @keyframes scanBubbleHop{ 0%,80%,100%{ transform:translateY(0); } 84%{ transform:translateY(-6px); } 88%{ transform:translateY(0); } 92%{ transform:translateY(-3px); } 96%{ transform:translateY(0); } }
+  @media (prefers-reduced-motion: reduce){ .scan-bubble{ animation:none; } }
+  @media (max-width:420px){
+    .scan-bubble-wrap{ left:calc(50% + 30px); }
+    .scan-bubble{ padding:6px 12px 7px; border-radius:15px; line-height:1.2; }
+    .scan-bubble .sb-name{ font-size:13.5px; } .scan-bubble .sb-new{ font-size:11.5px; } .scan-bubble .sb-go{ font-size:11px; }
+  }
+  @media (max-width:360px){ .scan-bubble .sb-cam{ display:none; } .scan-bubble .sb-name{ font-size:12.5px; } .scan-bubble-wrap{ left:calc(50% + 27px); } }
+  /* 更新日誌裡的連結（v.101） */
+  .log-item li a.log-link{ color:var(--accent); font-weight:700; text-decoration:underline; text-underline-offset:2px; }
+
   /* 選單：標題下方的介紹短片連結 */
   .intro-line{ font-size:13.5px; color:var(--ink-soft); margin:-14px 0 20px; }
   .intro-line a{ color:var(--accent); font-weight:700; text-decoration:none; border-bottom:1px solid var(--accent-line); padding-bottom:1px; }
@@ -377,6 +404,7 @@ window.addEventListener('appinstalled', function(){
         <span class="cover-note" style="top:40%; right:8%; font-size:40px;">♪</span>
       </div>
       <div class="cover-card">
+        <div class="scan-bubble-wrap"><a class="scan-bubble" href="https://andywu1101.github.io/scanner/" target="_blank" rel="noopener"><span class="sb-new">全新登場!!</span><span class="sb-name"><span class="sb-cam">📷 </span>伍線譜樂譜掃描</span><span class="sb-go">點我看看 ▸</span></a></div>
         <div class="cover-clef">𝄞</div>
         <h1 class="cover-title">音樂聽力練習</h1>
         <div class="cover-sub">Ear Training</div>
@@ -533,7 +561,7 @@ window.addEventListener('appinstalled', function(){
     <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
     <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.100　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.101　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->
@@ -1286,7 +1314,8 @@ window.CHANGELOG = [
   { v: 'v.97', items: ['音程練習與和絃辨認的設定頁，選擇難度時會列出該難度包含哪些音程／和絃，方便確認練習範圍', '修正節奏聽寫在「雙音」模式下，跨越小節線的連結線會出現音高錯誤的問題', '修正在 iPhone／iPad 將 App 切到背景後再切回來，聲音會失效的問題', '!!優化贊助者版，音程、和絃辨認的連續聽寫譜例導出版面'] },
   { v: 'v.98', items: ['優化 Android 手機與 Windows 電腦的中文字體，使介面更美觀', '音程練習與和絃辨認，新增標準音A按鈕', '修正單音節奏練習譜例出現音高錯誤的問題', '!!贊助者版新增「音高辨認 (找錯音)」的導出：可下載題目音檔、題目譜例與正確譜例'] },
   { v: 'v.99', items: ['分別針對電腦、iOS 設備、安卓，修正偶爾出現播放音高偏移的問題'] },
-  { v: 'v.100', items: ['版面優化，統一各練習頁的版面風格，畫面更簡潔美觀', '電腦與 iPad 橫式畫面優化', '修正四部和聲出現的和聲進行錯誤'] }
+  { v: 'v.100', items: ['版面優化，統一各練習頁的版面風格，畫面更簡潔美觀', '電腦與 iPad 橫式畫面優化', '修正四部和聲出現的和聲進行錯誤'] },
+  { v: 'v.101', items: [{ t: '全新登場!!伍線譜樂譜掃描', link: { text: '「點我看看 ▸」', href: 'https://andywu1101.github.io/scanner/' } }] }
 ];
 
 function showChangelog(){
@@ -1297,9 +1326,14 @@ function showChangelog(){
              g.items.map(function(t){
                /* 開頭加 !! 代表重點項目，用紅字顯示。
                   仍然走 escapeHtml，不直接開放 HTML。 */
+               /* v.101：項目也可以寫成 { t: 文字, link: { text: 連結字, href: 網址 } }，連結接在文字後面。
+                  網址只接受 https 開頭，文字一樣走 escapeHtml。 */
+               var link = (t && typeof t === 'object' && t.link && /^https:\/\//.test(t.link.href || '')) ? t.link : null;
+               if (t && typeof t === 'object') t = t.t;
                var hl = (typeof t === 'string' && t.indexOf('!!') === 0);
                var txt = hl ? t.slice(2) : t;
-               return '<li' + (hl ? ' class="log-hl"' : '') + '>' + escapeHtml(txt) + '</li>';
+               var a = link ? '<a class="log-link" href="' + escapeHtml(link.href) + '" target="_blank" rel="noopener">' + escapeHtml(link.text) + '</a>' : '';
+               return '<li' + (hl ? ' class="log-hl"' : '') + '>' + escapeHtml(txt) + a + '</li>';
              }).join('') + '</ul></div>';
     }).join('');
   }
