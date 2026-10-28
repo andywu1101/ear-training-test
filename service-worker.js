@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v101'; // v.101：封面新增伍線譜樂譜掃描 App 的連結
+const CACHE_NAME = 'ear-training-shell-v101-1'; // v.101：封面新增伍線譜樂譜掃描 App 的連結
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
