@@ -21,8 +21,9 @@
   var ANS_H = 24;             // 答案那一行的高度
   var TITLE_H = 24;           // 譜例上方標題那一行的高度（v.98，找錯音的「題目：共 N 個錯音」）
   var MAX_PIXELS = 40e6;      // Canvas 上限，避免手機記憶體爆掉
-  var CREDIT_H = 22;          // 右下角來源標註的高度
-  var CREDIT = '音樂聽力練習 · andywu1101.github.io/ear-training · Heng-Heng Wu';
+  /* v.102：拿掉右下角的來源浮水印（贊助者版才有導出，沒有外流的理由） */
+  var PDF_SCALE = 3;          // PDF 用 3 倍解析度，印出來更清楚
+  var PDF_MAX_RATIO = 1.414;  // 頁面高度超過「寬 × A4 比例」就換頁（只在兩排之間換）
 
   /* SVG 元素 → Image。
      先序列化成 blob URL，讓瀏覽器自己解碼，避免跨來源污染。 */
@@ -176,10 +177,10 @@
     var cols = Math.min(perRow, items.length);
     var rows = Math.ceil(items.length / perRow);
     var W = PAD * 2 + cols * cellW;
-    var H = PAD * 2 + rows * blockH + CREDIT_H - ((rows > 1) ? ROW_GAP : 0);
+    var H = PAD * 2 + rows * blockH - ((rows > 1) ? ROW_GAP : 0);
 
     /* 題目很多時自動降解析度，避免 Canvas 爆掉 */
-    var scale = SCALE;
+    var scale = opts.scale || SCALE;
     while (W * scale * H * scale > MAX_PIXELS && scale > 1) scale -= 0.25;
 
     var canvas = document.createElement('canvas');
@@ -242,12 +243,15 @@
       }
     });
 
-    /* 右下角的來源標註：淺灰小字，不干擾譜例，流傳出去也看得出來自哪裡 */
-    ctx.fillStyle = '#b5b0a2';
-    ctx.font = '11px -apple-system, "PingFang TC", "Noto Sans TC", sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(CREDIT, W - PAD, H - 7);
-
+    /* 版面資訊給 PDF 換頁用：每一排的上下緣（畫布座標，未乘解析度） */
+    canvas.__layout = { W: W, H: H, scale: scale, rows: rows, bands: (function () {
+      var out = [];
+      for (var r = 0; r < rows; r++) {
+        var top = PAD + r * blockH;
+        out.push({ top: top, bottom: top + blockH - ((rows > 1) ? ROW_GAP : 0) });
+      }
+      return out;
+    })() };
     return canvas;
   }
 
@@ -266,11 +270,82 @@
     });
   }
 
-  function fileName(prefix) {
-    var d = new Date();
+  /* v.102 檔名：主檔名（題型＋時間）在前，「譜例」放最後，與音檔同一個主檔名：
+       四部和聲_20261030-2258.mp3、四部和聲_20261030-2258_譜例.png
+     prefix 帶底線時（找錯音_題目、找錯音_正確），底線後面的字併進後綴：…_題目譜例、…_正確譜例。
+     「全部下載」時用同一個時間（ExportMenu 放在 __expCollect.date），不會差一分鐘。 */
+  function fileName(prefix, ext) {
+    var col = global.__expCollect;
+    var d = (col && col.date) || new Date();
     var p = function (x) { return String(x).padStart(2, '0'); };
-    return prefix + '_譜例_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())
-         + '-' + p(d.getHours()) + p(d.getMinutes()) + '.png';
+    var parts = String(prefix).split('_');
+    var base = parts.shift();
+    var tag = parts.join('');
+    return base + '_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())
+         + '-' + p(d.getHours()) + p(d.getMinutes()) + '_' + tag + '譜例.' + (ext || 'png');
+  }
+
+  /* ---- PDF（v.102）：不用外部套件，自己組一個只有圖片的 PDF ----
+     每頁寬度＝譜例圖片寬度；高度一般＝圖片高度。多排（連續聽寫、錯題本多題）時，
+     超過「寬 × 1.414」（A4 比例）就在兩排之間換頁，排版和 PNG 完全一樣。
+     圖片用 JPEG（品質 0.92）嵌入，PDF 1 像素＝0.75 點（96 dpi）。 */
+  function pageSlices(canvas) {
+    var L = canvas.__layout;
+    if (!L || L.H <= L.W * PDF_MAX_RATIO || L.bands.length < 2) return [{ y0: 0, y1: L ? L.H : canvas.height }];
+    var maxH = L.W * PDF_MAX_RATIO, slices = [], start = 0, i = 0;
+    while (i < L.bands.length) {
+      var y0 = (start === 0) ? 0 : L.bands[start].top - PAD;
+      var j = start;
+      // 能塞就塞：下一排的下緣＋底部留白不超過一頁高度
+      while (j + 1 < L.bands.length && (L.bands[j + 1].bottom + PAD - y0) <= maxH) j++;
+      var y1 = (j === L.bands.length - 1) ? L.H : L.bands[j].bottom + PAD;
+      slices.push({ y0: y0, y1: y1 });
+      start = j + 1; i = start;
+    }
+    return slices;
+  }
+  function jpegBytes(cv) {
+    var d = cv.toDataURL('image/jpeg', 0.92).split(',')[1];
+    var bin = atob(d), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  }
+  function canvasToPdf(canvas) {
+    var L = canvas.__layout || { W: canvas.width, H: canvas.height, scale: 1 };
+    var sc = L.scale || 1;
+    var pages = pageSlices(canvas).map(function (sl) {
+      var hPx = Math.round((sl.y1 - sl.y0) * sc);
+      var cv = document.createElement('canvas');
+      cv.width = canvas.width; cv.height = hPx;
+      var c = cv.getContext('2d');
+      c.fillStyle = BG; c.fillRect(0, 0, cv.width, cv.height);
+      c.drawImage(canvas, 0, Math.round(sl.y0 * sc), canvas.width, hPx, 0, 0, canvas.width, hPx);
+      return { jpg: jpegBytes(cv), pw: cv.width, ph: cv.height, w: L.W * 0.75, h: (sl.y1 - sl.y0) * 0.75 };
+    });
+    var enc = function (str) { var a = new Uint8Array(str.length); for (var i = 0; i < str.length; i++) a[i] = str.charCodeAt(i) & 255; return a; };
+    var chunks = [], size = 0, offsets = [];
+    var push = function (u8) { chunks.push(u8); size += u8.length; };
+    var obj = function (n, body) { offsets[n] = size; push(enc(n + ' 0 obj\n')); body.forEach(push); push(enc('\nendobj\n')); };
+    push(enc('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'));
+    var n = pages.length, kids = [];
+    for (var k = 0; k < n; k++) kids.push((3 + k * 3) + ' 0 R');
+    obj(1, [enc('<< /Type /Catalog /Pages 2 0 R >>')]);
+    obj(2, [enc('<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + n + ' >>')]);
+    pages.forEach(function (pg, k) {
+      var po = 3 + k * 3, io = po + 1, co = po + 2;
+      var w = pg.w.toFixed(2), h = pg.h.toFixed(2);
+      obj(po, [enc('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + w + ' ' + h + '] /Resources << /XObject << /Im0 ' + io + ' 0 R >> >> /Contents ' + co + ' 0 R >>')]);
+      obj(io, [enc('<< /Type /XObject /Subtype /Image /Width ' + pg.pw + ' /Height ' + pg.ph +
+                   ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + pg.jpg.length + ' >>\nstream\n'),
+               pg.jpg, enc('\nendstream')]);
+      var cs = 'q ' + w + ' 0 0 ' + h + ' 0 0 cm /Im0 Do Q';
+      obj(co, [enc('<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream')]);
+    });
+    var total = 3 + n * 3, xref = size;
+    var x = 'xref\n0 ' + total + '\n0000000000 65535 f \n';
+    for (var m = 1; m < total; m++) x += String(offsets[m]).padStart(10, '0') + ' 00000 n \n';
+    push(enc(x + 'trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n'));
+    return new Blob(chunks, { type: 'application/pdf' });
   }
 
   /* 交付與音檔同一套：iOS 走分享面板（才能存進相簿），安卓與桌機走下載。
@@ -281,7 +356,9 @@
     try { ua = navigator.userAgent || ''; } catch (e) {}
     var isIOS = /iPad|iPhone|iPod/.test(ua) ||
       (/Macintosh/.test(ua) && (function () { try { return (navigator.maxTouchPoints || 0) > 1; } catch (e) { return false; } })());
-    var file = new File([blob], name, { type: 'image/png' });
+    /* 「全部下載」時先收起來，由選單一次交付（v.102） */
+    if (global.__expCollect) { global.__expCollect.files.push({ blob: blob, name: name }); return { ok: true, collected: true }; }
+    var file = new File([blob], name, { type: blob.type || 'image/png' });
 
     function download() {
       try {
@@ -312,17 +389,35 @@
     return { ok: false, reason: 'download' };
   }
 
+  /* v.102：依選單的「譜例格式」輸出 PNG 或 PDF；「全部下載」時兩種都產生。 */
   async function exportSheets(items, prefix, ui) {
     ui = ui || {};
-    if (!items || !items.length) throw new Error('沒有可以導出的譜例');
-    if (ui.onStage) ui.onStage('render');
-    var canvas = await buildCanvas(items, ui);
-    if (ui.onStage) ui.onStage('encode');
-    var blob = await canvasToBlob(canvas);
-    if (ui.onStage) ui.onStage('deliver');
-    var r = await deliver(blob, fileName(prefix));
-    if (ui.onStage) ui.onStage('done', r);
-    return r;
+    var col = global.__expCollect;
+    try {
+      if (!items || !items.length) throw new Error('沒有可以導出的譜例');
+      var fmt = col ? 'both' : ((global.ExportMenu && global.ExportMenu.sheetFormat) ? global.ExportMenu.sheetFormat() : 'png');
+      if (ui.onStage) ui.onStage('render');
+      var r = null;
+      if (fmt === 'png' || fmt === 'both') {
+        var canvas = await buildCanvas(items, ui);
+        if (ui.onStage) ui.onStage('encode');
+        var blob = await canvasToBlob(canvas);
+        if (ui.onStage) ui.onStage('deliver');
+        r = await deliver(blob, fileName(prefix, 'png'));
+      }
+      if (fmt === 'pdf' || fmt === 'both') {
+        var pc = await buildCanvas(items, Object.assign({}, ui, { scale: PDF_SCALE }));
+        if (ui.onStage) ui.onStage('encode');
+        var pdf = canvasToPdf(pc);
+        if (ui.onStage) ui.onStage('deliver');
+        r = await deliver(pdf, fileName(prefix, 'pdf'));
+      }
+      if (ui.onStage) ui.onStage('done', r);
+      return r;
+    } catch (e) {
+      if (col) col.failed = (col.failed || 0) + (col.expectNow || 1);   // 讓選單不必等到逾時
+      throw e;
+    }
   }
 
   global.SheetExport = {
@@ -330,6 +425,7 @@
     buildCanvas: buildCanvas,
     svgToImage: svgToImage,
     fileName: fileName,
+    canvasToPdf: canvasToPdf,
     PER_ROW: PER_ROW
   };
 })(window);

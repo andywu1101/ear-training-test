@@ -72,7 +72,8 @@
   }
 
   function fileName(prefix) {
-    var d = new Date();
+    /* v.102：「全部下載」時用選單給的同一個時間，與譜例同一個主檔名 */
+    var d = (global.__expCollect && global.__expCollect.date) || new Date();
     var p = function (x) { return String(x).padStart(2, '0'); };
     return prefix + '_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())
          + '-' + p(d.getHours()) + p(d.getMinutes()) + '.mp3';
@@ -87,6 +88,8 @@
     try { ua = navigator.userAgent || ''; } catch (e) {}
     var isIOS = /iPad|iPhone|iPod/.test(ua) ||
       (/Macintosh/.test(ua) && (function () { try { return (navigator.maxTouchPoints || 0) > 1; } catch (e) { return false; } })());
+    /* 「全部下載」時先收起來，由選單一次交付（v.102） */
+    if (global.__expCollect) { global.__expCollect.files.push({ blob: blob, name: name }); return { ok: true, collected: true }; }
     var file = new File([blob], name, { type: 'audio/mpeg' });
 
     function download() {
@@ -122,16 +125,22 @@
      events：[{ midi, time, duration, gain }]，由各練習頁組出來（含標準音 A 與預備拍）。 */
   async function exportEvents(events, prefix, ui) {
     ui = ui || {};
-    if (!events || !events.length) throw new Error('沒有可以導出的內容');
-    if (ui.onStage) ui.onStage('render');
-    var audio = await global.PianoEngine.renderOffline(events);
-    if (ui.onStage) ui.onStage('encode');
-    var blob = await encodeMp3(audio, ui.onProgress);
-    if (ui.onStage) ui.onStage('deliver');
-    var name = fileName(prefix);
-    var r = await deliver(blob, name);
-    if (ui.onStage) ui.onStage('done', r);
-    return r;
+    var col = global.__expCollect;
+    try {
+      if (!events || !events.length) throw new Error('沒有可以導出的內容');
+      if (ui.onStage) ui.onStage('render');
+      var audio = await global.PianoEngine.renderOffline(events);
+      if (ui.onStage) ui.onStage('encode');
+      var blob = await encodeMp3(audio, ui.onProgress);
+      if (ui.onStage) ui.onStage('deliver');
+      var name = fileName(prefix);
+      var r = await deliver(blob, name);
+      if (ui.onStage) ui.onStage('done', r);
+      return r;
+    } catch (e) {
+      if (col) col.failed = (col.failed || 0) + 1;   // 讓選單不必等到逾時（v.102）
+      throw e;
+    }
   }
 
   global.AudioExport = {
