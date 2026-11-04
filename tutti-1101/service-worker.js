@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v102-1'; // v.102：贊助者版譜例導出去浮水印、PDF、全部下載；新增贊助者「愛麗絲」
+const CACHE_NAME = 'ear-training-shell-v103'; // v.103：搜尋引擎（標準網址、網站地圖、結構化資料、贊助者版與測試站 noindex）
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>音樂聽力練習App - 為音樂班、音樂系學生與老師設計的免費聽力訓練工具</title>
+<!-- v.103 搜尋引擎：標準網址固定指向正式站（測試站用同一份程式，靠這行把收錄集中到正式站）。
+     網址不在 /ear-training/ 底下（例如測試站 /ear-training-test/）時，自動加上 noindex，不讓搜尋引擎收錄。
+     贊助者版由打包腳本把標準網址換成 noindex（見 build.sh）。 -->
+<link rel="canonical" href="https://andywu1101.github.io/ear-training/">
+<script>if(location.pathname.indexOf('/ear-training/')!==0){var __m=document.createElement('meta');__m.name='robots';__m.content='noindex';document.head.appendChild(__m);}</script>
 <meta name="description" content="為音樂班、音樂系學生與老師設計的免費聽力訓練工具。音程、和絃、節奏、旋律、兩聲部、四部和聲，八種練習完全免費。">
 
 <!-- 分享預覽（Facebook、LINE 等）。沒有這些標籤時，各平台會自己亂抓頁面上的圖片。 -->
@@ -15,7 +20,9 @@
      寫死網址會讓 Facebook 抓測試站時跟著跳到正式站（抓到舊資料）。
      不設的話，各平台就用實際被分享的那個網址。
      og:image 則必須是絕對網址（各平台不接受相對路徑），
-     固定指向正式站——對外分享的永遠是正式站，測試站只有自己看。 -->
+     固定指向正式站——對外分享的永遠是正式站，測試站只有自己看。
+     （v.103 起另有 <link rel="canonical"> 固定指向正式站：那是給搜尋引擎看的，
+       目的就是把測試站歸到正式站底下，和這裡不設 og:url 的考量不衝突。） -->
 <meta property="og:image" content="https://andywu1101.github.io/ear-training/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -24,6 +31,25 @@
 <meta name="twitter:title" content="音樂聽力練習App">
 <meta name="twitter:description" content="為音樂班、音樂系學生與老師設計的免費聽力訓練工具。音程、和絃、節奏、旋律、兩聲部、四部和聲，八種練習完全免費。">
 <meta name="twitter:image" content="https://andywu1101.github.io/ear-training/og-image.png">
+<!-- v.103 結構化資料（schema.org WebApplication）：告訴搜尋引擎這是免費的教育類網頁 App -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "音樂聽力練習",
+  "alternateName": "音樂聽力練習App",
+  "url": "https://andywu1101.github.io/ear-training/",
+  "description": "為音樂班、音樂系學生與老師設計的免費聽力訓練工具。音程、和絃、節奏、旋律、兩聲部、四部和聲，八種練習完全免費。",
+  "applicationCategory": "EducationalApplication",
+  "operatingSystem": "Web（iPhone、iPad、Android、Windows、Mac 的瀏覽器）",
+  "browserRequirements": "需要支援 JavaScript 的瀏覽器",
+  "inLanguage": "zh-Hant-TW",
+  "isAccessibleForFree": true,
+  "image": "https://andywu1101.github.io/ear-training/og-image.png",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "TWD" },
+  "author": { "@type": "Person", "name": "伍祐恆 Heng-Heng Wu" }
+}
+</script>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -561,7 +587,7 @@ window.addEventListener('appinstalled', function(){
     <div class="report-wrap"><button type="button" class="report-btn" onclick="showBackup()">💾 導入及導出紀錄</button></div>
     <div class="report-wrap" style="margin-top:22px;"><a class="report-btn" href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener">🐞 回報問題或建議</a></div>
     <div class="report-wrap" style="margin-top:10px;"><button type="button" class="report-btn" onclick="showDonate(); showPanel('Sponsors');">💛 贊助者名單</button></div>
-    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.102　·　更新日誌 ▸</button></p>
+    <p class="app-version"><button type="button" class="ver-btn" id="appVersion" onclick="showChangelog()">音樂聽力練習 v.103　·　更新日誌 ▸</button></p>
   </div>
 
   <!-- 錯題本總覽 -->

@@ -1,2 +1,2 @@
 User-agent: *
-Disallow: /tutti-1101/
+Allow: /
