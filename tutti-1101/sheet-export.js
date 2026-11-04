@@ -11,7 +11,7 @@
 (function (global) {
   'use strict';
 
-  var SCALE = 2;              // 2 倍解析度，印出來才不會糊
+  var SCALE = 4;              // v.104：4 倍解析度（畫質優先）
   var BG = '#ffffff';         // 純白背景（不是 App 的米白，印刷比較正常）
   var INK = '#262420';
   var SOFT = '#75705f';
@@ -20,9 +20,11 @@
   var NUM_H = 22;             // 題號那一行的高度
   var ANS_H = 24;             // 答案那一行的高度
   var TITLE_H = 24;           // 譜例上方標題那一行的高度（v.98，找錯音的「題目：共 N 個錯音」）
-  var MAX_PIXELS = 40e6;      // Canvas 上限，避免手機記憶體爆掉
+  /* v.104：iPhone／iPad 的 Canvas 面積上限約 16,777,216 像素，超過會變成空白圖，
+     所以上限改成 1,600 萬；題目很多時自動降倍數（版面不變，只是像素較少）。 */
+  var MAX_PIXELS = 16e6;
   /* v.102：拿掉右下角的來源浮水印（贊助者版才有導出，沒有外流的理由） */
-  var PDF_SCALE = 3;          // PDF 用 3 倍解析度，印出來更清楚
+  var PDF_SCALE = 4;          // v.104：PDF 也是 4 倍
   var PDF_MAX_RATIO = 1.414;  // 頁面高度超過「寬 × A4 比例」就換頁（只在兩排之間換）
 
   /* SVG 元素 → Image。
@@ -39,7 +41,13 @@
       if (!w || !h) {
         try { var r = svgEl.getBoundingClientRect(); w = w || r.width; h = h || r.height; } catch (e) {}
       }
-      clone.setAttribute('width', w); clone.setAttribute('height', h);
+      /* v.104：直接用最終解析度轉檔。
+         只給原尺寸的話，有些瀏覽器（iOS Safari）會先以原尺寸點陣化、再被畫布放大而變糊。
+         用 viewBox 固定座標系，寬高乘上 k，內容就以 k 倍重新繪製，座標完全不變。 */
+      var k = opt.scale || 1;
+      if (!(vb.length === 4 && vb[2] > 0 && vb[3] > 0)) clone.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+      clone.setAttribute('width', w * k); clone.setAttribute('height', h * k);
+      clone.style.width = (w * k) + 'px'; clone.style.height = (h * k) + 'px';
 
       /* 量出 SVG 裡「實際有內容」的垂直範圍與符頭的水平中心。
          VexFlow 畫大譜表時上方會空 70px 左右、下方 45px，
@@ -121,7 +129,7 @@
       var blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
       var url = URL.createObjectURL(blob);
       var img = new Image();
-      img.onload = function () { URL.revokeObjectURL(url); resolve({ img: img, w: w, h: h, box: box }); };
+      img.onload = function () { URL.revokeObjectURL(url); resolve({ img: img, w: w, h: h, k: k, box: box }); };
       img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('譜例轉檔失敗')); };
       img.src = url;
     });
@@ -135,8 +143,9 @@
     opts = opts || {};
     var perRow = opts.perRow || PER_ROW;
     var shots = [];
+    var wantScale = opts.scale || SCALE;
     for (var i = 0; i < items.length; i++) {
-      shots.push(await svgToImage(items[i].svg, { centre: items[i].centre }));
+      shots.push(await svgToImage(items[i].svg, { centre: items[i].centre, scale: wantScale }));
     }
 
     /* 裁掉 SVG 上下的空白，題號與答案才不會離譜例太遠。
@@ -211,7 +220,7 @@
         ctx.textAlign = 'left';
         ctx.fillText(it.title, ox + (it.titleX || 0), sy - 7);
       }
-      ctx.drawImage(s.img, 0, s.cutTop, s.w, s.cutH, ox, sy, s.w, s.cutH);
+      ctx.drawImage(s.img, 0, s.cutTop * s.k, s.w * s.k, s.cutH * s.k, ox, sy, s.w, s.cutH);
 
       /* 標註用的是譜例自己的座標系，平移到圖片上對應的位置即可 */
       if (it.overlays && it.overlays.length) {
@@ -288,7 +297,7 @@
   /* ---- PDF（v.102）：不用外部套件，自己組一個只有圖片的 PDF ----
      每頁寬度＝譜例圖片寬度；高度一般＝圖片高度。多排（連續聽寫、錯題本多題）時，
      超過「寬 × 1.414」（A4 比例）就在兩排之間換頁，排版和 PNG 完全一樣。
-     圖片用 JPEG（品質 0.92）嵌入，PDF 1 像素＝0.75 點（96 dpi）。 */
+     圖片無損嵌入（v.104，FlateDecode；舊瀏覽器退回 JPEG 品質 1.0），版面 1 單位＝0.75 點。 */
   function pageSlices(canvas) {
     var L = canvas.__layout;
     if (!L || L.H <= L.W * PDF_MAX_RATIO || L.bands.length < 2) return [{ y0: 0, y1: L ? L.H : canvas.height }];
@@ -305,23 +314,38 @@
     return slices;
   }
   function jpegBytes(cv) {
-    var d = cv.toDataURL('image/jpeg', 0.92).split(',')[1];
+    var d = cv.toDataURL('image/jpeg', 1.0).split(',')[1];
     var bin = atob(d), arr = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     return arr;
   }
-  function canvasToPdf(canvas) {
+  /* v.104：無損。取出 RGB 原始像素，用瀏覽器內建的 deflate 壓縮（PDF 的 FlateDecode）。
+     不支援 CompressionStream 的舊瀏覽器（Safari 16.4 以前）改用最高品質 JPEG。 */
+  async function flateBytes(cv) {
+    if (typeof CompressionStream === 'undefined') return null;
+    try {
+      var d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      var rgb = new Uint8Array(cv.width * cv.height * 3);
+      for (var i = 0, j = 0; i < d.length; i += 4) { rgb[j++] = d[i]; rgb[j++] = d[i + 1]; rgb[j++] = d[i + 2]; }
+      var st = new Blob([rgb]).stream().pipeThrough(new CompressionStream('deflate'));
+      return new Uint8Array(await new Response(st).arrayBuffer());
+    } catch (e) { return null; }
+  }
+  async function canvasToPdf(canvas) {
     var L = canvas.__layout || { W: canvas.width, H: canvas.height, scale: 1 };
     var sc = L.scale || 1;
-    var pages = pageSlices(canvas).map(function (sl) {
+    var slices = pageSlices(canvas), pages = [];
+    for (var si = 0; si < slices.length; si++) { var sl = slices[si];
       var hPx = Math.round((sl.y1 - sl.y0) * sc);
       var cv = document.createElement('canvas');
       cv.width = canvas.width; cv.height = hPx;
       var c = cv.getContext('2d');
       c.fillStyle = BG; c.fillRect(0, 0, cv.width, cv.height);
       c.drawImage(canvas, 0, Math.round(sl.y0 * sc), canvas.width, hPx, 0, 0, canvas.width, hPx);
-      return { jpg: jpegBytes(cv), pw: cv.width, ph: cv.height, w: L.W * 0.75, h: (sl.y1 - sl.y0) * 0.75 };
-    });
+      var fl = await flateBytes(cv);
+      pages.push({ data: fl || jpegBytes(cv), filter: fl ? 'FlateDecode' : 'DCTDecode',
+                   pw: cv.width, ph: cv.height, w: L.W * 0.75, h: (sl.y1 - sl.y0) * 0.75 });
+    }
     var enc = function (str) { var a = new Uint8Array(str.length); for (var i = 0; i < str.length; i++) a[i] = str.charCodeAt(i) & 255; return a; };
     var chunks = [], size = 0, offsets = [];
     var push = function (u8) { chunks.push(u8); size += u8.length; };
@@ -336,8 +360,8 @@
       var w = pg.w.toFixed(2), h = pg.h.toFixed(2);
       obj(po, [enc('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + w + ' ' + h + '] /Resources << /XObject << /Im0 ' + io + ' 0 R >> >> /Contents ' + co + ' 0 R >>')]);
       obj(io, [enc('<< /Type /XObject /Subtype /Image /Width ' + pg.pw + ' /Height ' + pg.ph +
-                   ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + pg.jpg.length + ' >>\nstream\n'),
-               pg.jpg, enc('\nendstream')]);
+                   ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /' + pg.filter + ' /Length ' + pg.data.length + ' >>\nstream\n'),
+               pg.data, enc('\nendstream')]);
       var cs = 'q ' + w + ' 0 0 ' + h + ' 0 0 cm /Im0 Do Q';
       obj(co, [enc('<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream')]);
     });
@@ -408,7 +432,7 @@
       if (fmt === 'pdf' || fmt === 'both') {
         var pc = await buildCanvas(items, Object.assign({}, ui, { scale: PDF_SCALE }));
         if (ui.onStage) ui.onStage('encode');
-        var pdf = canvasToPdf(pc);
+        var pdf = await canvasToPdf(pc);
         if (ui.onStage) ui.onStage('deliver');
         r = await deliver(pdf, fileName(prefix, 'pdf'));
       }

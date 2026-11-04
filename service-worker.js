@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v103'; // v.103：搜尋引擎（標準網址、網站地圖、結構化資料、贊助者版與測試站 noindex）
+const CACHE_NAME = 'ear-training-shell-v104'; // v.104：贊助者版譜例匯出畫質（4 倍、PDF 無損）
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
