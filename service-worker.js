@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v104'; // v.104：贊助者版譜例匯出畫質（4 倍、PDF 無損）
+const CACHE_NAME = 'ear-training-shell-v104-1'; // v.104：贊助者版譜例匯出畫質（4 倍、PDF 無損）；v.104.1 修正單行譜例譜號被切
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [

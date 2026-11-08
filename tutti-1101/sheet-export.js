@@ -73,9 +73,28 @@
             if (x > hMax) hMax = x;
           });
         } catch (e) {}
+        /* v.104.1：上面只讀直線端點，曲線（例如高音譜號往下彎的尾巴）量不到，
+           單行譜例的譜號會被切掉一角。另外用瀏覽器算的實際外框（含曲線）量一次，
+           只在實際內容超出原本的裁切範圍時才放寬（見 buildCanvas）。
+           getBBox 要元素有排版，所以放一份副本到畫面外量，量完就移除。 */
+        var inkTop = Infinity, inkBot = -Infinity;
+        try {
+          var probe = svgEl.cloneNode(true);
+          probe.style.cssText = 'position:fixed;left:-100000px;top:0;visibility:hidden;display:block';
+          document.body.appendChild(probe);
+          probe.querySelectorAll('path').forEach(function (pth) {
+            var bb = pth.getBBox();
+            if (!bb.width && !bb.height) return;
+            if (bb.y < inkTop) inkTop = bb.y;
+            if (bb.y + bb.height > inkBot) inkBot = bb.y + bb.height;
+          });
+          probe.parentNode.removeChild(probe);
+        } catch (e) {}
         return {
           top: isFinite(minY) ? minY : 0,
           bottom: isFinite(maxY) ? maxY : 0,
+          inkTop: isFinite(inkTop) ? inkTop : null,
+          inkBottom: isFinite(inkBot) ? inkBot : null,
           headCentre: isFinite(hMin) ? (hMin + hMax + 13) / 2 : null
         };
       })();
@@ -156,17 +175,23 @@
     /* ⚠ 所有格子必須用「同一個」裁切範圍。
        逐格依自己的內容裁，各格裁掉的量不同，譜例在格子裡的垂直位置就會參差不齊。
        取全部的最小上緣與最大下緣，換來的是每一排都對齊。 */
-    var allTop = Infinity, allBottom = -Infinity;
+    var allTop = Infinity, allBottom = -Infinity, inkTop = Infinity, inkBot = -Infinity;
     shots.forEach(function (sh) {
       var b = sh.box || {};
       if ((b.top != null) && b.top < allTop) allTop = b.top;
       if ((b.bottom != null) && b.bottom > allBottom) allBottom = b.bottom;
+      if ((b.inkTop != null) && b.inkTop < inkTop) inkTop = b.inkTop;
+      if ((b.inkBottom != null) && b.inkBottom > inkBot) inkBot = b.inkBottom;
     });
     var cutTop = (anyOverlay || !isFinite(allTop)) ? 0 : Math.max(0, Math.floor(allTop - PEEK));
+    /* v.104.1：實際內容超出裁切範圍（超過 1 單位，排除反鋸齒等級的誤差）才往外放到包住內容再留 2；
+       沒超出的題目裁切完全不變。 */
+    if (cutTop > 0 && isFinite(inkTop) && inkTop < cutTop - 1) cutTop = Math.max(0, Math.floor(inkTop - 2));
     shots.forEach(function (sh) {
       sh.cutTop = cutTop;
       var bottomEdge = (anyOverlay || !isFinite(allBottom))
         ? sh.h : Math.min(sh.h, Math.ceil(allBottom + PEEK));
+      if (bottomEdge < sh.h && isFinite(inkBot) && inkBot > bottomEdge + 1) bottomEdge = Math.min(sh.h, Math.ceil(inkBot + 2));
       sh.cutH = Math.max(10, bottomEdge - cutTop);
     });
 
