@@ -638,8 +638,24 @@ function showPage(pageId) {
 }
 
 // 讓 CSS 的 100vh 在行動裝置（避開位址列）更準確
-function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight * 0.01 + 'px'); }
-window.addEventListener('resize', setVH); setVH();
+(function(){
+  /* v.105.2：iPhone 轉向時常常「事件先到、尺寸還沒更新」，只量一次會記到橫式的舊高度
+     （四部和聲整頁鎖高，鍵盤區因此被擠到 0 而消失）。每次觸發後隔 0.1／0.3／0.6／1 秒再補量；
+     切回 App、從上一頁快取回來時也補量。六個用到 --app-vh 的頁面寫法相同。 */
+  function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  var vhTimers = [];
+  function remeasureVH(){
+    setVH();
+    vhTimers.forEach(clearTimeout);
+    vhTimers = [100, 300, 600, 1000].map(function(ms){ return setTimeout(setVH, ms); });
+  }
+  setVH();
+  window.addEventListener('resize', remeasureVH);
+  window.addEventListener('orientationchange', remeasureVH);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', remeasureVH);
+  window.addEventListener('pageshow', remeasureVH);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) remeasureVH(); });
+})();
 
 (function(){
   const VF = Vex.Flow;
@@ -651,10 +667,10 @@ window.addEventListener('resize', setVH); setVH();
   const BASS_GAIN = 3.5 * Math.pow(10, BASS_BOOST_DB / 20);
   /* v.105：Yamaha C5（Salamander）每個取樣都正規化成一樣大聲，低音的能量集中在低頻，
      手機、平板的小喇叭幾乎放不出來，聽起來比上方聲部小 4～8 dB（標準音色的低音區天生就大 4～7 dB，不受影響）。
-     所以只在 C5 依音高補償低音：G3（55）以上 +1.5 dB，往下每半音多 0.35 dB，最多 +8.8 dB
-     （C3 約 +3.95、G2 約 +5.7、C2 約 +8.15）。作者試聽多組後選定（H 版本）。
+     所以只在 C5 依音高補償低音：G3（55）以上 +1.3 dB，往下每半音多 0.35 dB，最多 +7 dB
+     （C3 約 +3.75、G2 約 +5.5、D2 以下 +7）。作者試聽後選定 H 版本（+1.5／上限 8.8），v.105.2 再微調成現值。
      kit：即時播放傳 pianoInst.__kit；導出傳 PianoEngine.currentKit()（離線算音用的就是它）。 */
-  const C5_BASS = { baseDb: 1.5, pivot: 55, perSemi: 0.35, maxDb: 8.8 };
+  const C5_BASS = { baseDb: 1.3, pivot: 55, perSemi: 0.35, maxDb: 7.0 };   // v.105.2 作者微調（原 1.5／8.8）
   /* v.105.1：低音加大後，約 1% 的題目（多在 Lv.4／5）和絃起音瞬間會稍微超過上限（最大 +0.67 dBFS，1,500 題實測）。
      C5 的四部和聲整體（四個聲部＋標準音 A）一起降 1 dB，聲部之間的比例完全不變。標準音色不受影響。 */
   const C5_TRIM = Math.pow(10, -1 / 20);

@@ -847,8 +847,24 @@ window.addEventListener('appinstalled', function(){
 
 <script>
 /* 視窗實際高度寫進 --app-vh：手機工具列收合時 100vh 會變，用這個值才不會讓固定定位的元素跳動 */
-(function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
-  setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+(function(){
+  /* v.105.2：iPhone 轉向時常常「事件先到、尺寸還沒更新」，只量一次會記到橫式的舊高度
+     （四部和聲整頁鎖高，鍵盤區因此被擠到 0 而消失）。每次觸發後隔 0.1／0.3／0.6／1 秒再補量；
+     切回 App、從上一頁快取回來時也補量。六個用到 --app-vh 的頁面寫法相同。 */
+  function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  var vhTimers = [];
+  function remeasureVH(){
+    setVH();
+    vhTimers.forEach(clearTimeout);
+    vhTimers = [100, 300, 600, 1000].map(function(ms){ return setTimeout(setVH, ms); });
+  }
+  setVH();
+  window.addEventListener('resize', remeasureVH);
+  window.addEventListener('orientationchange', remeasureVH);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', remeasureVH);
+  window.addEventListener('pageshow', remeasureVH);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) remeasureVH(); });
+})();
 </script>
 <script>
 /* 從練習頁返回時帶 #menu：直接顯示選單、跳過封面（封面只在首次啟動出現）。此段趁早執行，避免閃到封面。 */
@@ -1345,7 +1361,7 @@ window.CHANGELOG = [
   { v: 'v.101', items: [{ t: '全新登場!!伍線譜樂譜掃描', link: { text: '「點我看看 ▸」', href: 'https://andywu1101.github.io/scanner/' } }] },
   { v: 'v.102', items: ['!!贊助者版：新增 PDF 格式與「全部下載」（音檔與譜例打包成同一個壓縮檔）'] },
   { v: 'v.104', items: ['!!贊助者版：提高譜例匯出畫質（PNG 與 PDF）', '!!贊助者版：修正單行譜例匯出時，譜號被切掉一小角的問題'] },
-  { v: 'v.105', items: ['優化 Yamaha C5 音色的四部和聲音量平衡，讓低音聲部更清楚'] }
+  { v: 'v.105', items: ['優化 Yamaha C5 音色的四部和聲音量平衡，讓低音聲部更清楚', '修正手機轉向後，四部和聲鍵盤消失的問題'] }
 ];
 
 function showChangelog(){

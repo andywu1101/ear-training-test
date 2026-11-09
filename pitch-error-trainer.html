@@ -2913,8 +2913,24 @@ function syncStaffScroll(idA, idB){
 }
 </script>
 <script>
-(function(){ function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
-  setVH(); window.addEventListener('resize', setVH); window.addEventListener('orientationchange', setVH); })();
+(function(){
+  /* v.105.2：iPhone 轉向時常常「事件先到、尺寸還沒更新」，只量一次會記到橫式的舊高度
+     （四部和聲整頁鎖高，鍵盤區因此被擠到 0 而消失）。每次觸發後隔 0.1／0.3／0.6／1 秒再補量；
+     切回 App、從上一頁快取回來時也補量。六個用到 --app-vh 的頁面寫法相同。 */
+  function setVH(){ document.documentElement.style.setProperty('--app-vh', window.innerHeight*0.01+'px'); }
+  var vhTimers = [];
+  function remeasureVH(){
+    setVH();
+    vhTimers.forEach(clearTimeout);
+    vhTimers = [100, 300, 600, 1000].map(function(ms){ return setTimeout(setVH, ms); });
+  }
+  setVH();
+  window.addEventListener('resize', remeasureVH);
+  window.addEventListener('orientationchange', remeasureVH);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', remeasureVH);
+  window.addEventListener('pageshow', remeasureVH);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) remeasureVH(); });
+})();
 </script>
 <script>
 /* 考試作答中與考卷回顧模式：不顯示「錯題本」相關按鈕 */
