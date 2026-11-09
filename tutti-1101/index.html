@@ -1270,7 +1270,9 @@ function maybeAutoChangelog(){
   document.body.style.pointerEvents = 'none';
   setTimeout(function(){
     document.body.style.pointerEvents = '';
-    try { localStorage.setItem(CHANGELOG_SEEN_KEY, latest); } catch(e){}
+    /* v.105.4：不在跳出時記「已看過」，改成按關閉時才記（見 closeChangelog）。
+       App 更新時新版接手會自動重新整理網頁，日誌可能還沒看完就被刷掉，
+       跳出時就記的話，下次進選單不會再跳。 */
     showChangelog();
   }, 400);
 }
@@ -1393,7 +1395,14 @@ function showChangelog(){
   var m2 = document.getElementById('logModal');
   if(m2){ m2.classList.add('open'); syncBodyLock(); if(box) setTimeout(function(){ box.scrollTop = box.scrollHeight; }, 30); }
 }
-function closeChangelog(){ var m=document.getElementById('logModal'); if(m) m.classList.remove('open'); syncBodyLock(); }
+function closeChangelog(){
+  var m=document.getElementById('logModal');
+  /* v.105.4：日誌確實開著、被關閉時才記成已看過（Esc 在日誌沒開時也會呼叫這裡，不能記） */
+  if(m && m.classList.contains('open') && window.CHANGELOG && CHANGELOG.length){
+    try { localStorage.setItem(CHANGELOG_SEEN_KEY, CHANGELOG[CHANGELOG.length - 1].v); } catch(e){}
+  }
+  if(m) m.classList.remove('open'); syncBodyLock();
+}
 /* 音訊除錯模式的隱藏開關（v.99）：更新日誌裡的「目前版本 v.XX」連點 5 下（2 秒內）切換開／關。
    主畫面 App 沒有網址列，不能加 ?debug=audio，所以另外給這個入口。
    ⚠ 鍵名要與 piano-engine.js 的 DEBUG_KEY 一致；面板顯示在各練習頁的左下角。 */

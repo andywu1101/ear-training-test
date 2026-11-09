@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v105-2'; // v.105：Yamaha C5 四部和聲低音依音高補償；v.105.1 C5 四部和聲整體 −1 dB 避免破音；v.105.2 低音微調、轉向後重新量畫面高度
+const CACHE_NAME = 'ear-training-shell-v105-4'; // v.105.4 更新日誌關閉時才記成已看過；v.105：Yamaha C5 四部和聲低音依音高補償；v.105.1 C5 四部和聲整體 −1 dB 避免破音；v.105.2 低音微調、轉向後重新量畫面高度
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
