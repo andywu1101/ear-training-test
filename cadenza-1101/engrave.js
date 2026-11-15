@@ -114,13 +114,18 @@
     return d;
   }
 
+  var STEP_IDX = { c: 0, d: 1, e: 2, f: 3, g: 4, a: 5, b: 6 };
   function makeNote(n, clef) {
+    /* ⚠ VexFlow 會把和絃的音由低到高重新排序，addAccidental 的索引是排序後的位置。
+       原本的順序（例如女高音在前、女低音在後）不排好，升記號會畫到另一個音上（v106.4 修正） */
+    if (!n.rest && n.pitches.length > 1) n.pitches = n.pitches.slice().sort(function (a, b) { return (a.oct * 7 + STEP_IDX[a.step]) - (b.oct * 7 + STEP_IDX[b.step]); });
     var keys = n.rest ? [clef === 'bass' ? 'd/3' : 'b/4'] : n.pitches.map(function (p) { return p.step + '/' + p.oct; });
     var sn = new VF.StaveNote({ clef: clef, keys: keys, duration: n.type + (n.rest ? 'r' : ''), auto_stem: !n.stem });
     if (n.stem) sn.setStemDirection(n.stem === 'up' ? 1 : -1);
     if (!n.rest) n.pitches.forEach(function (p, i) { if (p.acc) sn.addAccidental(i, new VF.Accidental(p.acc)); });
     for (var d = 0; d < n.dots; d++) sn.addDotToAll();
     n.vf = sn;
+    if (global.Engrave && global.Engrave.debugNotes) global.Engrave.debugNotes.push({ sn: sn, pitches: n.pitches });
     return sn;
   }
 
@@ -215,6 +220,9 @@
     var f = new VF.Formatter().joinVoices([v]);
     return f.preCalculateMinTotalWidth([v]);
   }
+  /* 自動排法：行數不變的前提下平均分配（4 小節放不下一行時排 2+2，不排 3+1；7 小節排 4+3） */
+  function balanced(n, per) { var lines = Math.ceil(n / per); return Math.ceil(n / lines); }
+  var NEED_K = 1.1;    // 安全係數：大量出題實測（v106.4，節奏＋單旋律各 720 題：1.0 有 2 個音超出小節、1.1 起 0）
   function autoPerLine(item, W) {
     var ms = item.measures, clef = ms[0].clefs[0] || 'treble';
     var keySpec = FIFTHS_KEY[String(ms[0].fifths || 0)];
@@ -223,7 +231,7 @@
     try { ms.forEach(function (m) { need = Math.max(need, measureNeed(m, clef)); }); } catch (e) { return 4; }
     for (var per = 4; per > 1; per--) {
       var mW = (W - X0 - pre1 - 2) / Math.min(per, ms.length);
-      if (need * 1.45 + 30 <= mW) return per;
+      if (need * NEED_K + 30 <= mW) return per;
     }
     return 1;
   }
@@ -231,7 +239,7 @@
   function renderLines(item, mode, d, opt) {
     var k = d.k, W = contentPx(d) / k;
     var ms = item.measures, n = ms.length;
-    var breaks = (item.breaks || defaultBreaks(n, autoPerLine(item, W))).filter(function (b) { return b > 0 && b < n; }).sort(function (a, b) { return a - b; });
+    var breaks = (item.breaks || defaultBreaks(n, item.perLine || balanced(n, autoPerLine(item, W)))).filter(function (b) { return b > 0 && b < n; }).sort(function (a, b) { return a - b; });
     item.shownBreaks = breaks.slice();   // 目前畫面上的換行位置（點小節線時以它為準）
     var lines = [], s0 = 0;
     breaks.concat([n]).forEach(function (b) { lines.push([s0, b]); s0 = b; });
@@ -357,9 +365,7 @@
     br.concat([n]).forEach(function (b) { lines.push([s0, b]); s0 = b; });
     var keySpec = FIFTHS_KEY[String(ms[0].fifths || 0)];
     var pre = preWidth('treble', null, keySpec);
-    /* 小節寬固定：以 10 小節、調號最寬（7 個升記號）來算，所以 6、8 小節後面留白，
-       而且不同調的題目小節寬都一樣 */
-    var mW = (W - X0 - preWidth('treble', null, 'C#') - 2) / GRAND_PER_LINE;
+    /* 每一行都補滿到右邊界（v106.4，作者：和其他題型對齊；12 小節 6＋6、單行的 6、8 小節也一樣） */
     var yT = 40, yB = yT + 100, H = yB + 40 + 62;
     var ans = item.answers || {};
     var systems = [];
@@ -368,6 +374,7 @@
       sys.style.height = (H * k) + 'px';
       var host = document.createElement('div'); sys.appendChild(host);
       var ctx = newCanvas(host, W, H, k);
+      var mW = (W - X0 - pre - 2) / (ln[1] - ln[0]);
       var right = X0 + pre + (ln[1] - ln[0]) * mW;
       var sT = stave(X0, yT, right - X0).addClef('treble'), sB = stave(X0, yB, right - X0).addClef('bass');
       if (keySpec !== 'C') { sT.addKeySignature(keySpec); sB.addKeySignature(keySpec); }
@@ -400,10 +407,10 @@
           if (num) overlay(sys, k, cc, bot + 22, num, 'numeral', 'center');
         }
       }
-      /* 調名／「＿＿調：」：放在第一行調號正下方，右緣對齊第一小節的起點 */
+      /* 調名／「＿＿調：」：第一行低音譜表下方，從譜表最左邊開始寫（同 SOP 的解答） */
       if (li === 0) {
         var keyText = mode === 'blank' ? '＿＿調：' : (ans.key || '');
-        if (keyText) { var kd = overlay(sys, k, X0 + pre - 2, bot + 22, keyText, 'keyname'); kd.style.transform = 'translate(-100%, 0)'; }
+        if (keyText) overlay(sys, k, 0, bot + 22, keyText, 'keyname');
       }
       fitSvg(host, W, H, k);
       sys.__meta = meta;
@@ -426,6 +433,6 @@
     return box;
   }
 
-  global.Engrave = { parse: parse, renderItem: renderItem, DENSITY: DENSITY, contentPx: contentPx, MM: MM,
+  global.Engrave = { debugNotes: null, setNeedK: function (v) { NEED_K = v; }, parse: parse, renderItem: renderItem, DENSITY: DENSITY, contentPx: contentPx, MM: MM,
                      defaultBreaks: defaultBreaks, CELLS_PER_ROW: CELLS_PER_ROW };
 })(window);

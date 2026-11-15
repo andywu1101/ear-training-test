@@ -162,6 +162,8 @@
         c.id = old.id; c.title = old.title; c.pageBreak = old.pageBreak;
         c.section = old.section;
         c.breaks = (old.breaks && old.data.barsCount === c.data.barsCount) ? old.breaks : null;
+        c.perLine = old.perLine || null;
+        if (old.data.bpm && c.data.bpm) c.data.bpm = old.data.bpm;   // 作者改過的 mp3 速度保留
         paper.items[paper.items.indexOf(old)] = c;
       }
       save(); renderList();
@@ -246,7 +248,26 @@
         var del = btn('🗑', '刪除', function () { ask('刪除第 ' + o.num + ' 題「' + it.title + '」？', function () { paper.items.splice(paper.items.indexOf(it), 1); save(); renderList(); }); });
         var pb = btn('⤓', it.pageBreak ? '取消「從這題換頁」' : '從這題換頁', function () { it.pageBreak = !it.pageBreak; save(); renderList(); });
         if (it.pageBreak) pb.classList.add('pb-on');
-        [grip, num, ti, info, rg, pb, del].forEach(function (x) { row.appendChild(x); });
+        var extra = [];
+        /* 每行小節數（節奏、單旋律）：自動／1～4；點過小節線就是「自訂」 */
+        if (it.layout === 'lines' && it.data.barsCount > 1) {
+          var pl = document.createElement('select'); pl.className = 'it-sel'; pl.title = '每行小節數';
+          pl.innerHTML = '<option value="auto">每行 自動</option>' + [1, 2, 3, 4].map(function (v) { return '<option value="' + v + '">每行 ' + v + ' 小節</option>'; }).join('') +
+                         '<option value="custom" disabled>每行 自訂</option>';
+          pl.value = it.breaks ? 'custom' : (it.perLine ? String(it.perLine) : 'auto');
+          pl.onchange = function () { it.breaks = null; it.perLine = pl.value === 'auto' ? null : parseInt(pl.value, 10); save(); renderPreview(); };
+          extra.push(pl);
+        }
+        /* mp3 速度（節奏、單旋律、四部和聲）：只影響音檔與預覽播放，譜例不變 */
+        if (it.data.bpm) {
+          var sp = document.createElement('label'); sp.className = 'it-bpm'; sp.title = 'mp3 速度（只影響音檔，譜例不變）';
+          var sym = (it.data.meterType === 'compound') ? '♪' : '♩';
+          sp.innerHTML = '<span>' + sym + '=</span>';
+          var bi = document.createElement('input'); bi.type = 'number'; bi.min = 40; bi.max = 160; bi.step = 1; bi.value = it.data.bpm;
+          bi.onchange = function () { var v = Math.max(40, Math.min(160, parseInt(bi.value, 10) || it.data.bpm)); bi.value = v; it.data.bpm = v; save(); };
+          sp.appendChild(bi); extra.push(sp);
+        }
+        [grip, num, ti, info].concat(extra, [rg, pb, del]).forEach(function (x) { row.appendChild(x); });
         grip.onmousedown = function () { row.draggable = true; };
         row.ondragstart = function (e) { dragId = it.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
         row.ondragend = function () { row.draggable = false; row.classList.remove('dragging'); clearDrop(); dragId = null; };
@@ -344,8 +365,8 @@
       pg.forEach(function (b) {
         inn.appendChild(b.el);
         if (interactive && b.item && autoBreakIds[b.item.id] && pi > 0 && pg[0] === b) {
-          var n = document.createElement('div'); n.className = 'auto-break'; n.textContent = '← 上一頁放不下';
-          b.el.style.position = 'relative'; n.style.top = '0'; b.el.appendChild(n);
+          var n = document.createElement('div'); n.className = 'auto-break'; n.textContent = '上一頁放不下，自動換頁';
+          b.el.style.position = 'relative'; b.el.appendChild(n);
         }
       });
       page.appendChild(inn);
