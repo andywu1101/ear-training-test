@@ -1176,6 +1176,8 @@ function updateStaffHeader(pageId){
     const totalMs = (t - ctx.currentTime) * 1000; animatePlayhead(totalMs); return totalMs;
   }
 
+  /* 出題模式（v106.2）：只給出題工具 cadenza-1101 用，網址帶 ?maker=1 才啟動，一般使用者完全不會執行 */
+  const MAKER_MODE = new URLSearchParams(location.search).get('maker') === '1';
   const intModule = (function(){
     const QUALITIES = {
       P1:    { label: '完全一度',      semitones: 0,  baseStep: 0 },
@@ -1267,6 +1269,7 @@ function updateStaffHeader(pageId){
       const insufficient = curLevel.id === CUSTOM_ID && customPool.length < 2;
       const btn = document.getElementById('int-enterBtn'); btn.disabled = insufficient;
       btn.textContent = insufficient ? '⚠️ 請至少勾選 2 種音程才能開始' : `🎯 確認設定，進入「音程${mode==='test'?'測驗':'練習'}」 →`;
+      if(MAKER_MODE && !insufficient) btn.textContent = '➕ 出題';   // 出題模式（v106.2）
     }
     function updateStatus(){ document.getElementById('int-statusBadge').textContent = `${curLevel.name}｜${qtype==='single'?'單題作答':'連續聽寫'} (${mode==='test'?'測驗模式':'練習模式'})`; }
 
@@ -1626,6 +1629,47 @@ function updateStaffHeader(pageId){
       document.getElementById('int-dictSubmitBtn').disabled = true;
     }
 
+    /* ===== 出題模式（v106.2，出題工具 cadenza-1101 專用；?maker=1 才會執行）=====
+       出題、繪譜、音檔一律呼叫本頁原本的函式，這裡只負責把結果交給出題工具。 */
+    function makerSnapshot(activePool){
+      const allowRepeat = document.querySelector('input[name="int-dictRepeat"]:checked').value === 'allow';
+      const count = allowRepeat ? parseInt(document.getElementById('int-dictationCountInput').value,10)||10 : activePool.length;
+      return { levelId: curLevel.id, levelName: curLevel.name, pool: activePool.slice(), count: count, allowRepeat: allowRepeat, compound: compound };
+    }
+    function makerTitle(snap){ return snap.levelId === CUSTOM_ID ? '混合' : snap.levelName; }
+    function makerOffer(activePool){
+      const snap = makerSnapshot(activePool);
+      const data = { questions: dictSession.questions };
+      if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'interval', data: data, snapshot: snap, title: makerTitle(snap) });
+    }
+    if(MAKER_MODE) window.__maker = {
+      type: 'interval',
+      regen: function(snap){
+        const keep = compound; compound = !!snap.compound;
+        try{ return { questions: generateDictQs(snap.count, snap.allowRepeat, snap.pool) }; }
+        finally{ compound = keep; }
+      },
+      /* 譜例：用本頁的大譜表繪譜畫在畫面外，交給 MusicXML 記錄器（sheet-export.js）轉成文字 */
+      musicxml: function(data){
+        const made = data.questions.map(q => offscreenStaff(q.root, q.intervals, q.steps, 280, 260));
+        try{ return window.SheetExport.buildMusicXML(made.map(m => ({ svg: m.svg })), {}); }
+        finally{ made.forEach(m => m.holder.remove()); }
+      },
+      answers: function(data){ return data.questions.map(q => QUALITIES[q.qualityKey] ? QUALITIES[q.qualityKey].label : q.qualityKey); },
+      events: function(data){ return buildDictExportEvents(data.questions); }
+    };
+    function makerSetup(){
+      document.body.classList.add('maker-mode');
+      const st = document.createElement('style');
+      st.textContent = 'body.maker-mode #pageIntSettings .settings-topbar, body.maker-mode #pageIntSettings .review-entry-btn,' +
+        ' body.maker-mode #pageIntSettings .switch-group:has(#int-modeSwitch), body.maker-mode #pageIntSettings .switch-group:has(#int-qtypeSwitch),' +
+        ' body.maker-mode #int-dictReplayRow, body.maker-mode #int-noSpecialSettings { display:none !important; }';
+      document.head.appendChild(st);
+      const dictBtn = document.querySelector('#int-qtypeSwitch [data-qtype="dictation"]'); if(dictBtn) dictBtn.click();
+      const enter = document.getElementById('int-enterBtn'); if(enter) enter.textContent = '➕ 出題';
+    }
+    if(MAKER_MODE) window.__makerSetup = makerSetup;
+
     return {
       init: function(){
         renderCustom(); renderTabs(); updateScore(); refreshReviewCount(); updateSettingsVis();
@@ -1654,6 +1698,7 @@ function updateStaffHeader(pageId){
             dictSession = { questions: generateDictQs(count, allowRepeat, activePool), maxReplays: max, replaysLeft: max, submitted: false, hasPlayed: false, activeIndex: 0 };
             renderDictBoard();
           }
+          if(MAKER_MODE){ makerOffer(activePool); return; }   // 出題模式：把題目交給出題工具，不進作答頁
           showPage('int-practice'); ensureAudio();
         };
         document.getElementById('int-playBtn').onclick = () => {
@@ -1968,6 +2013,7 @@ function updateStaffHeader(pageId){
 
   window.intModule = intModule;
   intModule.init();
+  if(MAKER_MODE && window.__makerSetup) window.__makerSetup();   // 出題模式（v106.2）
   loadPiano();
   /* 「🎵 標準音 A」按鈕（單題作答與連續聽寫）：隨時可按，播放 A4（440Hz）2 秒，不影響題目播放次數。
      考試模式在播放前會自動給標準音，所以隱藏。

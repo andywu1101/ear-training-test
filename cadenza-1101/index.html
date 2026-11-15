@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>出題工具</title>
+<script src="../tutti-1101/vexflow-min.js"></script>
+<script src="engrave.js"></script>
+<style>
+  :root{
+    --paper:#efeee6; --panel:#fbfaf6; --panel-border:#ddd8c9; --hairline:#e2ddce;
+    --ink:#262420; --ink-soft:#75705f; --accent:#33415c; --correct:#4b7a5b; --wrong:#a6493b;
+    --font: 'Inter', -apple-system, 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
+    --paper-font: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--paper); color:var(--ink); font-family:var(--font); }
+  button{ font-family:inherit; cursor:pointer; }
+  input, select{ font-family:inherit; }
+
+  /* ---- 上方工具列 ---- */
+  .topbar{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--panel-border); }
+  .topbar label{ font-size:13px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; }
+  .topbar input[type=text]{ border:1px solid var(--panel-border); border-radius:8px; padding:6px 9px; font-size:14px; background:#fff; }
+  #hdTitle{ width:300px; } #hdAuthor{ width:90px; } #hdDate{ width:100px; }
+  .seg{ display:inline-flex; border:1px solid var(--panel-border); border-radius:8px; overflow:hidden; }
+  .seg button{ border:0; background:#fff; padding:6px 11px; font-size:13px; color:var(--ink-soft); }
+  .seg button.on{ background:var(--accent); color:#fff; }
+  .tb-btn{ border:1px solid var(--panel-border); background:#fff; border-radius:8px; padding:7px 12px; font-size:13.5px; color:var(--ink); }
+  .tb-btn.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .tb-btn:disabled{ opacity:.45; cursor:default; }
+  .spacer{ flex:1; }
+  .ver{ font-size:11px; color:var(--ink-soft); }
+
+  /* ---- 出題畫面 ---- */
+  .main{ display:grid; grid-template-columns: minmax(520px, 1fr) 420px; height:calc(100vh - 58px); }
+  .left{ display:flex; flex-direction:column; border-right:1px solid var(--panel-border); min-width:0; }
+  .tabs{ display:flex; flex-wrap:wrap; gap:4px; padding:8px 10px 0; }
+  .tabs button{ border:1px solid var(--panel-border); border-bottom:0; background:#f4f2ea; border-radius:8px 8px 0 0; padding:7px 13px; font-size:13.5px; color:var(--ink-soft); }
+  .tabs button.on{ background:#fff; color:var(--ink); font-weight:600; }
+  .tabs button:disabled{ opacity:.4; cursor:default; }
+  .frames{ flex:1; position:relative; background:#fff; border-top:1px solid var(--panel-border); }
+  .frames iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:none; }
+  .frames iframe.on{ display:block; }
+
+  .right{ overflow:auto; padding:12px 14px 40px; }
+  .list-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:13px; color:var(--ink-soft); }
+  .empty{ color:var(--ink-soft); font-size:13.5px; padding:24px 6px; line-height:1.7; }
+  .sec{ margin-bottom:14px; }
+  .sec-name{ display:flex; align-items:center; gap:6px; font-weight:700; font-size:15px; margin-bottom:6px; }
+  .sec-name input{ font:inherit; border:1px solid transparent; background:transparent; border-radius:6px; padding:2px 5px; width:200px; }
+  .sec-name input:hover, .sec-name input:focus{ border-color:var(--panel-border); background:#fff; }
+  .it{ display:flex; align-items:center; gap:6px; background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:6px 8px; margin-bottom:6px; }
+  .it.dragging{ opacity:.4; }
+  .it.drop-before{ box-shadow: 0 -3px 0 var(--accent); }
+  .it.drop-after{ box-shadow: 0 3px 0 var(--accent); }
+  .grip{ cursor:grab; color:var(--ink-soft); font-size:16px; padding:0 2px; user-select:none; }
+  .it-num{ font-weight:600; min-width:22px; text-align:right; }
+  .it input{ flex:1; min-width:0; font:inherit; font-size:13.5px; border:1px solid transparent; background:transparent; border-radius:6px; padding:3px 5px; }
+  .it input:hover, .it input:focus{ border-color:var(--panel-border); background:#fff; }
+  .it-info{ font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
+  .ib{ border:1px solid transparent; background:transparent; border-radius:6px; padding:3px 5px; font-size:14px; }
+  .ib:hover{ border-color:var(--panel-border); background:#fff; }
+  .ib.pb-on{ background:var(--accent); color:#fff; }
+  .it-note{ font-size:11.5px; color:var(--wrong); margin:-3px 0 6px 34px; }
+
+  /* ---- 預覽畫面 ---- */
+  .pv{ display:none; height:calc(100vh - 58px); overflow:auto; padding:20px 0 60px; }
+  .pv.on{ display:block; }
+  .main.off{ display:none; }
+  .pv-hint{ text-align:center; font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
+  .pages{ display:flex; flex-direction:column; align-items:center; gap:18px; }
+
+  /* ---- A4 頁面（螢幕預覽與列印共用） ---- */
+  .page{ width:210mm; height:297mm; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.12); position:relative; overflow:hidden; font-family:var(--paper-font); color:#000; }
+  .page-in{ position:absolute; }
+  .head{ position:relative; text-align:center; font-weight:700; }
+  .head .au{ position:absolute; right:0; bottom:-16px; font-size:12px; font-weight:400; }
+  .sec-title{ font-weight:700; }
+  .item-title{ margin-left:6px; }
+  .sys{ position:relative; }
+  .ov{ position:absolute; white-space:nowrap; line-height:1; }
+  .ov.cellnum{ font-size:11px; }
+  .ov.ans{ font-size:12.5px; }
+  .barhit{ position:absolute; width:12px; cursor:pointer; border-radius:3px; }
+  .barhit:hover{ background:rgba(51,65,92,.18); }
+  .barhit.at-break{ background:rgba(51,65,92,.08); }
+  .auto-break{ position:absolute; right:-4mm; transform:translateX(100%); font-size:11px; color:var(--wrong); width:30mm; }
+
+  /* ---- 卡片 ---- */
+  .mask{ position:fixed; inset:0; background:rgba(20,18,14,.45); display:none; align-items:center; justify-content:center; z-index:50; }
+  .mask.on{ display:flex; }
+  .card{ background:var(--panel); border-radius:16px; padding:18px 20px; width:min(860px, 94vw); max-height:92vh; overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.25); }
+  .card h3{ margin:0 0 10px; font-size:16px; }
+  .card .pv-box{ background:#fff; border:1px solid var(--hairline); border-radius:10px; padding:10px 14px; font-family:var(--paper-font); overflow:auto; }
+  .card .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+  .card .chk{ font-size:13px; color:var(--ink-soft); display:flex; gap:6px; align-items:center; margin-top:10px; }
+  .card audio{ height:34px; }
+  .msg{ font-size:13px; color:var(--ink-soft); }
+  .msg.err{ color:var(--wrong); }
+
+  #printArea{ display:none; }
+  @page{ size:A4; margin:0; }
+  @media print{
+    html, body{ background:#fff; height:auto; }
+    body > *:not(#printArea){ display:none !important; }
+    #printArea{ display:block; }
+    #printArea .page{ box-shadow:none; page-break-after:always; break-after:page; }
+    #printArea .page:last-child{ page-break-after:auto; break-after:auto; }
+    .barhit, .auto-break{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <label>標題 <input type="text" id="hdTitle" placeholder="例：新北高中2026/11/16聽寫課堂練習"></label>
+  <label>署名 <input type="text" id="hdAuthor"></label>
+  <label>上課日期 <input type="text" id="hdDate" placeholder="YYYYMMDD"></label>
+  <label>間距 <span class="seg" id="density"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span></label>
+  <span class="spacer"></span>
+  <span class="seg" id="viewSeg"><button data-v="edit" class="on">出題</button><button data-v="blank">預覽作答卷</button><button data-v="key">預覽解答</button></span>
+  <button class="tb-btn" id="btnPrintBlank">🖨 列印作答卷</button>
+  <button class="tb-btn" id="btnPrintKey">🖨 列印解答</button>
+  <button class="tb-btn primary" id="btnMp3">⬇️ 下載 mp3</button>
+  <span class="ver">出題工具 v1</span>
+</div>
+
+<div class="main" id="mainView">
+  <div class="left">
+    <div class="tabs" id="tabs"></div>
+    <div class="frames" id="frames"></div>
+  </div>
+  <div class="right">
+    <div class="list-head">
+      <span>題目列表</span><span class="spacer"></span>
+      <label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="noPreviewTop"> 出題後直接加入</label>
+      <button class="tb-btn" id="btnClear">清空考卷</button>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<div class="pv" id="pvView">
+  <div class="pv-hint">單旋律、節奏：點小節線可以「從這裡換行」，點行尾的小節線可以「併回上一行」。紅字表示上一頁放不下而自動換頁。</div>
+  <div class="pages" id="pvPages"></div>
+</div>
+
+<div class="mask" id="cardMask">
+  <div class="card">
+    <h3 id="cardTitle">預覽</h3>
+    <div class="pv-box" id="cardScore"></div>
+    <div class="row">
+      <button class="tb-btn" id="cardPlay">▶ 播放</button>
+      <audio id="cardAudio" controls style="display:none;"></audio>
+      <span class="msg" id="cardMsg"></span>
+    </div>
+    <div class="row">
+      <button class="tb-btn primary" id="cardAdd">＋ 加入考卷</button>
+      <button class="tb-btn" id="cardRegen">🔄 重抽</button>
+      <button class="tb-btn" id="cardCancel">取消</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="noPreviewCard"> 下次直接加入，不預覽</label>
+  </div>
+</div>
+
+<div class="mask" id="confirmMask">
+  <div class="card" style="width:min(420px,92vw);">
+    <h3 id="confirmText">確定？</h3>
+    <div class="row"><button class="tb-btn primary" id="confirmOk">確定</button><button class="tb-btn" id="confirmNo">取消</button></div>
+  </div>
+</div>
+
+<div class="mask" id="busyMask">
+  <div class="card" style="width:min(420px,92vw);">
+    <h3>處理中</h3>
+    <div class="msg" id="busyMsg">…</div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<script src="maker.js"></script>
+</body>
+</html>
