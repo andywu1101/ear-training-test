@@ -124,6 +124,20 @@
     return sn;
   }
 
+  /* 符頭置中：上下兩行共用同一個 TickContext；量排版後的符頭左右界（臨時記號會把符頭往右推、
+     同度與二度會有錯開的符頭），再整組平移到中心 */
+  function centreAt(voices, cc) {
+    var tc = voices[0].notes[0].getTickContext();
+    var lo = Infinity, hi = -Infinity;
+    voices.forEach(function (o) { o.notes.forEach(function (n) {
+      var b = n.getNoteHeadBeginX(), e = n.getNoteHeadEndX();
+      var disp = (n.note_heads || []).some(function (h) { return h.displaced || (h.isDisplaced && h.isDisplaced()); });
+      if (disp) { if (n.getStemDirection() > 0) e += (e - b); else b -= (e - b); }
+      lo = Math.min(lo, b); hi = Math.max(hi, e);
+    }); });
+    tc.setX(tc.getX() + (cc - (lo + hi) / 2));
+  }
+
   /* ---------- 音程／和絃：一行 5 格的大譜表 ---------- */
   var CELLS_PER_ROW = 5;
   function renderCells(item, mode, d, numStart) {
@@ -171,16 +185,7 @@
           voices.forEach(function (o) { f.joinVoices([o.v]); });
           f.format(voices.map(function (o) { return o.v; }), 0);
           /* 符頭中心對到格子中心：所有聲部共用同一個 TickContext，上下兩行的符頭自然對齊 */
-          var tc = voices[0].notes[0].getTickContext();
-          /* 量排版後的符頭左右界（臨時記號會把符頭往右推、同度與二度會有錯開的符頭），再整組平移到格子中心 */
-          var lo = Infinity, hi = -Infinity;
-          voices.forEach(function (o) { o.notes.forEach(function (n) {
-            var b = n.getNoteHeadBeginX(), e = n.getNoteHeadEndX();
-            var disp = (n.note_heads || []).some(function (h) { return h.displaced || (h.isDisplaced && h.isDisplaced()); });
-            if (disp) { if (n.getStemDirection() > 0) e += (e - b); else b -= (e - b); }
-            lo = Math.min(lo, b); hi = Math.max(hi, e);
-          }); });
-          tc.setX(tc.getX() + (cc - (lo + hi) / 2));
+          centreAt(voices, cc);
           voices.forEach(function (o) { o.v.draw(ctx, o.st); });
         }
         var ans = answers[r * CELLS_PER_ROW + i];
@@ -195,11 +200,39 @@
 
   /* ---------- 節奏／單旋律：一條譜表，小節等寬、可指定換行 ---------- */
   function defaultBreaks(n, per) { var b = []; for (var i = per; i < n; i += per) b.push(i); return b; }
+  /* 預設每行 4 小節；但音符太密（例如 12/8 有十六分音符又有臨時記號）放不下時，自動減少每行小節數。
+     作者自己點過換行（item.breaks 有值）就照作者的。 */
+  function measureNeed(m, clef) {
+    var src = m.staves[0] || [];
+    if (!src.length) return 0;
+    var notes = src.map(function (nn) { return makeNote(nn, clef); }), tStart = -1;
+    src.forEach(function (nn, i) {
+      if (nn.tupStart) tStart = i;
+      if (nn.tupStop && tStart >= 0) { new VF.Tuplet(notes.slice(tStart, i + 1), { num_notes: nn.tupNum || 3, notes_occupied: nn.tupNorm || 2 }); tStart = -1; }
+    });
+    var total = src.reduce(function (s, nn) { return s + nn.div; }, 0) || 96;
+    var v = new VF.Voice({ num_beats: total / 6, beat_value: 16 }).setMode(VF.Voice.Mode.SOFT).addTickables(notes);
+    var f = new VF.Formatter().joinVoices([v]);
+    return f.preCalculateMinTotalWidth([v]);
+  }
+  function autoPerLine(item, W) {
+    var ms = item.measures, clef = ms[0].clefs[0] || 'treble';
+    var keySpec = FIFTHS_KEY[String(ms[0].fifths || 0)];
+    var pre1 = preWidth(clef, ms[0].time, keySpec);
+    var need = 0;
+    try { ms.forEach(function (m) { need = Math.max(need, measureNeed(m, clef)); }); } catch (e) { return 4; }
+    for (var per = 4; per > 1; per--) {
+      var mW = (W - X0 - pre1 - 2) / Math.min(per, ms.length);
+      if (need * 1.45 + 30 <= mW) return per;
+    }
+    return 1;
+  }
 
   function renderLines(item, mode, d, opt) {
     var k = d.k, W = contentPx(d) / k;
     var ms = item.measures, n = ms.length;
-    var breaks = (item.breaks || defaultBreaks(n, 4)).filter(function (b) { return b > 0 && b < n; }).sort(function (a, b) { return a - b; });
+    var breaks = (item.breaks || defaultBreaks(n, autoPerLine(item, W))).filter(function (b) { return b > 0 && b < n; }).sort(function (a, b) { return a - b; });
+    item.shownBreaks = breaks.slice();   // 目前畫面上的換行位置（點小節線時以它為準）
     var lines = [], s0 = 0;
     breaks.concat([n]).forEach(function (b) { lines.push([s0, b]); s0 = b; });
     var clef = ms[0].clefs[0] || 'treble';
@@ -304,6 +337,81 @@
     return systems;
   }
 
+
+  /* ---------- 四部和聲：大譜表、每小節一個全音符和絃置中、調名與級數 ---------- */
+  var GRAND_PER_LINE = 10;
+  function grandBreaks(n) { return n <= GRAND_PER_LINE ? [] : (n === 12 ? [6] : defaultBreaks(n, GRAND_PER_LINE)); }
+  function chordOf(notes) {
+    /* 同一譜表的兩個聲部合成一個和絃；同音只留一個（否則同一個音會畫兩個臨時記號） */
+    var seen = {}, ps = [];
+    notes.forEach(function (n) { if (n.rest) return; n.pitches.forEach(function (p) {
+      var id = p.step + p.oct + ':' + p.alter; if (seen[id]) { if (p.acc) seen[id].acc = seen[id].acc || p.acc; return; }
+      var c = { step: p.step, oct: p.oct, alter: p.alter, acc: p.acc }; seen[id] = c; ps.push(c);
+    }); });
+    return ps.length ? { rest: false, pitches: ps, type: 'w', dots: 0 } : null;
+  }
+  function renderGrand(item, mode, d) {
+    var k = d.k, W = contentPx(d) / k;
+    var ms = item.measures, n = ms.length;
+    var br = grandBreaks(n), lines = [], s0 = 0;
+    br.concat([n]).forEach(function (b) { lines.push([s0, b]); s0 = b; });
+    var keySpec = FIFTHS_KEY[String(ms[0].fifths || 0)];
+    var pre = preWidth('treble', null, keySpec);
+    /* 小節寬固定：以 10 小節、調號最寬（7 個升記號）來算，所以 6、8 小節後面留白，
+       而且不同調的題目小節寬都一樣 */
+    var mW = (W - X0 - preWidth('treble', null, 'C#') - 2) / GRAND_PER_LINE;
+    var yT = 40, yB = yT + 100, H = yB + 40 + 62;
+    var ans = item.answers || {};
+    var systems = [];
+    lines.forEach(function (ln, li) {
+      var sys = document.createElement('div'); sys.className = 'sys';
+      sys.style.height = (H * k) + 'px';
+      var host = document.createElement('div'); sys.appendChild(host);
+      var ctx = newCanvas(host, W, H, k);
+      var right = X0 + pre + (ln[1] - ln[0]) * mW;
+      var sT = stave(X0, yT, right - X0).addClef('treble'), sB = stave(X0, yB, right - X0).addClef('bass');
+      if (keySpec !== 'C') { sT.addKeySignature(keySpec); sB.addKeySignature(keySpec); }
+      sT.setContext(ctx).draw(); sB.setContext(ctx).draw();
+      new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();
+      new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(ctx).draw();
+      var top = sT.getYForLine(0), bot = sB.getYForLine(4);
+      var meta = { bars: [], line: li };
+      for (var mi = ln[0]; mi < ln[1]; mi++) {
+        var x0 = X0 + pre + (mi - ln[0]) * mW, x1 = x0 + mW, cc = (x0 + x1) / 2;
+        if (mi === n - 1) { vline(ctx, x1 - 6, top, bot, 1); vline(ctx, x1 - 3, top, bot, 3); }
+        else vline(ctx, x1 - 1, top, bot, 1);
+        meta.bars.push({ index: mi, x0: x0, x1: x1, centre: cc });
+        if (mode !== 'blank') {
+          var voices = [];
+          [0, 1].forEach(function (si) {
+            var ch = chordOf(ms[mi].staves[si] || []); if (!ch) return;
+            var clef = si === 0 ? 'treble' : 'bass', st = si === 0 ? sT : sB;
+            var note = makeNote(ch, clef).setStave(st);
+            voices.push({ v: new VF.Voice({ num_beats: 4, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT).addTickables([note]), st: st, notes: [note] });
+          });
+          if (voices.length) {
+            var f = new VF.Formatter();
+            voices.forEach(function (o) { f.joinVoices([o.v]); });
+            f.format(voices.map(function (o) { return o.v; }), 0);
+            centreAt(voices, cc);
+            voices.forEach(function (o) { o.v.draw(ctx, o.st); });
+          }
+          var num = (ans.numerals || [])[mi];
+          if (num) overlay(sys, k, cc, bot + 22, num, 'numeral', 'center');
+        }
+      }
+      /* 調名／「＿＿調：」：放在第一行調號正下方，右緣對齊第一小節的起點 */
+      if (li === 0) {
+        var keyText = mode === 'blank' ? '＿＿調：' : (ans.key || '');
+        if (keyText) { var kd = overlay(sys, k, X0 + pre - 2, bot + 22, keyText, 'keyname'); kd.style.transform = 'translate(-100%, 0)'; }
+      }
+      fitSvg(host, W, H, k);
+      sys.__meta = meta;
+      systems.push(sys);
+    });
+    return systems;
+  }
+
   /* ---------- 一個小題（標題＋譜） ---------- */
   function renderItem(item, mode, d, numState, opt) {
     var box = document.createElement('div'); box.className = 'item';
@@ -312,7 +420,8 @@
     t.textContent = numState.item + '. ' + item.title;
     box.appendChild(t);
     if (!item.measures) item.measures = parse(item.xml);
-    var systems = (item.layout === 'cells') ? renderCells(item, mode, d, numState) : renderLines(item, mode, d, opt);
+    var systems = (item.layout === 'cells') ? renderCells(item, mode, d, numState)
+                : (item.layout === 'grand') ? renderGrand(item, mode, d) : renderLines(item, mode, d, opt);
     systems.forEach(function (s) { s.style.marginTop = d.sysGap + 'px'; box.appendChild(s); });
     return box;
   }

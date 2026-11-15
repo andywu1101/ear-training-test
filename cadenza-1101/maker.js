@@ -5,16 +5,16 @@
   'use strict';
   var STORE = 'earTrainer.maker.paper', NOPV = 'earTrainer.maker.noPreview';
 
-  /* 題型：第一階段只開放音程與節奏 */
+  /* 題型：第二階段開放音程、和絃、節奏、單旋律、四部和聲 */
   var TYPES = [
     { id: 'interval', label: '音程', page: 'interval-trainer.html', on: true },
-    { id: 'chord', label: '和絃', page: 'chord-trainer.html' },
+    { id: 'chord', label: '和絃', page: 'chord-trainer.html', on: true },
     { id: 'rhythm', label: '節奏', page: 'rhythm-trainer.html', on: true },
-    { id: 'melody', label: '單旋律', page: 'melody-trainer.html' },
+    { id: 'melody', label: '單旋律', page: 'melody-trainer.html', on: true },
     { id: 'twopart', label: '兩聲部', page: 'two-part-trainer.html' },
     { id: 'pitcherr', label: '找錯音', page: 'pitch-error-trainer.html' },
     { id: 'pitchstack', label: '音堆', page: 'pitch-stack-trainer.html' },
-    { id: 'fourpart', label: '四部和聲', page: 'four-part-trainer.html' }
+    { id: 'fourpart', label: '四部和聲', page: 'four-part-trainer.html', on: true }
   ];
   /* 大題：順序固定 */
   var SECTIONS = [
@@ -42,12 +42,13 @@
     return p;
   }
   function save() {
-    var slim = JSON.parse(JSON.stringify(paper, function (k, v) { return (k === 'measures') ? undefined : v; }));
+    var slim = JSON.parse(JSON.stringify(paper, function (k, v) { return (k === 'measures' || k === 'shownBreaks') ? undefined : v; }));
     try { localStorage.setItem(STORE, JSON.stringify(slim)); } catch (e) {}
   }
   function secName(id) { return paper.sectionNames[id] || SECTIONS.filter(function (s) { return s.id === id; })[0].name; }
   function sectionOf(type, data) {
     if (type === 'rhythm') return data.barsCount === 1 ? 'memRhythm' : 'rhythm';
+    if (type === 'melody') return data.barsCount === 1 ? 'memMelody' : 'melody';
     return type;
   }
   /* 依大題順序排好的題目，附上編號 */
@@ -73,6 +74,7 @@
     var t = TYPES.filter(function (x) { return x.id === type; })[0];
     var f = document.createElement('iframe');
     f.src = '../tutti-1101/' + t.page + '?maker=1';
+    f.addEventListener('load', function () { f.__loadedAt = Date.now(); });
     $('frames').appendChild(f);
     frames[type] = f;
     return f;
@@ -82,8 +84,10 @@
     return new Promise(function (res, rej) {
       var t0 = Date.now();
       (function poll() {
-        var w = frameWin(type);
-        if (w && w.SheetExport && w.PianoEngine) return res(w);
+        var w = frameWin(type), f = frames[type];
+        /* ⚠ MusicXML 記錄器要等 VexFlow 載入後才掛得上（sheet-export.js 每 0.25 秒試一次），
+           所以頁面載入完成後再多等一下，否則剛開的練習頁會「沒有樂譜資料」 */
+        if (w && w.SheetExport && w.PianoEngine && f.__loadedAt && Date.now() - f.__loadedAt > 800) return res(w);
         if (Date.now() - t0 > 20000) return rej(new Error('練習頁載入逾時'));
         setTimeout(poll, 150);
       })();
@@ -118,7 +122,7 @@
   function buildCandidate(w, type, data, snapshot, title) {
     var xml = w.__maker.musicxml(data);
     return { id: uid(), type: type, section: sectionOf(type, data), title: title, data: data, snapshot: snapshot,
-             xml: xml, answers: w.__maker.answers(data), layout: (type === 'interval' || type === 'chord') ? 'cells' : 'lines',
+             xml: xml, answers: w.__maker.answers(data), layout: (type === 'interval' || type === 'chord') ? 'cells' : (type === 'fourpart' ? 'grand' : 'lines'),
              pageBreak: false, breaks: null };
   }
   function addItem(c) { paper.items.push(c); save(); renderList(); }
@@ -237,7 +241,7 @@
         var ti = document.createElement('input'); ti.value = it.title;
         ti.onchange = function () { it.title = ti.value.trim() || it.title; ti.value = it.title; save(); };
         var info = document.createElement('span'); info.className = 'it-info';
-        info.textContent = it.layout === 'cells' ? (it.data.questions.length + ' 格') : '';
+        info.textContent = it.layout === 'cells' ? (it.data.questions.length + ' 格') : (it.layout === 'grand' ? (it.answers && it.answers.key ? it.answers.key.replace('：', '') : '') : '');
         var rg = btn('🔄', '重抽', function () { regenItem(it); });
         var del = btn('🗑', '刪除', function () { ask('刪除第 ' + o.num + ' 題「' + it.title + '」？', function () { paper.items.splice(paper.items.indexOf(it), 1); save(); renderList(); }); });
         var pb = btn('⤓', it.pageBreak ? '取消「從這題換頁」' : '從這題換頁', function () { it.pageBreak = !it.pageBreak; save(); renderList(); });
@@ -350,7 +354,7 @@
   }
   function toggleBreak(it, bar) {
     var n = it.data.barsCount;
-    var br = (it.breaks || Engrave.defaultBreaks(n, 4)).slice();
+    var br = (it.breaks || it.shownBreaks || Engrave.defaultBreaks(n, 4)).slice();
     var i = br.indexOf(bar);
     if (i >= 0) br.splice(i, 1); else br.push(bar);
     it.breaks = br.sort(function (a, b) { return a - b; });

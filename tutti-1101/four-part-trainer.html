@@ -2270,6 +2270,8 @@ function showPage(pageId) {
   };
 
   // ================= 主模組控制器 =================
+  /* 出題模式（v106.3）：只給出題工具 cadenza-1101 用，網址帶 ?maker=1 才啟動，一般使用者完全不會執行 */
+  const MAKER_MODE = new URLSearchParams(location.search).get('maker') === '1';
   const fptModule = {
     mode: 'practice', keyPref: 'mix', bars: 10, bpm: 64, curLevel: LEVELS[0],
     activeTab: 'bass', currentAccidental: 'n', accidentalExplicit: false, currentOctave: 3,
@@ -3757,6 +3759,7 @@ function showPage(pageId) {
         } else this.testSession = null;
         
         this.generateQuestion();
+        if(MAKER_MODE){ makerOffer(); return; }   // 出題模式：把題目交給出題工具，不進作答頁
         showPage('fpt-practice');
         this.switchTab('bass');
         setTimeout(() => { let el = document.getElementById('staffContainerOuter'); if (el) el.scrollLeft = 0; }, 80);
@@ -3835,8 +3838,71 @@ function showPage(pageId) {
     }
   };
 
+  /* ===== 出題模式（v106.3，出題工具 cadenza-1101 專用；?maker=1 才會執行）=====
+     出題、繪譜、音檔一律呼叫本頁原本的函式，這裡只負責把結果交給出題工具。 */
+  const MAKER_FIELDS = ['keyPref','bars','bpm','curLevel','keyObj','questionSeq','questionVoicings','userSeq','userBass','userKeyAns','isSubmitted','hasPlayed','activeSlot'];
+  const MAKER_CN = ['無','一','兩','三','四','五','六','七'];
+  function makerData(m){
+    return { keyObj: JSON.parse(JSON.stringify(m.keyObj)), questionSeq: m.questionSeq.slice(),
+             questionVoicings: JSON.parse(JSON.stringify(m.questionVoicings)), bars: m.bars, bpm: m.bpm, levelId: m.curLevel.id };
+  }
+  function makerTitle(d){
+    const sigs = d.keyObj.sigs || [], n = sigs.length;
+    const kind = n ? (sigs[0][1] === '#' ? '升' : '降') : '';
+    return (n ? MAKER_CN[n] + '個' + kind + '記號' : '無升降記號') + ' 4/4拍 ' + d.bars + '小節';
+  }
+  function makerOffer(){
+    const m = fptModule, data = makerData(m);
+    const snap = { keyPref: m.keyPref, bars: m.bars, bpm: m.bpm, levelId: m.curLevel.id };
+    if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'fourpart', data: data, snapshot: snap, title: makerTitle(data) });
+  }
+  /* 暫時把某一題放進模組狀態，做完立刻還原 */
+  function makerWith(fields, fn){
+    const m = fptModule, keep = {};
+    MAKER_FIELDS.forEach(k => { keep[k] = m[k]; });
+    try{ Object.keys(fields).forEach(k => { m[k] = fields[k]; }); return fn(m); }
+    finally{ MAKER_FIELDS.forEach(k => { m[k] = keep[k]; }); }
+  }
+  if(MAKER_MODE) window.__maker = {
+    type: 'fourpart',
+    regen: function(snap){
+      const lv = LEVELS.find(l => l.id === snap.levelId) || LEVELS[0];
+      return makerWith({ keyPref: snap.keyPref, bars: snap.bars, bpm: snap.bpm, curLevel: lv }, function(m){ m.generateQuestion(); return makerData(m); });
+    },
+    /* 譜例：用本頁解答的繪譜畫在畫面外（同 exportSheet），交給 MusicXML 記錄器 */
+    musicxml: function(data){
+      const id = '__fptMaker', holder = document.createElement('div');
+      holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:1400px;';
+      holder.innerHTML = '<div id="' + id + '"></div>';
+      document.body.appendChild(holder);
+      try{
+        fptModule.renderStaff({ targetSvgId: id, bars: data.bars, keyObj: data.keyObj,
+          userSeq: data.questionSeq, userBass: Array(data.bars).fill(null), userKeyAns: data.keyObj.name,
+          isSubmitted: true, showAnswer: true, customVoicings: data.questionVoicings, forceCorrectSlots: true,
+          outSlots: [], outKeyRect: {} });
+        return window.SheetExport.buildMusicXML([{ svg: holder.querySelector('svg') }], {});
+      } finally { holder.remove(); }
+    },
+    /* 解答文字：調名與每小節的級數（與解答頁、導出相同的 displayChord） */
+    answers: function(data){
+      return { key: data.keyObj.name.replace(' ', '') + '：', numerals: data.questionSeq.map(sym => displayChord(sym, data.keyObj.isMin) || '') };
+    },
+    events: function(data){
+      return makerWith({ questionVoicings: data.questionVoicings, bpm: data.bpm }, function(m){ return m.buildExportEvents(); });
+    }
+  };
+  function makerSetup(){
+    document.body.classList.add('maker-mode');
+    const st = document.createElement('style');
+    st.textContent = 'body.maker-mode #pageFptSettings .nav-header-row, body.maker-mode #fpt-reviewEntryBtn,' +
+      ' body.maker-mode #pageFptSettings .switch-group:has(#fpt-modeSwitch), body.maker-mode #testReplayWrapper { display:none !important; }';
+    document.head.appendChild(st);
+    const enter = document.getElementById('fpt-enterBtn'); if(enter) enter.textContent = '➕ 出題';
+  }
+
   window.fptModule = fptModule;
   fptModule.init(); loadPiano();
+  if(MAKER_MODE) makerSetup();   // 出題模式（v106.3）
   if(bootPaperReview(fptModule)){ /* 考卷回顧 */ }
   else if(window.EXAM && window.EXAM.isExamMode()){ fptModule.examBootstrap(); }
 

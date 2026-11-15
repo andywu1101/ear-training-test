@@ -41,8 +41,9 @@
   .tabs button.on{ background:#fff; color:var(--ink); font-weight:600; }
   .tabs button:disabled{ opacity:.4; cursor:default; }
   .frames{ flex:1; position:relative; background:#fff; border-top:1px solid var(--panel-border); }
-  .frames iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:none; }
-  .frames iframe.on{ display:block; }
+  /* 沒顯示的練習頁不可以用 display:none：裡面量不到尺寸，單旋律等頁面會畫不出譜（重抽、匯出 mp3 時要用到） */
+  .frames iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; visibility:hidden; pointer-events:none; }
+  .frames iframe.on{ visibility:visible; pointer-events:auto; }
 
   .right{ overflow:auto; padding:12px 14px 40px; }
   .list-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:13px; color:var(--ink-soft); }
@@ -83,6 +84,8 @@
   .ov{ position:absolute; white-space:nowrap; line-height:1; }
   .ov.cellnum{ font-size:11px; }
   .ov.ans{ font-size:12.5px; }
+  .ov.numeral{ font-size:14px; font-family:'Times New Roman', Times, serif; }
+  .ov.keyname{ font-size:12.5px; }
   .barhit{ position:absolute; width:12px; cursor:pointer; border-radius:3px; }
   .barhit:hover{ background:rgba(51,65,92,.18); }
   .barhit.at-break{ background:rgba(51,65,92,.08); }
@@ -114,7 +117,7 @@
 </head>
 <body>
 <div class="topbar">
-  <label>標題 <input type="text" id="hdTitle" placeholder="例：新北高中2026/11/16聽寫課堂練習"></label>
+  <label>標題 <input type="text" id="hdTitle" placeholder="例：聽力模擬考試練習"></label>
   <label>署名 <input type="text" id="hdAuthor"></label>
   <label>上課日期 <input type="text" id="hdDate" placeholder="YYYYMMDD"></label>
   <label>間距 <span class="seg" id="density"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span></label>
@@ -123,7 +126,7 @@
   <button class="tb-btn" id="btnPrintBlank">🖨 列印作答卷</button>
   <button class="tb-btn" id="btnPrintKey">🖨 列印解答</button>
   <button class="tb-btn primary" id="btnMp3">⬇️ 下載 mp3</button>
-  <span class="ver">出題工具 v1</span>
+  <span class="ver">出題工具 v2</span>
 </div>
 
 <div class="main" id="mainView">
