@@ -651,7 +651,7 @@ function showPage(pageId) {
 }
 
 (function(){
-  const SIMPLE_ORDER = ['4', '2-2', '1-1-1-1', '2-1-1', '1-1-2', '1-2-1', '3-1', '1-3', '3tuplet'];
+  const SIMPLE_ORDER = ['8', '4', '2-2', '1-1-1-1', '2-1-1', '1-1-2', '1-2-1', '3-1', '1-3', '3tuplet', '6-2', '2-6'];   // v.106.1：'8'、'6-2'、'2-6' 是兩拍節奏型
   const COMPOUND_ORDER = [
     '6', '4-2', '2-4', '4-1-1', '1-1-4', '2-2-2', '2-2-1-1', '2-1-1-2',
     '1-1-2-2', '2-1-1-1-1', '1-1-2-1-1', '1-1-1-1-2', '1-1-1-1-1-1', '3-1-1-1', '1-1-1-3', '1-3-1-1',
@@ -704,6 +704,91 @@ function showPage(pageId) {
 
   const TIE_UNIT = 3;   // 時值放大倍率：三連音的 4/3 乘 3 後才是整數，避免浮點誤差
 
+  /* ===== v.106.1：兩拍節奏型（二分音符、附點四分＋八分、八分＋附點四分，只有單拍子）=====
+     資料仍是「一格一拍」：兩拍節奏型放在第 i 格，第 i+1 格寫 CONT（延續格，不畫、不發聲）。
+     這樣連結線（tieAcross）、作答游標、標紅都還是以拍為單位，舊紀錄完全相容。
+     ⚠ 兩拍節奏型往外連的連結線記在 tieAcross[i+1]（延續格之後的拍界）；tieAcross[i] 是內部，一律 false。
+     位置：不跨小節線；4/4 只能從第 1、3 拍開始（從第 2 拍開始的二分音符跨過小節中線，記譜法不對）。
+     模擬測驗不出、不能填（examBootstrap 會排除）。 */
+  const TWO_BEAT = { '8': true, '6-2': true, '2-6': true };
+  const CONT = 'cont';
+  ALL_BLOCKS[CONT] = { id: CONT, lengths: [], tieNext: [], isTuplet: false, type: 'simple', beats: 1 };
+  function isTwoBeat(id) { return !!TWO_BEAT[id]; }
+  function spanOf(seq, i) { return (seq && seq[i + 1] === CONT) ? 2 : 1; }
+  function twoBeatOK(i, beatsPerBar) {
+    const p = i % beatsPerBar;
+    if (p + 1 >= beatsPerBar) return false;
+    if (beatsPerBar === 4 && p % 2 === 1) return false;
+    return true;
+  }
+  // 一拍有幾個時值單位（已乘 TIE_UNIT）：單拍子 4×3、複拍子 6×3
+  function beatUnitOf() {
+    for (let a = 0; a < arguments.length; a++) {
+      const s = arguments[a] || [];
+      for (let i = 0; i < s.length; i++) {
+        const b = ALL_BLOCKS[s[i]];
+        if (b && b.lengths.length) { const sum = b.lengths.reduce((x, y) => x + y, 0); return Math.round(sum / spanOf(s, i) * TIE_UNIT); }
+      }
+    }
+    return 4 * TIE_UNIT;
+  }
+  /* 每一拍裡「重新起音」的位置（相對拍頭，已乘 TIE_UNIT）。沒填的拍是 null。
+     沒有休止符，所以起音位置就決定了所有時值：記法不同但起音一樣＝時值一樣。 */
+  function beatAttacks(seq, tieAcross, U) {
+    const n = seq.length, out = new Array(n);
+    for (let i = 0; i < n; i++) out[i] = [];
+    for (let i = 0; i < n; i++) {
+      const id = seq[i];
+      if (id === CONT) continue;
+      if (!id || id === 'placeholder' || !ALL_BLOCKS[id]) { out[i] = null; continue; }
+      const blk = ALL_BLOCKS[id], L = blk.lengths, TN = blk.tieNext || [];
+      const tiedIn = i > 0 && !!(tieAcross && tieAcross[i - 1]) && seq[i - 1] && seq[i - 1] !== 'placeholder';
+      let p = i * U;
+      for (let j = 0; j < L.length; j++) {
+        const tied = (j === 0) ? tiedIn : !!TN[j - 1];
+        if (!tied) { const b = Math.floor((p + 1e-6) / U); if (out[b]) out[b].push(Math.round(p - b * U)); }
+        p += Math.round(L[j] * TIE_UNIT);
+      }
+    }
+    return out;
+  }
+  function sameList(a, b) { return !!a && !!b && a.length === b.length && a.every((v, k) => v === b[k]); }
+  function startsAt0(a) { return !!a && a.length > 0 && a[0] === 0; }
+  function tieDiffAt(au, aq, tieU, tieQ, i) {
+    if (au[i + 1] && aq[i + 1]) return startsAt0(au[i + 1]) !== startsAt0(aq[i + 1]);
+    return !!(tieU || [])[i] !== !!(tieQ || [])[i];
+  }
+  /* v.106.1：每一拍聽到的音高——拍頭正在響的音＋拍內每個新起音（位置:音高）。
+     音高一律照音符順序對應（空白拍佔 1 個、延續格佔 0 個），連結線連過去的音沿用前一個音。
+     用來判斷音高對不對：原本照音符流水號比對，二分音符（1 個音）和四分⌒四分（2 個音）會對不上。 */
+  function beatPitches(seq, tieAcross, pitchArray, U) {
+    const n = seq.length, out = new Array(n);
+    for (let i = 0; i < n; i++) out[i] = [];
+    let noteIdx = 0, prevMidi = null;
+    for (let i = 0; i < n; i++) {
+      const id = seq[i];
+      if (id === CONT) continue;
+      if (!id || id === 'placeholder' || !ALL_BLOCKS[id]) { out[i] = null; noteIdx += 1; prevMidi = null; continue; }
+      const blk = ALL_BLOCKS[id], L = blk.lengths, TN = blk.tieNext || [];
+      const tiedIn = i > 0 && !!(tieAcross && tieAcross[i - 1]) && seq[i - 1] && seq[i - 1] !== 'placeholder';
+      let p = i * U;
+      for (let j = 0; j < L.length; j++) {
+        const tied = (j === 0) ? tiedIn : !!TN[j - 1];
+        const midi = (tied && prevMidi != null) ? prevMidi : getPitchFromObj(pitchArray ? pitchArray[noteIdx + j] : null);
+        const len = Math.round(L[j] * TIE_UNIT), s0 = p, e0 = p + len;
+        for (let b = Math.floor((s0 + 1e-6) / U); b * U < e0 && b < n; b++) {
+          if (!out[b]) continue;
+          const off = Math.max(0, Math.round(s0 - b * U));
+          if (off === 0) out[b].unshift('0:' + midi);
+          else if (!tied) out[b].push(off + ':' + midi);
+        }
+        prevMidi = midi; p = e0;
+      }
+      noteIdx += L.length;
+    }
+    return out;
+  }
+
   /* 拍界：第 i 拍與第 i+1 拍之間。連結線可以跨小節線，所以只要不是最後一拍就成立。
      （小節末拍的連結線＝跨小節，判定時由 compareBars 另外檢查，見下方說明。） */
   function isInnerBoundary(i, beatsPerBar, totalBeats) {
@@ -725,6 +810,7 @@ function showPage(pageId) {
   function canToggleTie(seq, tieAcross, i, beatsPerBar) {
     if (!isInnerBoundary(i, beatsPerBar, seq.length)) return false;
     if (tieAcross[i]) return true;
+    if (seq[i + 1] === CONT) return false;   // v.106.1：兩拍節奏型內部
     if (seq[i] === 'placeholder' || seq[i + 1] === 'placeholder') return false;
     return chainLenIfSet(tieAcross, i) <= 2;
   }
@@ -745,7 +831,8 @@ function showPage(pageId) {
         if (active) pending += v; else { pending = v; active = true; }
         let tiedOut;
         if (j < L.length - 1) tiedOut = !!TN[j];
-        else tiedOut = !!(tieAcross && tieAcross[i]) && (i + 1 < to) && seq[i + 1] && seq[i + 1] !== 'placeholder';
+        else { const e = i + spanOf(seq, i) - 1;   // v.106.1：兩拍節奏型往外連的連結線在延續格之後
+          tiedOut = !!(tieAcross && tieAcross[e]) && (e + 1 < to) && seq[e + 1] && seq[e + 1] !== 'placeholder'; }
         if (!tiedOut) { vals.push(pending); pending = 0; active = false; }
       }
     }
@@ -777,13 +864,15 @@ function showPage(pageId) {
     const total = barsCount * beatsPerBar;
     const wrong = new Array(total).fill(false);
     const barOK = compareBars(userSeq, qSeq, tieU, tieQ, beatsPerBar, barsCount);
+    /* v.106.1：逐拍比對起音位置（同節奏頁）：記法不同但時值一樣的拍不標紅 */
+    const U = beatUnitOf(qSeq, userSeq);
+    const au = beatAttacks(userSeq, tieU, U), aq = beatAttacks(qSeq, tieQ, U);
     for (let b = 0; b < barsCount; b++) {
       if (barOK[b]) continue;
       const from = b * beatsPerBar, to = from + beatsPerBar;
       for (let i = from; i < to; i++) {
-        if (userSeq[i] !== qSeq[i]) wrong[i] = true;
-        // 連結線不同時前後兩拍都標紅（跨小節時，紅色會落在下一小節的第一拍）
-        if (isInnerBoundary(i, beatsPerBar, total) && !!tieU[i] !== !!tieQ[i]) { wrong[i] = true; wrong[i + 1] = true; }
+        if (!sameList(au[i], aq[i])) wrong[i] = true;
+        if (isInnerBoundary(i, beatsPerBar, total) && tieDiffAt(au, aq, tieU, tieQ, i)) { wrong[i] = true; wrong[i + 1] = true; }
       }
     }
     return wrong;
@@ -851,6 +940,7 @@ function showPage(pageId) {
       else if(len===3) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'8', auto_stem: true }).addDot(0);
       else if(len===4) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true });
       else if(len===6) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true }).addDot(0);
+      else if(len===8) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'h', auto_stem: true });   // v.106.1 二分音符
 
       applyAccidental(n1, pObj, measureAccState);
 
@@ -876,7 +966,7 @@ function showPage(pageId) {
      四分音符吃掉大半寬度、兩個十六分音符擠成一團，連結線也短到看不清。
      這四個改成手動指定落點，間距依「時值^K」分配。
      K = 1 是原本的純比例（差距過大），K = 0 是完全平均（看不出長短）。 */
-  const MINI_CUSTOM = { '4~1-1': 1, '1-1~4': 1, '4-1-1': 1, '1-1-4': 1 };
+  const MINI_CUSTOM = { '4~1-1': 1, '1-1~4': 1, '4-1-1': 1, '1-1-4': 1, '6-2': 1, '2-6': 1 };   // v.106.1
   const MINI_GAP_K = 0.7;
   const MINI_RIGHT_PAD = 12;       // 右緣留給最後一個符頭（畫布 260 ÷ scale 1.25 ＝ 有效寬度只有 208）
   const MINI_HEAD_CENTRE = 28.5;   // 符頭視覺中心相對 tickContext 座標的偏移（實測）
@@ -1003,6 +1093,13 @@ function showPage(pageId) {
       const wrongRhythmBeats = (correctSeq && correctPitch)
         ? markWrongBeats(seq, correctSeq, tieArr, correctTie || [], cfg.beatsPerBar, cfg.barsCount)
         : null;
+      /* v.106.1：音高錯誤改成逐拍比「聽到的音高」，記法不同（二分音符 vs 四分⌒四分）也對得上 */
+      let pitchBeatsU = null, pitchBeatsC = null;
+      if (correctSeq && correctPitch) {
+        const U = beatUnitOf(correctSeq, seq);
+        pitchBeatsU = beatPitches(seq, tieArr, pitchArray, U);
+        pitchBeatsC = beatPitches(correctSeq, correctTie || [], correctPitch, U);
+      }
 
       for(let b = 0; b < cfg.barsCount; b++) {
         const isFirst = (b === 0); const sWidth = isFirst ? barWidth + 60 : barWidth;
@@ -1025,17 +1122,21 @@ function showPage(pageId) {
         }
 
         barKeys.forEach(id => {
+          if (id === CONT) {
+            /* v.106.1：兩拍節奏型的延續格不畫東西；音符、連結線借用前一格的 */
+            barBeatNotes[globalBeatIdx] = barBeatNotes[globalBeatIdx - 1];
+            beatFirstNotes[globalBeatIdx] = beatFirstNotes[globalBeatIdx - 1];
+            globalBeatIdx++;
+            return;
+          }
           if (id !== 'placeholder') {
             const block = ALL_BLOCKS[id];
             let isWrong = false;
             if(correctSeq && correctPitch) {
-              if(wrongRhythmBeats && wrongRhythmBeats[globalBeatIdx]) isWrong = true;
-              else {
-                for(let k = 0; k < block.lengths.length; k++) {
-                  let pU = getPitchFromObj(pitchArray[globalNoteIdx + k]);
-                  let pC = getPitchFromObj(correctPitch[globalNoteIdx + k]);
-                  if(pU !== pC) { isWrong = true; break; }
-                }
+              const span = spanOf(seq, globalBeatIdx);
+              for (let k = 0; k < span; k++) {
+                const bi = globalBeatIdx + k;
+                if ((wrongRhythmBeats && wrongRhythmBeats[bi]) || !sameList(pitchBeatsU[bi], pitchBeatsC[bi])) isWrong = true;
               }
             }
             let hlNoteIdx = (interactive && activeTab === 'pitch') ? activeNote : -1;
@@ -1101,7 +1202,8 @@ function showPage(pageId) {
 
         if(activeTab === 'rhythm') {
           for(let i = 0; i < beatFirstNotes.length; i++) {
-            let fn = beatFirstNotes[i]; let nn = beatFirstNotes[i+1];
+            if (seq[i] === CONT) continue;   // v.106.1：兩拍節奏型一個點選框
+            let fn = beatFirstNotes[i]; let nn = beatFirstNotes[i + spanOf(seq, i)];
             let stave = fn.getStave(); if(!stave) continue;
             let nx = typeof fn.getAbsoluteX === 'function' ? fn.getAbsoluteX() : stave.getX() + fn.getTickContext().getX();
             let x = nx - 12; let y = stave.getYForLine(0) - 18; let h = 86; let w = 30;
@@ -1477,8 +1579,9 @@ function showPage(pageId) {
         else pending += L[j];
         let tiedOut;
         if (j < L.length - 1) tiedOut = !!TN[j];
-        else tiedOut = !!(tieAcross && tieAcross[i]) && isInnerBoundary(i, beatsPerBar, seq.length)
-                       && seq[i + 1] && seq[i + 1] !== 'placeholder';
+        else { const e = i + spanOf(seq, i) - 1;
+          tiedOut = !!(tieAcross && tieAcross[e]) && isInnerBoundary(e, beatsPerBar, seq.length)
+                       && seq[e + 1] && seq[e + 1] !== 'placeholder'; }
         if (!tiedOut) flush();
       }
       noteIdx += L.length;
@@ -1625,7 +1728,13 @@ function showPage(pageId) {
       resetStaffScroll();
       this.questionSeq = []; this.questionPitch = [];
       const pool = Array.from(this.selectedPatterns);
-      for(let i=0; i<this.totalBeats; i++) this.questionSeq.push(pool[Math.floor(Math.random() * pool.length)]);
+      /* v.106.1：兩拍節奏型只在可以放的位置參加抽選（同節奏頁） */
+      for(let i=0; i<this.totalBeats; ){
+        const cand = pool.filter(id => !isTwoBeat(id) || (this.meterType === 'simple' && i + 1 < this.totalBeats && twoBeatOK(i, this.beatsPerBar)));
+        const id = cand.length ? cand[Math.floor(Math.random() * cand.length)] : '4';
+        this.questionSeq.push(id); i++;
+        if (isTwoBeat(id)) { this.questionSeq.push(CONT); i++; }
+      }
       this.questionTie = this.buildQuestionTie();
 
       const steps = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
@@ -1661,7 +1770,7 @@ function showPage(pageId) {
           // 一拍的最後一個音：改看跨拍連結線，讓被連結的兩個音音高相同
           tiedFromPrev = (k < numNotes - 1)
             ? !!(block.tieNext && block.tieNext[k])
-            : !!this.questionTie[i];
+            : !!this.questionTie[i + spanOf(this.questionSeq, i) - 1];   // v.106.1：兩拍節奏型往外連的連結線在延續格之後
         }
       }
     },
@@ -1674,7 +1783,7 @@ function showPage(pageId) {
       if (!this.tieEnabled) return tie;
 
       const slots = [];
-      for (let i = 0; i < n - 1; i++) if (isInnerBoundary(i, this.beatsPerBar, n)) slots.push(i);
+      for (let i = 0; i < n - 1; i++) if (isInnerBoundary(i, this.beatsPerBar, n) && this.questionSeq[i + 1] !== CONT) slots.push(i);
       if (!slots.length) return tie;   // 3/8 這種每小節只有一拍的拍號，小節內沒有拍界
 
       const maxN = Math.min(this.tieMax || this.barsCount, slots.length);
@@ -1701,12 +1810,12 @@ function showPage(pageId) {
        回傳拍界索引，不能操作時回傳 -1。 */
     _tieSlotForActive: function() {
       if (!this.hasPlayed) return -1;
-      if (this.activeTab === 'rhythm') return this.activeSlotIdx;
+      if (this.activeTab === 'rhythm') return (this.activeSlotIdx >= 0) ? this.activeSlotIdx + spanOf(this.userSeq, this.activeSlotIdx) - 1 : -1;   // v.106.1
       const nIdx = this.activeNoteIdx;
       if (nIdx < 0) return -1;
       const b = this._beatIdxOfNote(nIdx);
       const lastNoteOfBeat = this._firstNoteIdxOfBeat(b) + this._noteCountOf(this.userSeq[b]) - 1;
-      return (nIdx === lastNoteOfBeat) ? b : -1;
+      return (nIdx === lastNoteOfBeat) ? b + spanOf(this.userSeq, b) - 1 : -1;
     },
 
     refreshTieBtn: function() {
@@ -1780,9 +1889,10 @@ function showPage(pageId) {
           let currNoteInBeat = idx - count;
           // 一拍的最後一個音：改看跨拍連結線（下一拍必須存在且已填）
           if (currNoteInBeat === block.lengths.length - 1) {
-            return !!(this.userTie && this.userTie[b])
-                   && isInnerBoundary(b, this.beatsPerBar, this.userSeq.length)
-                   && this.userSeq[b + 1] && this.userSeq[b + 1] !== 'placeholder';
+            const e = b + spanOf(this.userSeq, b) - 1;   // v.106.1
+            return !!(this.userTie && this.userTie[e])
+                   && isInnerBoundary(e, this.beatsPerBar, this.userSeq.length)
+                   && this.userSeq[e + 1] && this.userSeq[e + 1] !== 'placeholder';
           }
           return block.tieNext && block.tieNext[currNoteInBeat];
         }
@@ -2089,7 +2199,7 @@ function showPage(pageId) {
       if(this.meterType === 'compound') this.beatsPerBar /= 3;
       this.totalBeats = this.barsCount * this.beatsPerBar;
       const order = this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
-      this.selectedPatterns = new Set(order);
+      this.selectedPatterns = new Set(order.filter(id => !isTwoBeat(id)));   // v.106.1：考試不含兩拍節奏型
 
       // 連結線：由考卷設定決定（大學檔至少 1 次、至多 2 次；高中檔沒有這個欄位＝不出）
       this.tieEnabled = !!cfg.tie;
@@ -2219,28 +2329,36 @@ function showPage(pageId) {
         if(!this.selectedPatterns.has(id)) return;
         const btn = document.createElement('div'); btn.className = 'rhythm-btn';
         const svgDiv = document.createElement('div'); btn.appendChild(svgDiv);
+        btn.dataset.pid = id;
         btn.onclick = () => {
           if(!this.hasPlayed || this.activeSlotIdx === -1) return;
-          let reqBeats = ALL_BLOCKS[id].beats; let available = 0; let removeCount = 0;
-          for(let i = this.activeSlotIdx; i < this.userSeq.length; i++) {
-            available += this.userSeq[i] === 'placeholder' ? 1 : ALL_BLOCKS[this.userSeq[i]].beats;
-            removeCount++; if(available >= reqBeats) break;
+          const i = this.activeSlotIdx, seq = this.userSeq, tie = this.userTie;
+          /* v.106.1：一格一拍；兩拍節奏型一次填兩格（第二格寫 CONT） */
+          if (isTwoBeat(id)) {
+            if (!(i + 1 < seq.length && twoBeatOK(i, this.beatsPerBar))) return;
+            if (seq[i + 1] !== CONT && seq[i + 2] === CONT) { seq[i + 2] = 'placeholder'; tie[i + 2] = false; }
+            seq[i] = id; seq[i + 1] = CONT; tie[i] = false;
+          } else {
+            if (seq[i + 1] === CONT) { seq[i + 1] = 'placeholder'; tie[i + 1] = false; }
+            seq[i] = id;
           }
-          if(available >= reqBeats) {
-            this.userSeq.splice(this.activeSlotIdx, removeCount, id);
-            let overshot = available - reqBeats;
-            for(let k=0; k<overshot; k++) this.userSeq.splice(this.activeSlotIdx + 1 + k, 0, 'placeholder');
-            this.rebuildUserPitchArray();
-            let nextSlot = this.activeSlotIdx + 1;
-            if(nextSlot < this.userSeq.length) this.activeSlotIdx = nextSlot; else this.activeSlotIdx = this.userSeq.length - 1;
-            this.updateUI();
-          }
+          this.rebuildUserPitchArray();
+          const nextSlot = i + spanOf(seq, i);
+          this.activeSlotIdx = nextSlot < seq.length ? nextSlot : seq.length - 1;
+          this.updateUI();
         };
         pad.appendChild(btn); setTimeout(() => drawMiniRhythm(svgDiv, id), 10);
       });
     },
 
     updateUI: function() {
+      if (this.activeSlotIdx > 0 && this.userSeq[this.activeSlotIdx] === CONT) this.activeSlotIdx--;   // v.106.1：游標不停在延續格
+      /* v.106.1：兩拍節奏型放不下的位置（小節最後一拍、4/4 的第 2、4 拍）灰掉 */
+      document.querySelectorAll('#mel-keypad .rhythm-btn').forEach(b => {
+        if (!isTwoBeat(b.dataset.pid)) return;
+        const ok = this.activeSlotIdx >= 0 && this.activeSlotIdx + 1 < this.userSeq.length && twoBeatOK(this.activeSlotIdx, this.beatsPerBar);
+        b.style.opacity = ok ? '' : '0.3';
+      });
       renderMainStaff('mel-staff-svg', this.userSeq, this.userPitch, true, null, null, this.clef, this.activeTab, this.activeSlotIdx, this.activeNoteIdx, null, this.userTie, null);
       this.refreshTieBtn();
       // 提交鈕在播放後即可按；未填的格子會在提交時跳出提醒並計為錯誤
@@ -2447,9 +2565,11 @@ function showPage(pageId) {
           let t = this.activeSlotIdx;
           if(t === -1) { for(let i = this.userSeq.length - 1; i >= 0; i--) { if(this.userSeq[i] !== 'placeholder') { t = i; break; } } }
           else { if(this.userSeq[t] === 'placeholder' && t > 0) { t--; while(t > 0 && this.userSeq[t] === 'placeholder') t--; } }
+          if(t > 0 && this.userSeq[t] === CONT) t--;   // v.106.1：延續格 → 刪整個兩拍節奏型
           if(t >= 0 && this.userSeq[t] !== 'placeholder') {
-            let b = ALL_BLOCKS[this.userSeq[t]].beats; this.clearTieAround(t); this.userSeq.splice(t, 1);
-            for(let k=0; k<b; k++) this.userSeq.splice(t, 0, 'placeholder');
+            const span = spanOf(this.userSeq, t);
+            this.clearTieAround(t); if (span === 2) this.clearTieAround(t + 1);
+            for(let k=0; k<span; k++) this.userSeq[t + k] = 'placeholder';
             this.activeSlotIdx = t; this.rebuildUserPitchArray(); this.updateUI();
           }
         } else {
@@ -2493,10 +2613,10 @@ function showPage(pageId) {
         if(!compareBars(this.userSeq, this.questionSeq, this.userTie, this.questionTie,
                         this.beatsPerBar, this.barsCount).every(Boolean)) { isCorrect = false; }
         else {
-          let totalNotes = this.getTotalNoteCount(this.userSeq);
-          for(let i = 0; i < totalNotes; i++) {
-            if(getPitchFromObj(this.userPitch[i]) !== getPitchFromObj(this.questionPitch[i])) { isCorrect = false; break; }
-          }
+          /* v.106.1：逐拍比「聽到的音高」，記法不同（二分音符 vs 四分⌒四分）也算對 */
+          const U = beatUnitOf(this.questionSeq, this.userSeq);
+          const pu = beatPitches(this.userSeq, this.userTie, this.userPitch, U), pq = beatPitches(this.questionSeq, this.questionTie, this.questionPitch, U);
+          for(let i = 0; i < pq.length; i++) { if(!sameList(pu[i], pq[i])) { isCorrect = false; break; } }
         }
         this.score.t++; if(isCorrect) this.score.c++;
         document.getElementById('mel-scoreNum').textContent = `${this.score.c}/${this.score.t}`;

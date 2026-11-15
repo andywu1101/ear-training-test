@@ -601,7 +601,7 @@ function _syncHelpLock(){
 document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document.querySelectorAll('.help-modal.open').forEach(function(m){ m.classList.remove('open'); }); _syncHelpLock(); } });
 
 (function(){
-  const SIMPLE_ORDER = ['4', '2-2', '1-1-1-1', '2-1-1', '1-1-2', '1-2-1', '3-1', '1-3', '3tuplet'];
+  const SIMPLE_ORDER = ['8', '4', '2-2', '1-1-1-1', '2-1-1', '1-1-2', '1-2-1', '3-1', '1-3', '3tuplet', '6-2', '2-6'];
   const COMPOUND_ORDER = [
     '6', '4-2', '2-4', '4-1-1', '1-1-4', '2-2-2', '2-2-1-1', '2-1-1-2',
     '1-1-2-2', '2-1-1-1-1', '1-1-2-1-1', '1-1-1-1-2', '1-1-1-1-1-1', '3-1-1-1', '1-1-1-3', '1-3-1-1',
@@ -626,6 +626,13 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
   const ALL_BLOCKS = {};
   SIMPLE_ORDER.forEach(id => { ALL_BLOCKS[id] = { id, ...parsePatternId(id), type: 'simple', beats: 1 }; });
   COMPOUND_ORDER.forEach(id => { ALL_BLOCKS[id] = { id, ...parsePatternId(id), type: 'compound', beats: 1 }; });
+  /* v.106.1：兩拍節奏型（二分音符、附點四分＋八分、八分＋附點四分）。仍維持「一格一拍」：
+     節奏型放在第 i 格，第 i+1 格寫延續格 CONT（不含音符、不畫、不發聲），拍子編號因此不變；不跨小節線，4/4 只放第 1、3 拍 */
+  const TWO_BEAT = ['8', '6-2', '2-6'];
+  const CONT = 'cont';
+  ALL_BLOCKS[CONT] = { id: CONT, lengths: [], tieNext: [], isTuplet: false, type: 'simple', beats: 1 };
+  const isTwoBeat = id => TWO_BEAT.includes(id);
+  function twoBeatOK(i, bpb){ const p = i % bpb; return p + 1 < bpb && !(bpb === 4 && p % 2 === 1); }
 
   const VF = Vex.Flow;
 
@@ -696,6 +703,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       else if(len===3) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'8', auto_stem: true }).addDot(0);
       else if(len===4) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true });
       else if(len===6) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'q', auto_stem: true }).addDot(0);
+      else if(len===8) n1 = new VF.StaveNote({ clef: clef, keys:[getVexKey(pObj, clef)], duration:'h', auto_stem: true });   // v.106.1
 
       applyAccidental(n1, pObj, measureAccState);
 
@@ -1322,18 +1330,22 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
   function notesOfPattern(id){ return ALL_BLOCKS[id].lengths.length; }
 
   // 逐拍挑節奏型，並確保總音符數不超過額度（挑不到就用音符最少的那一型）
-  function genRhythm(totalBeats, pool, budget){
+  function genRhythm(totalBeats, pool, budget, bpb){
     const seq = []; let used = 0;
     for(let i = 0; i < totalBeats; i++){
+      if(seq[i] === CONT) continue;   // v.106.1：兩拍節奏型的延續格
       const left = totalBeats - i - 1;
-      const ok = pool.filter(id => used + notesOfPattern(id) + left <= budget);
+      const fit = id => !isTwoBeat(id) || (i + 1 < totalBeats && twoBeatOK(i, bpb));
+      const ok = pool.filter(id => fit(id) && used + notesOfPattern(id) + left - (isTwoBeat(id) ? 1 : 0) <= budget);
       let id;
       if(ok.length) id = pick(ok);
       else {
-        id = pool[0];
-        pool.forEach(x => { if(notesOfPattern(x) < notesOfPattern(id)) id = x; });
+        const fp = pool.filter(x => !isTwoBeat(x));
+        id = fp[0];
+        fp.forEach(x => { if(notesOfPattern(x) < notesOfPattern(id)) id = x; });
       }
-      seq.push(id); used += notesOfPattern(id);
+      seq[i] = id; used += notesOfPattern(id);
+      if(isTwoBeat(id)) seq[i + 1] = CONT;
     }
     return seq;
   }
@@ -1443,6 +1455,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
             else if(len === 2) n = new VF.StaveNote({ clef: cfg.clef, keys:[key], duration:'8', auto_stem:true });
             else if(len === 3) n = new VF.StaveNote({ clef: cfg.clef, keys:[key], duration:'8', auto_stem:true }).addDot(0);
             else if(len === 4) n = new VF.StaveNote({ clef: cfg.clef, keys:[key], duration:'q', auto_stem:true });
+            else if(len === 8) n = new VF.StaveNote({ clef: cfg.clef, keys:[key], duration:'h', auto_stem:true });   // v.106.1 二分音符
             else n = new VF.StaveNote({ clef: cfg.clef, keys:[key], duration:'q', auto_stem:true }).addDot(0);
             applyAccPE(n, pObj, state);
             const mk = marks[globalNoteIdx + k];
@@ -1875,7 +1888,9 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
     // 節奏型不再由使用者選擇：內部隨機使用該拍號的全部節奏型
     rhythmPool(){
-      return (this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER).slice();
+      const EXm = window.EXAM;
+      const exam = !!(EXm && EXm.isExamMode && EXm.isExamMode());
+      return (this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER).filter(id => !(exam && isTwoBeat(id)));   // v.106.1：考試不含兩拍節奏型
     },
 
     /* ---------- 出題 ---------- */
@@ -1887,7 +1902,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 
       let built = null;
       for(let attempt = 0; attempt < 400 && !built; attempt++){
-        const seq = genRhythm(totalBeats, pool, budget);
+        const seq = genRhythm(totalBeats, pool, budget, this.beatsPerBar);
         const info = analyseSeq(seq, this.beatsPerBar);
         if(info.groupCount < 3) continue;
 
