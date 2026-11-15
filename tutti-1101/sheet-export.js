@@ -408,6 +408,14 @@
     /* 「全部下載」時先收起來，由選單一次交付（v.102） */
     if (global.__expCollect) { global.__expCollect.files.push({ blob: blob, name: name }); return { ok: true, collected: true }; }
     var file = new File([blob], name, { type: blob.type || 'image/png' });
+    /* v.106：iOS 的分享面板不一定認得 MusicXML 的檔案類型，認不得就換成一般 XML／純文字（檔名不變） */
+    if (isIOS && navigator.canShare && !navigator.canShare({ files: [file] })) {
+      ['application/xml', 'text/xml', 'text/plain'].some(function (t) {
+        var f2 = new File([blob], name, { type: t });
+        if (navigator.canShare({ files: [f2] })) { file = f2; return true; }
+        return false;
+      });
+    }
 
     function download() {
       try {
@@ -438,7 +446,324 @@
     return { ok: false, reason: 'download' };
   }
 
-  /* v.102：依選單的「譜例格式」輸出 PNG 或 PDF；「全部下載」時兩種都產生。 */
+  /* ==== MusicXML（v.106）====
+     不轉換圖片，而是記錄 VexFlow 實際畫出來的東西（譜表、音符、臨時記號、連結線、符槓、三連音），
+     再寫成 MusicXML。所以音高、拼寫、小節、記號都和 PNG／PDF 那張一模一樣。
+     做法：在 Stave／StaveNote／StaveTie／Beam 的 draw 外面包一層，依「畫在哪一個 <svg>」分類記下來（WeakMap，不留記憶體）。
+     各頁不必改：導出時本來就會在畫面外另外畫一份乾淨的譜，拿那一份的 svg 去查就好。
+     ⚠ 音高：有些頁面的 key 只寫字母（c/4），升降靠臨時記號＋小節內規則＋調號，這裡照讀譜規則還原；
+       key 本身帶升降的（c#/4）直接用。跨小節的連結線，後一個音沿用前一個音的升降。 */
+  var MX_REG = new WeakMap();
+  var mxHooked = false;
+  function mxRec(ctx) {
+    var svg = ctx && ctx.svg; if (!svg) return null;
+    var r = MX_REG.get(svg);
+    if (!r) { r = { staves: [], notes: [], ties: [], beams: [] }; MX_REG.set(svg, r); }
+    return r;
+  }
+  function mxInstall() {
+    if (mxHooked) return true;
+    var VF = global.Vex && global.Vex.Flow;
+    if (!VF || !VF.Stave || !VF.StaveNote) return false;
+    mxHooked = true;
+    function wrap(proto, name, fn) {
+      if (!proto || typeof proto[name] !== 'function') return;
+      var orig = proto[name];
+      proto[name] = function () { var out = orig.apply(this, arguments); try { fn.call(this, arguments); } catch (e) {} return out; };
+    }
+    wrap(VF.Stave.prototype, 'addTimeSignature', function (a) { this.__mxTime = a[0]; });
+    wrap(VF.Stave.prototype, 'draw', function () { var r = mxRec(this.context); if (r && r.staves.indexOf(this) < 0) r.staves.push(this); });
+    wrap(VF.StaveNote.prototype, 'draw', function () { var r = mxRec(this.context); if (r && r.notes.indexOf(this) < 0) r.notes.push(this); });
+    wrap(VF.StaveTie && VF.StaveTie.prototype, 'draw', function () { var r = mxRec(this.context); if (r) r.ties.push(this); });
+    wrap(VF.Beam && VF.Beam.prototype, 'draw', function () { var r = mxRec(this.context); if (r) r.beams.push(this); });
+    wrap(VF.SVGContext && VF.SVGContext.prototype, 'clear', function () { if (this.svg) MX_REG.delete(this.svg); });
+    return true;
+  }
+  /* vexflow 載入後才能掛；本機檔載入失敗會改用 CDN，所以多試幾次 */
+  (function tryInstall(n) { if (!mxInstall() && n < 60) setTimeout(function () { tryInstall(n + 1); }, 250); })(0);
+
+  var MX_DIV = 24;   // 每個四分音符 24 單位：十六分＝6、附點十六分＝9、三連音八分＝8、三連音十六分＝4
+  var MX_BASE = { w: 4, h: 2, q: 1, '8': 0.5, '16': 0.25, '32': 0.125 };
+  var MX_TYPE = { w: 'whole', h: 'half', q: 'quarter', '8': 'eighth', '16': '16th', '32': '32nd' };
+  var MX_FLAGS = { '8': 1, '16': 2, '32': 3 };
+  var MX_ACC = { '#': 1, 'b': -1, 'n': 0, '##': 2, 'bb': -2 };
+  var MX_ACC_NAME = { '#': 'sharp', 'b': 'flat', 'n': 'natural', '##': 'double-sharp', 'bb': 'flat-flat' };
+  var MX_MAJ = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7, F: -1, Bb: -2, Eb: -3, Ab: -4, Db: -5, Gb: -6, Cb: -7 };
+  var MX_MIN = { A: 0, E: 1, B: 2, 'F#': 3, 'C#': 4, 'G#': 5, 'D#': 6, 'A#': 7, D: -1, G: -2, C: -3, F: -4, Bb: -5, Eb: -6, Ab: -7 };
+
+  function mxEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function mxKey(spec) {
+    if (!spec) return null;
+    var m = String(spec).match(/^([A-G][#b]?)(m?)$/);
+    if (!m) return null;
+    var f = m[2] ? MX_MIN[m[1]] : MX_MAJ[m[1]];
+    return (f == null) ? null : { fifths: f, minor: !!m[2] };
+  }
+  function mxKeyAlter(key, letter) {
+    if (!key || !key.fifths) return 0;
+    var order = key.fifths > 0 ? 'FCGDAEB' : 'BEADGCF';
+    return order.indexOf(letter) < Math.abs(key.fifths) ? (key.fifths > 0 ? 1 : -1) : 0;
+  }
+  function mxNoteX(n) { try { return n.getAbsoluteX(); } catch (e) { return 0; } }
+  function mxDur(n) {
+    var d = String(n.getDuration ? n.getDuration() : n.duration || 'q').replace(/r$/, '');
+    var q = MX_BASE[d] || 1;
+    var dots = n.dots || 0;
+    q = q * (2 - 1 / Math.pow(2, dots));
+    var t = n.tuplet;
+    if (t && t.num_notes) q = q * (t.notes_occupied || 2) / t.num_notes;
+    return { div: Math.round(q * MX_DIV), type: MX_TYPE[d] || 'quarter', dots: dots, flags: MX_FLAGS[d] || 0, tuplet: t };
+  }
+  function mxShownAcc(n, i) {
+    var mods = (n.getModifiers ? n.getModifiers() : n.modifiers) || [];
+    for (var k = 0; k < mods.length; k++) {
+      var m = mods[k];
+      if (m && m.getCategory && m.getCategory() === 'accidentals' && m.index === i) return m.type;
+    }
+    return null;
+  }
+
+  /* 一張 svg → 若干小節（每個小節：各譜表、各聲部的音符） */
+  function mxItemModel(svg) {
+    var r = svg && MX_REG.get(svg);
+    if (!r || !r.staves.length) return null;
+    var staves = r.staves.filter(function (s) { return true; });
+    var ys = [], xs = [];
+    staves.forEach(function (s) {
+      var y = Math.round(s.y), x = Math.round(s.x);
+      if (ys.indexOf(y) < 0) ys.push(y);
+      if (xs.indexOf(x) < 0) xs.push(x);
+    });
+    ys.sort(function (a, b) { return a - b; }); xs.sort(function (a, b) { return a - b; });
+    var grand = ys.length === 2 && xs.every(function (x) {
+      return ys.every(function (y) { return staves.some(function (s) { return Math.round(s.x) === x && Math.round(s.y) === y; }); });
+    });
+    var cols = [];   // 每一欄＝一個小節：{ staves: [stave(1), stave(2)] }
+    if (grand) {
+      xs.forEach(function (x) {
+        cols.push({ staves: ys.map(function (y) { return staves.filter(function (s) { return Math.round(s.x) === x && Math.round(s.y) === y; })[0]; }) });
+      });
+    } else {
+      staves.slice().sort(function (a, b) { return (Math.round(a.y) - Math.round(b.y)) || (a.x - b.x); })
+            .forEach(function (s) { cols.push({ staves: [s] }); });
+    }
+    var nStaff = grand ? 2 : 1;
+    /* 音符分到欄與譜表 */
+    var where = new Map();
+    cols.forEach(function (c, ci) { c.staves.forEach(function (s, si) { where.set(s, { ci: ci, si: si }); }); c.notes = [[], []]; });
+    r.notes.forEach(function (n) {
+      var st = n.getStave ? n.getStave() : n.stave; var w = st && where.get(st);
+      if (w) cols[w.ci].notes[w.si].push(n);
+    });
+    /* 連結線 */
+    var tieInfo = new Map();
+    function tmark(n, i, kind) { if (!n) return; var t = tieInfo.get(n) || { start: {}, stop: {} }; t[kind][i] = true; tieInfo.set(n, t); }
+    r.ties.forEach(function (t) {
+      var o = t.notes || t;
+      var f = o.first_note, l = o.last_note, fi = o.first_indices || [0], li = o.last_indices || [0];
+      fi.forEach(function (i) { tmark(f, i, 'start'); });
+      li.forEach(function (i) { tmark(l, i, 'stop'); });
+    });
+    /* 符槓 */
+    var beamInfo = new Map();
+    r.beams.forEach(function (b) {
+      var ns = b.notes || [];
+      ns.forEach(function (n, k) {
+        var out = [], fl = mxDur(n).flags;
+        for (var L = 1; L <= fl; L++) {
+          var p = k > 0 && mxDur(ns[k - 1]).flags >= L, q = k < ns.length - 1 && mxDur(ns[k + 1]).flags >= L;
+          out.push(p && q ? 'continue' : (q ? 'begin' : (p ? 'end' : (k < ns.length - 1 ? 'forward hook' : 'backward hook'))));
+        }
+        beamInfo.set(n, out);
+      });
+    });
+    /* 音高：照讀譜規則還原（每欄、每譜表一份小節內臨時記號狀態） */
+    var curKey = [null, null], curClef = ['treble', 'bass'], alterOf = new Map();
+    if (!grand) curClef = ['treble'];
+    cols.forEach(function (c) {
+      c.key = []; c.time = null; c.clef = [];
+      c.staves.forEach(function (s, si) {
+        (s.getModifiers ? s.getModifiers() : []).forEach(function (m) {
+          var cat = m.getCategory && m.getCategory();
+          if (cat === 'keysignatures') { var k = mxKey(m.keySpec); if (k) curKey[si] = k; }
+          /* ⚠ 沒畫譜號的譜表，stave.clef 仍是預設的 treble，只能看譜表上真的有沒有譜號 */
+          if (cat === 'clefs' && (m.type === 'treble' || m.type === 'bass')) curClef[si] = m.type;
+        });
+        c.key[si] = curKey[si]; c.clef[si] = curClef[si];
+        if (s.__mxTime && !c.time) c.time = s.__mxTime;
+      });
+      for (var si = 0; si < nStaff; si++) {
+        var state = {};
+        c.notes[si].slice().sort(function (a, b) { return mxNoteX(a) - mxNoteX(b); }).forEach(function (n) {
+          var alts = [];
+          (n.keys || []).forEach(function (k, i) {
+            var m = String(k).toLowerCase().match(/^([a-g])(bb|##|b|#|n)?\/(-?\d+)/);
+            if (!m) { alts.push(0); return; }
+            var L = m[1].toUpperCase(), oct = parseInt(m[3], 10), id = L + oct;
+            var shown = mxShownAcc(n, i), a;
+            if (shown != null && MX_ACC[shown] != null) a = MX_ACC[shown];
+            else if (m[2]) a = MX_ACC[m[2]];
+            else if (state[id] != null) a = state[id];
+            else {
+              var carried = null;
+              r.ties.forEach(function (t) { var o = t.notes || t; if (o.last_note === n && o.first_note && alterOf.has(o.first_note)) carried = alterOf.get(o.first_note)[(o.first_indices || [0])[0]]; });
+              a = (carried != null) ? carried : mxKeyAlter(c.key[si], L);
+            }
+            if (shown != null) state[id] = a;
+            alts.push(a);
+          });
+          alterOf.set(n, alts);
+        });
+      }
+    });
+    return { cols: cols, nStaff: nStaff,
+             tieInfo: tieInfo, beamInfo: beamInfo, alterOf: alterOf };
+  }
+
+  function buildMusicXML(items, ui) {
+    var models = items.map(function (it) { return mxItemModel(it.svg); });
+    if (!models.length || models.some(function (m) { return !m || !m.cols.length; })) throw new Error('沒有樂譜資料');
+    var nStaff = Math.max.apply(null, models.map(function (m) { return m.nStaff; }));
+    var perRow = ui.perRow || PER_ROW;
+    var X = [], mno = 0, lastKey = null, lastTime = null, lastClefs = null;
+    function words(text, place, staff, bold) {
+      return '<direction placement="' + place + '"><direction-type><words' + (bold ? ' font-weight="bold"' : '') + '>' + mxEsc(text) +
+             '</words></direction-type><staff>' + staff + '</staff></direction>';
+    }
+    models.forEach(function (md, ii) {
+      var it = items[ii];
+      /* 文字：題號、標題、答案、四部和聲的級數與調名 */
+      var lyricAt = {}, wordsAt = {};
+      function addWords(ci, s) { (wordsAt[ci] = wordsAt[ci] || []).push(s); }
+      (it.overlays || []).forEach(function (o) {
+        if (!o || !o.text) return;
+        var ci = 0, best = Infinity;
+        md.cols.forEach(function (c, k) {
+          var s = c.staves[0], x0 = s.x, x1 = s.x + (s.width || 0);
+          var d = (o.x >= x0 && o.x <= x1) ? 0 : Math.min(Math.abs(o.x - x0), Math.abs(o.x - x1));
+          if (d < best) { best = d; ci = k; }
+        });
+        var lowY = Math.max.apply(null, md.cols[ci].staves.map(function (s) { return s.y; }));
+        var below = o.y > lowY + 40;
+        if (below && !/：$/.test(o.text)) (lyricAt[ci] = lyricAt[ci] || []).push(o.text);
+        else addWords(ci, words(o.text, below ? 'below' : 'above', below ? md.nStaff : 1, !!o.bold));
+      });
+      if (it.title) addWords(0, words(it.title, 'above', 1, true));
+      if (it.num != null) addWords(0, words(it.num + '.', 'above', 1, true));
+      if (it.answer) addWords(0, words(it.answer, 'below', md.nStaff, false));
+
+      md.cols.forEach(function (c, ci) {
+        mno++;
+        var body = [];
+        var newSys = (ii > 0 && ci === 0 && items.length > 1 && ii % perRow === 0);
+        if (newSys) body.push('<print new-system="yes"/>');
+        /* 小節長度：有拍號照拍號，沒有就取最長的聲部 */
+        var voices = [];   // { si, notes }
+        for (var si = 0; si < md.nStaff; si++) {
+          var groups = [], keyOf = new Map();
+          c.notes[si].forEach(function (n) {
+            var v = n.voice || n.getVoice && (function () { try { return n.getVoice(); } catch (e) { return null; } })() || 'v';
+            if (!keyOf.has(v)) { keyOf.set(v, groups.length); groups.push([]); }
+            groups[keyOf.get(v)].push(n);
+          });
+          groups.forEach(function (g) { g.sort(function (a, b) { return mxNoteX(a) - mxNoteX(b); }); });
+          groups.sort(function (a, b) {
+            var sa = a[0].getStemDirection ? a[0].getStemDirection() : 1, sb = b[0].getStemDirection ? b[0].getStemDirection() : 1;
+            return sb - sa;
+          });
+          groups.forEach(function (g, gi) { voices.push({ si: si, vn: si * 4 + gi + 1, notes: g }); });
+          if (!groups.length) voices.push({ si: si, vn: si * 4 + 1, notes: [] });
+        }
+        var tm = c.time || lastTime, mlen;
+        if (tm && /^\d+\/\d+$/.test(tm)) { var p = tm.split('/'); mlen = Math.round(parseInt(p[0], 10) * 4 / parseInt(p[1], 10) * MX_DIV); }
+        else mlen = Math.max.apply(null, voices.map(function (v) { return v.notes.reduce(function (s, n) { return s + mxDur(n).div; }, 0); }).concat([MX_DIV * 4]));
+        /* 屬性：第一小節或有改變時才寫 */
+        var keyNow = c.key[0] || null;
+        var clefs = c.clef;
+        var attr = [];
+        if (mno === 1) attr.push('<divisions>' + MX_DIV + '</divisions>');
+        var kStr = keyNow ? JSON.stringify(keyNow) : 'none';
+        if (mno === 1 || kStr !== lastKey) attr.push('<key><fifths>' + (keyNow ? keyNow.fifths : 0) + '</fifths>' + (keyNow && keyNow.minor ? '<mode>minor</mode>' : '') + '</key>');
+        var tShow = c.time || null, tStr = tShow || ('hidden:' + mlen);
+        if (mno === 1 || (tShow && tShow !== lastTime)) {
+          if (tShow && tShow !== 'C' && /^\d+\/\d+$/.test(tShow)) { var tp = tShow.split('/'); attr.push('<time><beats>' + tp[0] + '</beats><beat-type>' + tp[1] + '</beat-type></time>'); }
+          else attr.push('<time print-object="no"><beats>' + (mlen / MX_DIV) + '</beats><beat-type>4</beat-type></time>');
+        }
+        if (mno === 1) attr.push('<staves>' + nStaff + '</staves>');
+        var cStr = clefs.join(',');
+        if (mno === 1 || cStr !== lastClefs) clefs.forEach(function (cl, k) {
+          attr.push('<clef number="' + (k + 1) + '">' + (cl === 'bass' ? '<sign>F</sign><line>4</line>' : '<sign>G</sign><line>2</line>') + '</clef>');
+        });
+        if (attr.length) body.push('<attributes>' + attr.join('') + '</attributes>');
+        lastKey = kStr; if (tShow) lastTime = tShow; lastClefs = cStr;
+        (wordsAt[ci] || []).forEach(function (w) { body.push(w); });
+
+        var lyrics = (lyricAt[ci] || []).slice(), lyricDone = false;
+        var lowestVoice = voices.filter(function (v) { return v.si === md.nStaff - 1 && v.notes.length; });
+        lowestVoice = lowestVoice.length ? lowestVoice[lowestVoice.length - 1] : null;
+        var pos = 0;
+        voices.forEach(function (v, vi) {
+          if (vi > 0 && pos > 0) { body.push('<backup><duration>' + pos + '</duration></backup>'); pos = 0; }
+          if (!v.notes.length) {
+            body.push('<note print-object="no"><rest measure="yes"/><duration>' + mlen + '</duration><voice>' + v.vn + '</voice><staff>' + (v.si + 1) + '</staff></note>');
+            pos += mlen; return;
+          }
+          v.notes.forEach(function (n) {
+            var d = mxDur(n), rest = n.isRest && n.isRest();
+            var ti = md.tieInfo.get(n), bi = md.beamInfo.get(n), alts = md.alterOf.get(n) || [];
+            var keys = rest ? [null] : (n.keys || []);
+            var tuplet = d.tuplet, tFirst = tuplet && tuplet.notes && tuplet.notes[0] === n, tLast = tuplet && tuplet.notes && tuplet.notes[tuplet.notes.length - 1] === n;
+            keys.forEach(function (k, i) {
+              var x = ['<note>'];
+              if (i > 0) x.push('<chord/>');
+              if (rest) x.push('<rest/>');
+              else {
+                var m = String(k).toLowerCase().match(/^([a-g])(bb|##|b|#|n)?\/(-?\d+)/) || [0, 'c', '', '4'];
+                x.push('<pitch><step>' + m[1].toUpperCase() + '</step>' + (alts[i] ? '<alter>' + alts[i] + '</alter>' : '') + '<octave>' + m[3] + '</octave></pitch>');
+              }
+              x.push('<duration>' + d.div + '</duration>');
+              var tStart = ti && ti.start[i], tStop = ti && ti.stop[i];
+              if (tStop) x.push('<tie type="stop"/>');
+              if (tStart) x.push('<tie type="start"/>');
+              x.push('<voice>' + v.vn + '</voice><type>' + d.type + '</type>');
+              for (var q = 0; q < d.dots; q++) x.push('<dot/>');
+              var shown = !rest && mxShownAcc(n, i);
+              if (shown && MX_ACC_NAME[shown]) x.push('<accidental>' + MX_ACC_NAME[shown] + '</accidental>');
+              if (tuplet && tuplet.num_notes) x.push('<time-modification><actual-notes>' + tuplet.num_notes + '</actual-notes><normal-notes>' + (tuplet.notes_occupied || 2) + '</normal-notes></time-modification>');
+              if (d.type !== 'whole' && !rest && n.getStemDirection) { try { x.push('<stem>' + (n.getStemDirection() > 0 ? 'up' : 'down') + '</stem>'); } catch (e) {} }
+              x.push('<staff>' + (v.si + 1) + '</staff>');
+              if (i === 0 && bi) bi.forEach(function (b, L) { x.push('<beam number="' + (L + 1) + '">' + b + '</beam>'); });
+              var nt = [];
+              if (tStop) nt.push('<tied type="stop"/>');
+              if (tStart) nt.push('<tied type="start"/>');
+              if (i === 0 && tFirst) nt.push('<tuplet type="start" bracket="yes" placement="above"/>');   // 和 PNG 一樣有括弧
+              if (i === 0 && tLast) nt.push('<tuplet type="stop"/>');
+              if (nt.length) x.push('<notations>' + nt.join('') + '</notations>');
+              if (i === 0 && !lyricDone && v === lowestVoice && lyrics.length) {
+                lyrics.forEach(function (t, li) { x.push('<lyric number="' + (li + 1) + '"><syllabic>single</syllabic><text>' + mxEsc(t) + '</text></lyric>'); });
+                lyricDone = true;
+              }
+              x.push('</note>');
+              body.push(x.join(''));
+            });
+            pos += d.div;
+          });
+        });
+        if (ci === md.cols.length - 1) body.push('<barline location="right"><bar-style>light-heavy</bar-style></barline>');
+        X.push('<measure number="' + mno + '">' + body.join('') + '</measure>');
+      });
+    });
+    var dt = new Date(), p2 = function (x) { return String(x).padStart(2, '0'); };
+    return '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' +
+      '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n' +
+      '<score-partwise version="4.0">' +
+      '<identification><encoding><software>音樂聽力練習</software><encoding-date>' + dt.getFullYear() + '-' + p2(dt.getMonth() + 1) + '-' + p2(dt.getDate()) + '</encoding-date></encoding></identification>' +
+      '<part-list><score-part id="P1"><part-name print-object="no">Piano</part-name></score-part></part-list>' +
+      '<part id="P1">' + X.join('') + '</part></score-partwise>\n';
+  }
+
+  /* v.102：依選單的「譜例格式」輸出 PNG 或 PDF；「全部下載」時兩種都產生。
+     v.106：多一種 MusicXML；「全部下載」時三種都產生（MusicXML 失敗不影響另外兩種）。 */
   async function exportSheets(items, prefix, ui) {
     ui = ui || {};
     var col = global.__expCollect;
@@ -461,6 +786,16 @@
         if (ui.onStage) ui.onStage('deliver');
         r = await deliver(pdf, fileName(prefix, 'pdf'));
       }
+      if (fmt === 'musicxml' || fmt === 'both') {
+        try {
+          var xml = buildMusicXML(items, ui);
+          if (ui.onStage) ui.onStage('deliver');
+          r = await deliver(new Blob([xml], { type: 'application/vnd.recordare.musicxml+xml' }), fileName(prefix, 'musicxml'));
+        } catch (e) {
+          if (!col) throw e;
+          col.failed = (col.failed || 0) + 1;
+        }
+      }
       if (ui.onStage) ui.onStage('done', r);
       return r;
     } catch (e) {
@@ -475,6 +810,7 @@
     svgToImage: svgToImage,
     fileName: fileName,
     canvasToPdf: canvasToPdf,
+    buildMusicXML: buildMusicXML,
     PER_ROW: PER_ROW
   };
 })(window);

@@ -43,14 +43,14 @@
       '<div class="em-box">' +
         '<h3>導出</h3>' +
         '<p class="em-sub" id="em-sub">選擇要下載的內容</p>' +
-        '<div class="em-fmt">譜例格式 <span class="em-seg"><button type="button" data-fmt="png">PNG</button><button type="button" data-fmt="pdf">PDF</button></span></div>' +
+        '<div class="em-fmt">譜例格式 <span class="em-seg"><button type="button" data-fmt="png">PNG</button><button type="button" data-fmt="pdf">PDF</button><button type="button" data-fmt="musicxml">MusicXML</button></span></div>' +
         '<button type="button" class="em-btn" id="em-audio">🎵 下載音檔</button>' +
         '<button type="button" class="em-btn ghost" id="em-sheet">🖼️ 下載譜例</button>' +
         /* 第三顆（v.98）：只有傳入 onSheet2 的頁面才顯示，例如找錯音的「正確譜例」 */
         '<button type="button" class="em-btn ghost" id="em-sheet2" style="display:none;"></button>' +
         /* v.102：一次下載音檔＋譜例（PNG 與 PDF），全部同一個主檔名 */
         '<div id="em-all" style="display:none;">' +
-          '<p class="em-all-title">全部下載（音檔＋譜例 PNG＋PDF）</p>' +
+          '<p class="em-all-title">全部下載（音檔＋譜例 PNG＋PDF＋MusicXML）</p>' +
           '<button type="button" class="em-btn all" id="em-all-zip">📦 全部下載（壓縮檔）</button>' +
           '<button type="button" class="em-btn all" id="em-all-files">📂 全部下載（個別檔案）</button>' +
         '</div>' +
@@ -79,10 +79,10 @@
   /* ---- 譜例格式（記住上次的選擇）---- */
   var FMT_KEY = 'earTrainer.export.sheetFormat';
   function sheetFormat() {
-    try { var v = localStorage.getItem(FMT_KEY); if (v === 'pdf' || v === 'png') return v; } catch (e) {}
+    try { var v = localStorage.getItem(FMT_KEY); if (v === 'pdf' || v === 'png' || v === 'musicxml') return v; } catch (e) {}
     return 'png';
   }
-  function setFormat(v) { try { localStorage.setItem(FMT_KEY, v === 'pdf' ? 'pdf' : 'png'); } catch (e) {} }
+  function setFormat(v) { try { localStorage.setItem(FMT_KEY, (v === 'pdf' || v === 'musicxml') ? v : 'png'); } catch (e) {} }
   function paintFormat() {
     var f = sheetFormat(), el = document.getElementById(EL_ID);
     if (!el) return;
@@ -101,8 +101,8 @@
     if (busy || !current) return;
     var steps = [];
     if (current.onAudio)  steps.push({ fn: current.onAudio,  n: 1 });   // 音檔 1 個
-    if (current.onSheet)  steps.push({ fn: current.onSheet,  n: 2 });   // 譜例 PNG＋PDF
-    if (current.onSheet2) steps.push({ fn: current.onSheet2, n: 2 });
+    if (current.onSheet)  steps.push({ fn: current.onSheet,  n: 3 });   // 譜例 PNG＋PDF＋MusicXML（v.106）
+    if (current.onSheet2) steps.push({ fn: current.onSheet2, n: 3 });
     close();
     busy = true;
     var col = { date: new Date(), files: [], failed: 0 };

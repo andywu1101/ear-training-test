@@ -1229,8 +1229,15 @@ function updateStaffHeader(pageId){
       const voiced = applyInv(baseIvs, invIdx);
       return { root, qualityKey: key, intervals: voiced.map(v=>v.semis), steps: voiced.map(v=>v.step) };
     }
+    /* v.106：判斷兩題音高是否一模一樣（實際發聲的音高組合，異名同音算一樣） */
+    function pitchSig(q){ return q ? q.intervals.map(function(i){ return q.root + i; }).sort(function(a,b){ return a-b; }).join(',') : ''; }
+    function genNotSame(gen, usedSigs){
+      for(let i=0; i<200; i++){ const q = gen(); if(!usedSigs.has(pitchSig(q))) return q; }
+      return gen();
+    }
     function generateDictQs(count, allowRepeat){
-      if(allowRepeat){ const qs = []; for(let i=0; i<count; i++) qs.push(generateQ()); return qs; }
+      /* v.106：可重複＝同一種和絃可以再出，但音高不能和前面的題目一模一樣 */
+      if(allowRepeat){ const qs = [], used = new Set(); for(let i=0; i<count; i++){ const q = genNotSame(generateQ, used); used.add(pitchSig(q)); qs.push(q); } return qs; }
       return shuffleCopy(activePool()).slice(0, count).map(key => {
         const root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
         const baseIvs = QUALITIES[key].intervals; const invIdx = inversion ? Math.floor(Math.random() * baseIvs.length) : 0;
@@ -1330,13 +1337,13 @@ function updateStaffHeader(pageId){
       updateStartBtn(); updateStatus();
     }
     function newQ(){
-      window.stopAllPlayback(); hasPlayed = false; current = generateQ(); answered = false;
+      window.stopAllPlayback(); hasPlayed = false; current = genNotSame(generateQ, new Set([pitchSig(current)])); answered = false;
       document.getElementById('chr-playCaption').textContent = pianoInstrument ? '' : '音色載入中，請稍候';
       document.getElementById('chr-questionCount').textContent = `第 ${qIndex} 題`;
       renderGrid(); updatePlayBtn();
     }
     function newTestQ(){
-      window.stopAllPlayback(); hasPlayed = false; current = generateQ(); answered = false;
+      window.stopAllPlayback(); hasPlayed = false; current = genNotSame(generateQ, new Set([pitchSig(current)])); answered = false;
       testSession.replaysLeft = testSession.maxReplays;
       document.getElementById('chr-questionCount').textContent = `第 ${testSession.index} / ${testSession.total} 題 目前正確 ${testSession.correct} 題`;
       renderGrid(); updatePlayBtn();

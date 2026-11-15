@@ -99,6 +99,8 @@
   .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); color: var(--ink); cursor: pointer; }
   .rv-speed{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 16px; margin:18px 0 0; }
   .rv-speed-label{ font-size:13px; color:var(--ink-soft); margin-bottom:8px; }
+  /* v.106：.rv-speed 不是 flex，.bpm-slider 的 flex:1 無效，拉桿只有預設寬度，靠左一小段 → 改成滿寬 */
+  .rv-speed .bpm-slider{ display:block; width:100%; min-width:0; }
   .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
 
   .level-tabs{ display:flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }

@@ -1222,8 +1222,15 @@ function updateStaffHeader(pageId){
       return { root, qualityKey: key, intervals: [0, actualSemitones], steps: [0, actualStep] };
     }
 
+    /* v.106：判斷兩題音高是否一模一樣（實際發聲的音高組合，異名同音算一樣） */
+    function pitchSig(q){ return q ? q.intervals.map(function(i){ return q.root + i; }).sort(function(a,b){ return a-b; }).join(',') : ''; }
+    function genNotSame(gen, usedSigs){
+      for(let i=0; i<200; i++){ const q = gen(); if(!usedSigs.has(pitchSig(q))) return q; }
+      return gen();
+    }
     function generateDictQs(count, allowRepeat, currentPool){
-      if(allowRepeat){ const qs = []; for(let i=0; i<count; i++) qs.push(generateQ(currentPool)); return qs; }
+      /* v.106：可重複＝同一個音程可以再出，但音高不能和前面的題目一模一樣 */
+      if(allowRepeat){ const qs = [], used = new Set(); for(let i=0; i<count; i++){ const q = genNotSame(function(){ return generateQ(currentPool); }, used); used.add(pitchSig(q)); qs.push(q); } return qs; }
       return shuffleCopy(currentPool).slice(0, count).map(key => {
         let root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
         const q = QUALITIES[key]; let step = (key === 'A4_d5') ? (Math.random() < 0.5 ? 3 : 4) : q.baseStep;
@@ -1332,13 +1339,13 @@ function updateStaffHeader(pageId){
       updateStartBtn(); updateStatus();
     }
     function newQ(){
-      window.stopAllPlayback(); hasPlayed = false; current = generateQ(curLevel.id === CUSTOM_ID ? customPool : curLevel.pool); answered = false;
+      window.stopAllPlayback(); hasPlayed = false; current = genNotSame(function(){ return generateQ(curLevel.id === CUSTOM_ID ? customPool : curLevel.pool); }, new Set([pitchSig(current)])); answered = false;
       document.getElementById('int-playCaption').textContent = pianoInstrument ? '' : '音色載入中，請稍候';
       document.getElementById('int-questionCount').textContent = `第 ${qIndex} 題`;
       renderGrid(); updatePlayBtn();
     }
     function newTestQ(){
-      window.stopAllPlayback(); hasPlayed = false; current = generateQ(curLevel.id === CUSTOM_ID ? customPool : curLevel.pool); answered = false;
+      window.stopAllPlayback(); hasPlayed = false; current = genNotSame(function(){ return generateQ(curLevel.id === CUSTOM_ID ? customPool : curLevel.pool); }, new Set([pitchSig(current)])); answered = false;
       testSession.replaysLeft = testSession.maxReplays;
       document.getElementById('int-questionCount').textContent = `第 ${testSession.index} / ${testSession.total} 題 目前正確 ${testSession.correct} 題`;
       renderGrid(); updatePlayBtn();

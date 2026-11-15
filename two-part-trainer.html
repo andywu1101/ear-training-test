@@ -64,6 +64,8 @@
   .select-box { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--panel-border); font-size: 14px; background: var(--panel); cursor: pointer; }
   .rv-speed{ background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 16px; margin:18px 0 0; }
   .rv-speed-label{ font-size:13px; color:var(--ink-soft); margin-bottom:8px; }
+  /* v.106：.rv-speed 不是 flex，.bpm-slider 的 flex:1 無效，拉桿只有預設寬度，靠左一小段 → 改成滿寬 */
+  .rv-speed .bpm-slider{ display:block; width:100%; min-width:0; }
   .bpm-slider { flex: 1; min-width: 150px; accent-color: var(--accent); }
 
   .pattern-grid-header { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px; }
@@ -458,7 +460,7 @@
     <p class="subtitle">收錄答錯的兩聲部題，重整或關閉後仍會保留。可分別聆聽你的作答與正解，並對照紅色標錯音符。</p>
     <div id="tp-reviewList"></div>
       <div class="rv-speed js-review-links">
-        <div class="rv-speed-label">🎵 播放速度　<span id="tp-rvBpmVal">80</span> BPM</div>
+        <div class="rv-speed-label">🎵 播放速度　♩／♪ = <span id="tp-rvBpmVal">80</span> BPM</div>
         <input type="range" id="tp-rvBpm" class="bpm-slider" min="40" max="160" value="80">
       </div>
       <div class="js-review-links" style="margin-top:20px;">
@@ -2201,7 +2203,7 @@ function showPage(pageId) {
       this.lastEditedNoteIdx = { top:null, bottom:null };
 
       const badge = document.getElementById('tp-statusBadge');
-      if(badge) badge.textContent = `大譜表｜${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
+      if(badge) badge.textContent = `大譜表｜${this.meter}拍｜${this.barsCount}小節｜${(this.meterType === 'compound' ? '♪' : '♩')} = ${this.bpm}`;
       const back = document.querySelector('#pageTpPractice .nav-back-btn'); if(back) back.style.display = 'none';
       const sub = document.getElementById('tp-submitBtn'); if(sub) sub.style.display = 'none';
       // 考試不提供單獨聆聽高音／低音
@@ -2517,7 +2519,7 @@ function showPage(pageId) {
             this.testSession.replaysLeft = this.testSession.totalPlays;
         }
 
-        document.getElementById('tp-statusBadge').textContent = `大譜表｜${this.meter}拍｜${this.barsCount}小節｜${this.bpm}BPM`;
+        document.getElementById('tp-statusBadge').textContent = `大譜表｜${this.meter}拍｜${this.barsCount}小節｜${(this.meterType === 'compound' ? '♪' : '♩')} = ${this.bpm}`;
         this.userSeq.top = Array(this.totalBeats).fill('placeholder'); this.userSeq.bottom = Array(this.totalBeats).fill('placeholder');
         this.userTie = { top: Array(this.totalBeats).fill(false), bottom: Array(this.totalBeats).fill(false) };
         this.tieMin = 1; this.tieMax = this.barsCount;   // 練習：至少 1 次、上限＝小節數（兩聲部合計）
