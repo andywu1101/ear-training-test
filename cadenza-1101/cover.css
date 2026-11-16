@@ -1,0 +1,154 @@
+/* ===== 音樂聽力出考卷：封面與贊助／作者彈窗 =====
+   從 App 的 index.html 複製（v108.1）：.cover-*、.scan-bubble、.intro-btn、.donate-*、.author-*、街口／銀行／贊助者名單。
+   App 改了這些樣式時要一起更新。只多了 .cover-page（整頁蓋在工具上）與 .cover-logo（取代高音譜號）。 */
+:root{ --accent-soft: rgba(51,65,92,0.08); --accent-line: rgba(51,65,92,0.35); --wrong-soft: rgba(166,73,59,0.09); --radius: 16px;
+  --font-display: 'Fraunces', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-body: 'Inter', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif; --font-mono: 'JetBrains Mono', monospace; }
+.cover-page{ position:fixed; inset:0; z-index:70; background:var(--paper); overflow-y:auto; -webkit-overflow-scrolling:touch; padding:calc(var(--st, 0px) + 20px) 16px calc(var(--sb, 0px) + 40px); font-family:var(--font-body); color:var(--ink); -webkit-user-select:none; user-select:none; }
+.cover-page.off{ display:none; }
+.cover-page .cover{ min-height:calc(100% - 20px); }
+.cover-logo{ display:block; width:96px; height:96px; border-radius:22px; margin:0 auto 10px; box-shadow:0 6px 18px rgba(51,65,92,0.18); }
+@media (max-width:480px){ .cover-logo{ width:80px; height:80px; border-radius:18px; } }
+
+  /* ===== 封面頁 ===== */
+  .cover{ min-height: calc(100vh - 84px); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; position:relative; overflow:hidden; padding: 32px 8px; }
+  .cover-notes{ position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .cover-note{ position:absolute; font-family: var(--font-display); color: var(--accent); opacity:0.10; user-select:none; line-height:1; }
+  .cover-card{ position:relative; z-index:1; max-width: 540px; }
+  .cover-clef{ font-family: var(--font-display); font-size: 92px; color: var(--accent); opacity:0.9; line-height:1; margin-bottom: 2px; }
+  .cover-title{ font-family: var(--font-display); font-weight:600; font-size: 46px; margin: 0 0 6px; letter-spacing:-0.01em; }
+  .cover-sub{ font-family: var(--font-mono); font-size: 13px; letter-spacing:0.22em; color: var(--ink-soft); text-transform: uppercase; margin-bottom: 26px; }
+  .cover-msg{ font-size: 17px; line-height: 1.95; color: var(--ink); text-align:center; background: var(--panel); border:1px solid var(--panel-border); border-radius: var(--radius); padding: 22px 24px; margin: 0 auto 28px; box-shadow: 0 4px 16px rgba(51,65,92,0.06); }
+  .cover-start{ font-family: var(--font-body); font-weight:700; font-size: 18px; padding: 16px 44px; border-radius: 999px; background: var(--accent); color: var(--panel); border:none; cursor:pointer; box-shadow: 0 6px 20px rgba(51,65,92,0.25); transition: all .15s ease; display:inline-flex; align-items:center; gap:10px; touch-action: manipulation; }
+  .cover-start:hover, .cover-start:active{ filter:brightness(1.12); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(51,65,92,0.32); }
+  .cover-foot{ margin-top: 20px; font-size: 13.5px; color: var(--ink-soft); }
+  /* 封面作者列與小額贊助 */
+  .cover-author{ margin-top: 16px; font-size: 13.5px; color: var(--ink-soft); }
+  .cover-donate-wrap{ margin-top: 10px; }
+  /* 封面：網站介紹影片（外框樣式，與贊助鈕同尺寸但不搶焦點） */
+  .cover-intro-wrap{ margin-top: 10px; }
+  .intro-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:11px 26px; border-radius:999px; background:transparent; color:var(--accent); border:1px solid var(--accent-line); cursor:pointer; text-decoration:none; transition:all .15s ease; touch-action:manipulation; }
+  .intro-btn:hover, .intro-btn:active{ background:var(--accent); color:var(--panel); border-color:var(--accent); transform:translateY(-1px); }
+  /* v.101：封面「全新登場」對話框——伍線譜樂譜掃描 App 的連結。
+     放在高音譜號右側、斜 5 度、尾巴朝左指向譜號；手機縮小字、360 以下拿掉相機圖示。
+     位置用「封面卡片中線＋位移」算，不會遮到譜號與標題（v.101 實測 320～1440 寬）。 */
+  .scan-bubble-wrap{ position:absolute; top:0; left:calc(50% + 36px); transform:rotate(5deg); transform-origin:left center; z-index:2; white-space:nowrap; }
+  .scan-bubble{ position:relative; display:inline-flex; flex-direction:column; align-items:center; gap:2px; text-decoration:none;
+    background:#fff; color:var(--ink); border:2px solid var(--accent); border-radius:18px; padding:9px 18px 10px;
+    box-shadow:0 6px 18px rgba(51,65,92,0.16); font-family:var(--font-body); line-height:1.25; touch-action:manipulation;
+    animation: scanBubbleHop 2s ease-in-out 1.2s infinite; }
+  .scan-bubble:hover, .scan-bubble:active{ box-shadow:0 8px 22px rgba(51,65,92,0.28); }
+  .scan-bubble .sb-new{ font-size:12.5px; font-weight:800; color:var(--wrong); letter-spacing:.06em; }
+  .scan-bubble .sb-name{ font-size:15.5px; font-weight:800; color:var(--accent); }
+  .scan-bubble .sb-go{ font-size:11.5px; color:var(--ink-soft); }
+  .scan-bubble::before, .scan-bubble::after{ content:''; position:absolute; width:0; height:0; border-style:solid; }
+  .scan-bubble::before{ left:-12px; top:50%; margin-top:-9px; border-width:9px 12px 9px 0; border-color:transparent var(--accent) transparent transparent; }
+  .scan-bubble::after{ left:-8px; top:50%; margin-top:-6.5px; border-width:6.5px 9px 6.5px 0; border-color:transparent #fff transparent transparent; }
+  /* 每 2 秒輕輕彈兩下（彈的動作約 0.8 秒，停 1.2 秒）；系統開「減少動態」時不動 */
+  @keyframes scanBubbleHop{ 0%,40%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } 60%{ transform:translateY(0); } 70%{ transform:translateY(-3px); } 80%{ transform:translateY(0); } }
+  @media (prefers-reduced-motion: reduce){ .scan-bubble{ animation:none; } }
+  @media (max-width:420px){
+    .scan-bubble-wrap{ left:calc(50% + 30px); }
+    .scan-bubble{ padding:6px 12px 7px; border-radius:15px; line-height:1.2; }
+    .scan-bubble .sb-name{ font-size:13.5px; } .scan-bubble .sb-new{ font-size:11.5px; } .scan-bubble .sb-go{ font-size:11px; }
+  }
+  @media (max-width:360px){ .scan-bubble .sb-cam{ display:none; } .scan-bubble .sb-name{ font-size:12.5px; } .scan-bubble-wrap{ left:calc(50% + 27px); } }
+  /* 更新日誌裡的連結（v.101） */
+  .log-item li a.log-link{ color:var(--accent); font-weight:700; text-decoration:underline; text-underline-offset:2px; }
+
+  /* 選單：標題下方的介紹短片連結 */
+  .intro-line{ font-size:13.5px; color:var(--ink-soft); margin:-14px 0 20px; }
+  .intro-line a{ color:var(--accent); font-weight:700; text-decoration:none; border-bottom:1px solid var(--accent-line); padding-bottom:1px; }
+  .intro-line a:hover, .intro-line a:active{ border-color:var(--accent); }
+  .donate-btn{ display:inline-flex; align-items:center; gap:7px; font-family:var(--font-body); font-weight:700; font-size:14.5px; padding:11px 26px; border-radius:999px; background:var(--wrong); color:var(--panel); border:none; cursor:pointer; box-shadow:0 4px 14px rgba(166,73,59,0.28); transition:all .15s ease; touch-action:manipulation; }
+  .donate-btn:hover, .donate-btn:active{ filter:brightness(1.08); transform:translateY(-1px); box-shadow:0 6px 18px rgba(166,73,59,0.34); }
+  .donate-modal{ display:none; position:fixed; inset:0; z-index:1200; background:rgba(38,36,32,0.55); padding:24px 16px; overflow-y:auto; }
+  /* 用 margin:auto 置中：內容高過螢幕時卡片上緣才不會溢出捲動範圍被裁掉（圓角消失） */
+  .donate-modal.open{ display:flex; align-items:flex-start; justify-content:center; }
+  .donate-box{ background:var(--paper); border:1px solid var(--panel-border); border-radius:16px; overflow:hidden; margin:auto; max-width:400px; width:100%; padding:30px 26px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.28); }
+  .donate-box .dico{ font-size:40px; line-height:1; }
+  .donate-box h3{ font-family:var(--font-display); font-size:23px; font-weight:600; margin:10px 0 8px; }
+  .donate-box p{ font-size:15px; color:var(--ink-soft); line-height:1.8; margin:0 0 18px; }
+  .donate-box .ok-btn{ font-family:var(--font-body); font-weight:700; font-size:15px; padding:11px 30px; border-radius:999px; background:var(--accent); color:var(--panel); border:none; cursor:pointer; touch-action:manipulation; }
+  .donate-links{ display:flex; flex-direction:column; gap:10px; margin:6px 0 14px; }
+  .donate-go, .donate-home{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family:var(--font-body); font-weight:700; font-size:15px; padding:13px 20px; border-radius:999px; text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
+  .donate-go{ background:var(--wrong); color:var(--panel); box-shadow:0 4px 14px rgba(166,73,59,0.28); }
+  .donate-go:hover, .donate-go:active{ filter:brightness(1.08); transform:translateY(-1px); }
+  .donate-home{ background:transparent; color:var(--ink); border:1px solid var(--panel-border); }
+  .donate-home:hover, .donate-home:active{ border-color:var(--accent); background:var(--accent-soft); }
+  .donate-dismiss{ font-family:var(--font-body); font-size:15.5px; color:var(--ink-soft); background:transparent; border:none; cursor:pointer; text-decoration:underline; touch-action:manipulation; }
+  .cover-author a{ color:var(--ink-soft); text-decoration:none; border-bottom:1px dashed var(--accent-line); padding-bottom:1px; transition:all .15s ease; }
+  .cover-author a:hover, .cover-author a:active{ color:var(--accent); border-color:var(--accent); }
+  /* 封面作者列（改為開啟彈窗） */
+  .author-link{ font:inherit; color:var(--ink-soft); background:none; border:none; border-bottom:1px dashed var(--accent-line); padding:0 0 1px; cursor:pointer; transition:all .15s ease; touch-action:manipulation; }
+  .author-link:hover, .author-link:active{ color:var(--accent); border-color:var(--accent); }
+  /* 彈窗項目（作者主頁 / 停用項） */
+  .author-item, .donate-item{ display:flex; align-items:center; justify-content:center; gap:9px; font-family:var(--font-body); font-weight:700; font-size:15.5px; padding:13px 18px; border-radius:14px; text-decoration:none; cursor:pointer; transition:all .15s ease; touch-action:manipulation; border:1px solid var(--panel-border); background:var(--panel); color:var(--ink); }
+  .author-item:hover, .author-item:active{ border-color:var(--accent); background:var(--accent-soft); }
+  .author-item .ai-ico{ display:inline-flex; align-items:center; }
+  /* 作者卡片的邀約文案：字級略小、行高放寬，手機上會折成 2–3 行 */
+  .author-invite{ font-size:14px; line-height:1.9; color:var(--ink-soft); margin:2px 4px 14px; text-align:center; }
+  .donate-item.disabled{ color:var(--ink-soft); background:var(--panel); border-style:dashed; opacity:0.6; cursor:not-allowed; }
+  /* 街口支付 QR 卡（整張可點） */
+  .jkopay-card{ display:block; text-decoration:none; border:1px solid var(--panel-border); border-radius:16px; overflow:hidden; background:#fff; cursor:pointer; transition:all .15s ease; }
+  .jkopay-card:hover, .jkopay-card:active{ border-color:var(--accent); box-shadow:0 6px 18px rgba(51,65,92,0.14); transform:translateY(-1px); }
+  .jkopay-card img{ display:block; width:100%; max-width:270px; margin:14px auto 6px; }
+  .jkopay-label{ display:block; font-family:var(--font-body); font-weight:700; font-size:15px; color:var(--panel); background:var(--accent); padding:11px; text-align:center; }
+  /* 可複製街口帳號 */
+  .jkopay-acct{ display:flex; align-items:center; justify-content:center; gap:8px; font-size:14px; color:var(--ink-soft); margin:10px 0 2px; }
+  .jkopay-acct b{ color:var(--ink); font-family:var(--font-mono); letter-spacing:0.03em; }
+  .copy-btn{ font-family:var(--font-body); font-size:13px; font-weight:700; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:999px; padding:3px 12px; cursor:pointer; touch-action:manipulation; }
+  .copy-btn:hover, .copy-btn:active{ background:var(--accent); color:var(--panel); }
+  /* 付款說明、表單連結 */
+  .pay-note{ font-size:14px; color:var(--ink); line-height:1.8; margin:10px 2px 6px; text-align:center; }
+  .pay-note b{ color:var(--ink); }
+  .perk-hl{ color: var(--wrong); }
+  /* 可點的聯繫句：紅字＋底線，比一顆按鈕省空間，而且句子本身就說明了用途 */
+  .line-inline{ color: var(--wrong); text-decoration:underline;
+        text-underline-offset:3px; font-weight:600; white-space:nowrap; }
+  .form-link{ display:block; font-size:14px; font-weight:700; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:12px; padding:11px 12px; text-align:center; text-decoration:none; margin-top:4px; }
+  .form-link:hover, .form-link:active{ background:var(--accent); color:var(--panel); }
+  /* 銀行轉帳 */
+  .bank-row{ display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:12px 14px; font-size:15.5px; }
+  .bank-row .bk{ font-size:13px; color:var(--ink-soft); flex-shrink:0; width:34px; text-align:left; }
+  .bank-row b{ flex:1; font-family:var(--font-mono); letter-spacing:0.02em; text-align:left; }
+  /* 贊助者名單 */
+  .sponsor-list{ position: relative; display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; padding:14px 10px 40px; border:1px dashed var(--panel-border); border-radius:12px; }
+  /* 固定行高與高度：避免中英文因字型行高不同而上下錯位 */
+  .sponsor-list span{ display:inline-flex; align-items:center; justify-content:center; min-height:34px; line-height:1; font-size:15px; font-weight:600; color:var(--ink); background:var(--panel); border:1px solid var(--panel-border); border-radius:999px; padding:0 14px; }
+  /* 金色樂友：金色漸層文字＋一道反光由左掃到右，每 2 秒一次。
+     ⚠ 選擇器必須寫成 .sponsor-list span.sponsor-gold —— 名牌的 .sponsor-list span
+     規則帶有 background:var(--panel)，若只寫 .sponsor-gold 會被它蓋掉漸層，
+     而文字又是 transparent，結果就是整個名字消失（但仍框選得到）。
+     系統開啟「減少動態效果」時只保留靜態金色，不做動畫。 */
+  .sponsor-list span.sponsor-gold{
+    font-weight: 800;
+    color: #b8860b;
+    border-color: #e6c757;
+    background: linear-gradient(100deg,
+      #b8860b 0%, #d4af37 32%, #fff3b0 46%, #ffffff 50%, #fff3b0 54%, #d4af37 68%, #b8860b 100%);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: sponsorShine 2s ease-in-out infinite;
+  }
+  @keyframes sponsorShine{
+    0%, 55% { background-position: 130% 0; }
+    100%    { background-position: -30% 0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .sponsor-list span.sponsor-gold{ animation: none; background-position: 50% 0; }
+  }
+  /* 一般贊助者與金色樂友之間的換行元素：在 flex 容器裡佔滿整列，後面的名牌就會換到下一行。
+     不畫線，只留一點間距做區隔。 */
+  .sponsor-sep{ flex:0 0 100%; height:0; margin:5px 0 0; }
+  /* 名單框右下角的說明按鈕（金色小圓框） */
+  .sponsor-info-btn{
+    position: absolute; right: 6px; bottom: 6px;
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 1px solid #d4af37; background: #fffdf5; color: #b8860b;
+    font-family: var(--font-display); font-size: 14px; font-weight: 600; font-style: italic;
+    line-height: 1; padding: 0; cursor: pointer; touch-action: manipulation;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sponsor-info-btn:hover, .sponsor-info-btn:active{ background:#d4af37; color:#fff; }
+  @media (max-width:480px){ .cover-title{ font-size:34px; } .cover-clef{ font-size:76px; } .cover-msg{ font-size:15px; padding:18px 18px; } }

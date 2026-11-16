@@ -2,7 +2,19 @@
 <html lang="zh-Hant-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+/* v108.1：照伍線譜掃描 1.33／1.34 的做法。iPhone：畫面延伸到狀態列底下，頁首自己往下留狀態列高度（--st），
+   避開 iOS 26／27 主畫面 App 在狀態列下方蓋的霧化（作者 iOS 27 實測：最上面那列被霧化、點不到）。
+   iPad：拿掉 viewport-fit=cover，上方再多留 24 點（iPadOS 會延伸到狀態列下並霧化標題列） */
+(function () {
+  if (/iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    var m = document.querySelector('meta[name=viewport]');
+    if (m) m.setAttribute('content', m.getAttribute('content').replace(/,\s*viewport-fit=cover/, ''));
+    document.documentElement.classList.add('ipad');
+  }
+})();
+</script>
 <meta name="robots" content="noindex">
 <title>音聽出考卷</title>
 <!-- v108：加入主畫面（手機、平板、電腦 Chrome 安裝）。不設 apple-mobile-web-app-status-bar-style、不用 viewport-fit=cover
@@ -13,7 +25,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="音聽出考卷">
-<meta name="theme-color" content="#33415c">
+<meta name="theme-color" content="#fbfaf6">
 <meta name="description" content="一鍵產生聽寫考卷：作答卷、解答與音檔。音樂聽力練習 贊助者專屬工具。">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="音樂聽力練習">
@@ -28,6 +40,9 @@
 <script src="../tutti-1101/vexflow-min.js"></script>
 <script src="engrave.js"></script>
 <script src="pdf-export.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Sans+TC:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="cover.css">
 <style>
   :root{
     --paper:#efeee6; --panel:#fbfaf6; --panel-border:#ddd8c9; --hairline:#e2ddce;
@@ -37,6 +52,11 @@
   }
   *{ box-sizing:border-box; }
   html,body{ margin:0; height:100%; background:var(--paper); color:var(--ink); font-family:var(--font); }
+  /* v108.1：狀態列高度（主畫面 App 才有值；電腦、Safari 分頁是 0）。iPad 多留 24 點（同伍線譜掃描 1.34） */
+  :root{ --st:env(safe-area-inset-top, 0px); --sb:env(safe-area-inset-bottom, 0px); }
+  html.ipad{ --st:calc(env(safe-area-inset-top, 0px) + 24px); }
+  /* iOS 26 主畫面 App：網頁比畫面矮時底部會少畫一段（WebKit 301108），讓網頁本身高一點（同伍線譜掃描） */
+  @media (display-mode: standalone){ html{ min-height:min(100lvh, calc(100% + env(safe-area-inset-top))); } }
   /* v108：工具列折成兩行時下面不會被擠出畫面（原本用 100vh - 58px） */
   body{ display:flex; flex-direction:column; touch-action:manipulation; }
   button{ font-family:inherit; cursor:pointer; }
@@ -55,7 +75,7 @@
   .cb-h{ font-size:14px; font-weight:600; color:var(--ink-soft); margin-bottom:10px; display:flex; align-items:center; gap:8px; }
 
   /* ---- 頁首（v108） ---- */
-  .hdr{ display:flex; align-items:center; gap:14px; padding:10px 18px; background:var(--panel); border-bottom:1px solid var(--panel-border); flex:none; }
+  .hdr{ display:flex; align-items:center; gap:14px; padding:calc(var(--st) + 10px) 18px 10px; background:var(--panel); border-bottom:1px solid var(--panel-border); flex:none; }
   .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px; white-space:nowrap; }
   .brand img{ width:32px; height:32px; border-radius:8px; }
   .hdr #viewSeg{ margin-left:14px; }
@@ -190,7 +210,7 @@
   body.m{ height:100dvh; overflow:hidden; }
   body.m .d-only{ display:none !important; }
   body.m .m-only{ display:inline-block; }
-  body.m .hdr{ gap:8px; padding:8px 12px; }
+  body.m .hdr{ gap:8px; padding:calc(var(--st) + 8px) 12px 8px; }
   body.m .brand{ font-size:16px; gap:8px; flex:1; }
   body.m .brand img{ width:26px; height:26px; border-radius:6px; }
   body.m .hdr .spacer{ display:none; }
@@ -199,7 +219,7 @@
   /* 設定與匯出：整頁（不疊在別的畫面上） */
   body.m #mSet{ position:fixed; inset:0; z-index:40; background:var(--paper); flex-direction:column; }
   body.m[data-mtab=set] #mSet{ display:flex; }
-  body.m .mset-h{ display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--panel); border-bottom:1px solid var(--panel-border); font-size:16px; }
+  body.m .mset-h{ display:flex; align-items:center; gap:12px; padding:calc(var(--st) + 8px) 12px 8px; background:var(--panel); border-bottom:1px solid var(--panel-border); font-size:16px; }
   body.m .mset-body{ flex:1; overflow:auto; padding:14px 16px calc(24px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:12px; }
   body.m .mset-body > .card-box{ padding:14px 16px; }
   body.m .mset-btns{ display:flex; flex-direction:column; gap:10px; }
@@ -235,11 +255,13 @@
   body.m .pv{ padding:0 0 40px; touch-action:pan-x pan-y; -webkit-overflow-scrolling:touch; }
   body.m #mPvBar{ display:flex; gap:8px; align-items:center; padding:8px 10px; position:sticky; top:0; left:0; z-index:5; background:var(--paper); }
   body.m #mPvBar .seg button{ padding:8px 14px; font-size:14px; }
-  body.m .pv-hint{ display:none; }
+  body.m .pv-hint{ font-size:12px; margin:0 12px 8px; text-align:left; }
   body.m .pages{ align-items:flex-start; padding:0 8px; gap:10px; }
-  body.m .barhit{ display:none; }
-  body.m .mask .card{ width:100vw; max-width:none; height:100dvh; max-height:none; border-radius:0; padding:14px 14px calc(14px + env(safe-area-inset-bottom)); }
-  body.m .mask .card.small{ height:auto; border-radius:16px; width:min(420px, 92vw); }
+  /* v108.1 手機：小節線的點擊範圍加寬（約一個手指寬）並一直顯示虛線框；已經換行的位置顏色較深 */
+  body.m .barhit{ width:var(--bhw, 30px); margin-left:calc(var(--bhw, 30px) / -2 + 6px); background:rgba(51,65,92,.10); border:1.5px dashed rgba(51,65,92,.55); border-radius:6px; }   /* --bhw：依縮放倍率調整，手指點得到約 34px 寬 */
+  body.m .barhit.at-break{ background:rgba(166,73,59,.14); border-color:rgba(166,73,59,.7); }
+  body.m .mask .card{ width:100vw; max-width:none; height:100dvh; max-height:none; border-radius:0; padding:calc(var(--st) + 14px) 14px calc(14px + var(--sb)); }
+  body.m .mask .card.small{ height:auto; border-radius:16px; width:min(420px, 92vw); padding:16px 18px; }
   body.m .card .pv-box{ padding:6px; }
   body.m .card .row .tb-btn{ padding:11px 14px; font-size:15px; }
   body.m .it.dragging{ opacity:.55; box-shadow:0 6px 18px rgba(0,0,0,.18); }
@@ -257,6 +279,31 @@
 </style>
 </head>
 <body>
+<!-- v108.1：封面（和 App 的封面相同，每次打開都先看到；高音譜號換成「音樂聽力出考卷」的圖示） -->
+<div id="coverPage" class="cover-page">
+  <div class="cover">
+    <div class="cover-notes" aria-hidden="true">
+      <span class="cover-note" style="top:8%; left:9%; font-size:72px;">♪</span>
+      <span class="cover-note" style="top:18%; right:11%; font-size:56px;">♫</span>
+      <span class="cover-note" style="top:52%; left:6%; font-size:48px;">♩</span>
+      <span class="cover-note" style="bottom:14%; left:16%; font-size:64px;">𝄞</span>
+      <span class="cover-note" style="bottom:9%; right:14%; font-size:50px;">♬</span>
+      <span class="cover-note" style="top:40%; right:8%; font-size:40px;">♪</span>
+    </div>
+    <div class="cover-card">
+      <div class="scan-bubble-wrap"><a class="scan-bubble" href="https://andywu1101.github.io/scanner/" target="_blank" rel="noopener"><span class="sb-new">全新登場!!</span><span class="sb-name"><span class="sb-cam">📷 </span>伍線譜樂譜掃描</span><span class="sb-go">點我看看 ▸</span></a></div>
+      <img class="cover-logo" src="icon-512.png" alt="">
+      <h1 class="cover-title">音樂聽力出考卷</h1>
+      <div class="cover-sub">Exam Paper Maker</div>
+      <p class="cover-msg">感謝您的贊助與支持！<br>歡迎使用「音樂聽力出考卷」，<br>一鍵產生作答卷、解答與音檔，<br>讓備課與出題更輕鬆。</p>
+      <button class="cover-start" onclick="startMaker()">開始出題 →</button>
+      <div class="cover-foot">為音樂班、音樂系的學生與老師而做 🎵</div>
+      <div class="cover-author"><button type="button" class="author-link" onclick="showAuthor()">作者：伍祐恆 Heng-Heng Wu ▸</button></div>
+      <div class="cover-donate-wrap"><button class="donate-btn" onclick="showDonate()">❤ 小額贊助</button></div>
+      <div class="cover-intro-wrap"><a class="intro-btn" href="https://youtu.be/fF4-J2NGAnw" target="_blank" rel="noopener">▶ 網站介紹與說明</a></div>
+    </div>
+  </div>
+</div>
 <!-- v108：頁首（電腦、手機共用；手機只留圖示、名稱、套用模板、⋯） -->
 <div class="hdr" id="hdr">
   <span class="brand"><img src="icon-192.png" alt="">音聽出考卷</span>
@@ -328,7 +375,7 @@
 <div class="pv" id="pvView">
   <div id="mPvBar"><span class="seg" id="mPvSeg"><button data-v="blank">作答卷</button><button data-v="key">解答</button></span>
     <span class="spacer"></span><button class="tb-btn" id="btnPdfM">📄 匯出 PDF</button></div>
-  <div class="pv-hint">單旋律、節奏：點小節線可以「從這裡換行」，點行尾的小節線可以「併回上一行」。紅字表示上一頁放不下而自動換頁。</div>
+  <div class="pv-hint">節奏、單旋律、兩聲部、找錯音：點小節線（手機上是虛線框）可以「從這裡換行」，點行尾的（紅色框）可以「併回上一行」。紅字表示上一頁放不下而自動換頁。</div>
   <div class="pages" id="pvPages"></div>
 </div>
 
@@ -393,8 +440,87 @@
 <!-- 手機版底部分頁 -->
 <div id="mNav"><button data-t="make" class="on">出題</button><button data-t="list" id="mNavList">列表</button><button data-t="pv">預覽</button></div>
 
+<!-- ===== 從 App 的 index.html 複製的彈窗（v108.1）：贊助、作者主頁、金色樂友。App 改了要一起更新；贊助者名單由程式從 App 讀取 ===== -->
+<div class="donate-modal" id="donateModal" onclick="if(event.target===this) closeDonate()">
+  <div class="donate-box">
+    <div class="dico">❤</div>
+    <h3>支持這個工具</h3>
+    <div id="donateIntro">
+      <p>這個工具永久免費，你的支持會用於後續開發與維護，感謝你 🙏</p>
+      <p>贊助者會列入名單，並可獲得專屬版本，<span class="perk-hl">將題目導出為音檔與譜例圖檔，方便備課與出題</span>。<a class="line-inline" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener">請透過 LINE 與我聯繫 ▸</a></p>
+    </div>
+    <!-- 管道清單（日後要加新管道，在這裡多一顆按鈕即可） -->
+    <div class="donate-links" id="donateChannels">
+      <a class="author-item" href="https://portaly.cc/heng-heng.music/support" target="_blank" rel="noopener"><span class="ai-ico">❤</span> Portaly 小額贊助</a>
+      <button type="button" class="author-item" onclick="showPanel('Jko')"><span class="ai-ico">📱</span> 街口支付贊助</button>
+      <button type="button" class="author-item" onclick="showPanel('Bank')"><span class="ai-ico">🏦</span> 銀行轉帳贊助</button>
+      <button type="button" class="author-item" id="sponsorEntryBtn" style="display:none;" onclick="showPanel('Sponsors')"><span class="ai-ico">💛</span> 贊助者名單</button>
+    </div>
+
+    <!-- 街口支付明細（點上面按鈕才展開） -->
+    <div class="donate-links" id="donateJko" style="display:none;">
+      <a class="jkopay-card" href="https://service.jkopay.com/r/transfer?j=Transfer:902103863" target="_blank" rel="noopener">
+        <img src="../jkopay-qr.png" alt="街口支付 QR 碼，Heng-Heng Music，帳號 902103863">
+        <span class="jkopay-label">開啟街口支付</span>
+      </a>
+      <div class="jkopay-acct">街口帳號 <b>902103863</b><button class="copy-btn" type="button" onclick="copyText(event,'902103863')">複製</button></div>
+      <p class="pay-note">此 QR 為 <b>TWQR 共通碼</b>，可用街口支付，或<b>任一家銀行的網銀 App</b> 掃描付款。</p>
+      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">請填寫贊助者表單，讓我將您放上贊助者名單 ❤</a>
+      <a class="author-item" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#06C755" d="M12 2.6c-5.5 0-10 3.6-10 8.1 0 3.9 3.6 7.2 8.4 7.9.33.07.78.22.89.5.1.26.07.66.03.92 0 0-.12.72-.14.87-.05.26-.21 1 .88.55 1.1-.46 5.9-3.48 8.05-5.96 1.48-1.63 2.19-3.28 2.19-5.11 0-4.5-4.5-8.1-10-8.1z"/></svg></span> 祐恆的 LINE</a>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+
+    <!-- 銀行轉帳明細 -->
+    <div class="donate-links" id="donateBank" style="display:none;">
+      <div class="bank-row"><span class="bk">銀行</span><b>中國信託 (822)</b><button class="copy-btn" type="button" onclick="copyText(event,'822')">複製代號</button></div>
+      <div class="bank-row"><span class="bk">帳號</span><b>163540424795</b><button class="copy-btn" type="button" onclick="copyText(event,'163540424795')">複製</button></div>
+      <div class="bank-row"><span class="bk">戶名</span><b>伍○恆</b></div>
+      <p class="pay-note">轉帳僅需銀行代號與帳號；戶名供核對用。</p>
+      <a class="form-link" href="https://forms.gle/72e7fguVdx6RT3RZ9" target="_blank" rel="noopener">請填寫贊助者表單，讓我將您放上贊助者名單 ❤</a>
+      <a class="author-item" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#06C755" d="M12 2.6c-5.5 0-10 3.6-10 8.1 0 3.9 3.6 7.2 8.4 7.9.33.07.78.22.89.5.1.26.07.66.03.92 0 0-.12.72-.14.87-.05.26-.21 1 .88.55 1.1-.46 5.9-3.48 8.05-5.96 1.48-1.63 2.19-3.28 2.19-5.11 0-4.5-4.5-8.1-10-8.1z"/></svg></span> 祐恆的 LINE</a>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+
+    <!-- 贊助者名單（名單有人時才會出現入口） -->
+    <div class="donate-links" id="donateSponsors" style="display:none;">
+      <div id="sponsorList" class="sponsor-list">
+        <button type="button" class="sponsor-info-btn" aria-label="金色樂友說明" onclick="showGoldInfo()">i</button>
+      </div>
+      <p class="pay-note">每一位同意公開的贊助者，都會列在贊助者名單中，感謝你的支持 🙏<br><a class="line-inline" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener">專屬版本請記得透過 LINE 與我聯繫索取 ▸</a></p>
+      <button type="button" class="author-item" onclick="showPanel('')">← 返回贊助管道</button>
+    </div>
+    <button type="button" class="author-item" style="width:100%; margin-bottom:12px;" onclick="closeDonate(); showAuthor();"><span class="ai-ico">🔗</span> 作者主頁</button>
+    <button class="donate-dismiss" onclick="closeDonate()">關閉</button>
+  </div>
+</div>
+<div class="donate-modal" id="goldInfoModal" onclick="if(event.target===this) closeGoldInfo()">
+  <div class="donate-box">
+    <div class="dico">✨</div>
+    <h3>金色樂友</h3>
+    <p>累積贊助滿 5,000 元的朋友，名字會以金色顯示。</p>
+    <p>這個 App 完全免費、沒有廣告，能持續維護與增加新的練習項目，靠的是各位的支持。</p>
+    <p>無論金額多少，每一份贊助我都由衷感謝 🙏</p>
+    <button class="donate-dismiss" onclick="closeGoldInfo()">關閉</button>
+  </div>
+</div>
+<div class="donate-modal" id="authorModal" onclick="if(event.target===this) closeAuthor()">
+  <div class="donate-box">
+    <div class="dico">🎼</div>
+    <h3>作者主頁</h3>
+    <p>伍祐恆 Heng-Heng Wu</p>
+    <p class="author-invite">如果想精進鋼琴演奏、樂理、視唱、聽寫能力，歡迎來找我上課，可以加 LINE 私訊喔！</p>
+    <div class="donate-links">
+      <a class="author-item" href="https://line.me/ti/p/LF15Mk2vef" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#06C755" d="M12 2.6c-5.5 0-10 3.6-10 8.1 0 3.9 3.6 7.2 8.4 7.9.33.07.78.22.89.5.1.26.07.66.03.92 0 0-.12.72-.14.87-.05.26-.21 1 .88.55 1.1-.46 5.9-3.48 8.05-5.96 1.48-1.63 2.19-3.28 2.19-5.11 0-4.5-4.5-8.1-10-8.1z"/></svg></span> 祐恆的 LINE</a>
+      <a class="author-item" href="https://portaly.cc/heng-heng.music" target="_blank" rel="noopener"><span class="ai-ico">🔗</span> Portaly 主頁</a>
+      <a class="author-item" href="https://www.youtube.com/@HengHengWu" target="_blank" rel="noopener"><span class="ai-ico"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#FF0000" d="M23 7.6a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.5A3 3 0 0 0 1 7.6 31.3 31.3 0 0 0 .5 12 31.3 31.3 0 0 0 1 16.4a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.5a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 23.5 12 31.3 31.3 0 0 0 23 7.6z"/><path fill="#fff" d="M9.75 15.5l6-3.5-6-3.5z"/></svg></span> YouTube 頻道</a>
+    </div>
+    <button class="donate-dismiss" onclick="closeAuthor()">關閉</button>
+  </div>
+</div>
+
 <div id="printArea"></div>
 
+<script src="cover.js"></script>
 <script src="maker.js"></script>
 </body>
 </html>

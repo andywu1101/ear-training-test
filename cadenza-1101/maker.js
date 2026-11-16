@@ -873,7 +873,9 @@
   function applyPvZoom() {
     if (!isM()) { $('pvPages').style.zoom = ''; return; }
     var fit = Math.max(0.2, ($('pvView').clientWidth - 16) / PAGE_PX);
-    $('pvPages').style.zoom = (fit * pvZoom).toFixed(4);
+    var eff = fit * pvZoom;
+    $('pvPages').style.zoom = eff.toFixed(4);
+    $('pvPages').style.setProperty('--bhw', Math.max(16, Math.min(60, 34 / eff)).toFixed(1) + 'px');   // 小節線的點擊框在螢幕上約 34px 寬
   }
   (function () {
     var pv = $('pvView'), pinch = null;
