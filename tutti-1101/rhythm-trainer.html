@@ -2245,6 +2245,14 @@ function showPage(pageId) {
     answers: function(){ return []; },
     events: function(data){ return buildExportEvents(data.seq, data, data.tie); }
   };
+  if(MAKER_MODE) window.__maker.fromExam = function(cfg){   /* v106.8 套用模板：照本頁模擬考（examBootstrap）的出題設定，換成出題模式的快照 */
+    const n = parseInt(cfg.meter.split('/')[0], 10), bpb = cfg.meterType === 'compound' ? n / 3 : n;
+    const order = cfg.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER;
+    const snap = { pitchMode: cfg.pitchMode || 'single', meter: cfg.meter, meterType: cfg.meterType, barsCount: cfg.bars, beatsPerBar: bpb,
+                   totalBeats: cfg.bars * bpb, bpm: cfg.bpm || 80, tieEnabled: !!cfg.tie, tieMin: cfg.tieMin || 1, tieMax: cfg.tieMax || 2,
+                   patterns: order.filter(id => !isTwoBeat(id)) };
+    return { snapshot: snap, title: makerTitle(snap) };
+  };
   function makerSetup(){
     document.body.classList.add('maker-mode');
     const st = document.createElement('style');

@@ -16,13 +16,14 @@
     { id: 'pitchstack', label: '音堆', page: 'pitch-stack-trainer.html', on: true },
     { id: 'fourpart', label: '四部和聲', page: 'four-part-trainer.html', on: true }
   ];
-  /* 大題：順序固定 */
+  /* 大題：順序固定（v106.8 起比照大學檔模擬考的順序與名稱） */
   var SECTIONS = [
-    { id: 'interval', name: '音程聽寫' }, { id: 'chord', name: '和絃辨認' },
-    { id: 'rhythm', name: '節奏聽寫' }, { id: 'memRhythm', name: '記憶節奏' },
-    { id: 'melody', name: '單旋律聽寫' }, { id: 'memMelody', name: '記憶旋律' },
-    { id: 'twopart', name: '兩聲部聽寫' }, { id: 'memTwopart', name: '記憶兩聲部' },
-    { id: 'pitcherr', name: '音高辨認' }, { id: 'pitchstack', name: '音堆聽寫' }, { id: 'fourpart', name: '四部和聲' }
+    { id: 'pitcherr', name: '音高的辨認' },
+    { id: 'interval', name: '音程' }, { id: 'chord', name: '和絃性質判斷' },
+    { id: 'rhythm', name: '節奏' }, { id: 'memRhythm', name: '記憶節奏' },
+    { id: 'melody', name: '單旋律' }, { id: 'memMelody', name: '記憶旋律' },
+    { id: 'twopart', name: '兩聲部' }, { id: 'memTwopart', name: '記憶兩聲部' },
+    { id: 'pitchstack', name: '音堆辨認' }, { id: 'fourpart', name: '四部和聲' }
   ];
   var CN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
@@ -38,6 +39,7 @@
     p.header = p.header || { title: '', author: '伍祐恆', date: today() };
     p.density = p.density || 'dense';
     p.sectionNames = p.sectionNames || {};
+    p.sectionScores = p.sectionScores || {};
     p.items = p.items || [];
     return p;
   }
@@ -46,6 +48,23 @@
     try { localStorage.setItem(STORE, JSON.stringify(slim)); } catch (e) {}
   }
   function secName(id) { return paper.sectionNames[id] || SECTIONS.filter(function (s) { return s.id === id; })[0].name; }
+  /* ---------- 配分 ---------- */
+  function fmtScore(v) { return String(Math.round(v * 100) / 100); }
+  function scoreText(v) { return (v == null || v === '') ? '' : '（' + fmtScore(v) + '分）'; }
+  function parseScore(t) { t = String(t).trim(); if (t === '') return null; var v = parseFloat(t); return (isFinite(v) && v >= 0) ? v : null; }
+  /* 大題的分數：大題有填就用大題的；沒填就用小題的加總（都沒填＝null） */
+  function itemSum(secId) {
+    var its = paper.items.filter(function (it) { return it.section === secId && it.score != null; });
+    return its.length ? its.reduce(function (a, it) { return a + it.score; }, 0) : null;
+  }
+  function secTotal(secId) { var v = paper.sectionScores[secId]; return v != null ? v : itemSum(secId); }
+  function paperTotal() {
+    var t = null;
+    ordered().forEach(function (g) { var v = secTotal(g.sec); if (v != null) t = (t || 0) + v; });
+    return t;
+  }
+  window.__makerScoreText = scoreText;   // engrave.js 印小題配分用
+
   function sectionOf(type, data) {
     if (type === 'rhythm') return data.barsCount === 1 ? 'memRhythm' : 'rhythm';
     if (type === 'melody') return data.barsCount === 1 ? 'memMelody' : 'melody';
@@ -127,11 +146,13 @@
   };
   function buildCandidate(w, type, data, snapshot, title) {
     var xml = w.__maker.musicxml(data);
-    return { id: uid(), type: type, section: sectionOf(type, data), title: title, data: data, snapshot: snapshot,
+    return { id: uid(), type: type, section: sectionOf(type, data), title: title, autoTitle: title, data: data, snapshot: snapshot,
              xml: xml, answers: w.__maker.answers(data), layout: (type === 'interval' || type === 'chord') ? 'cells' : (type === 'fourpart' ? 'grand' : (type === 'pitchstack' ? 'stack' : 'lines')),
              blankNotes: type === 'pitcherr',   // 找錯音：作答卷要印題目譜
              pageBreak: false, breaks: null };
   }
+  /* 新題目的自動標題：依題目內容決定標題的題型（四部和聲、找錯音）用頁面給的；其他題型由設定決定，與原本相同 */
+  function autoTitleOf(w, data, it) { return (w.__maker.titleOf ? w.__maker.titleOf(data) : null) || it.autoTitle || it.title; }
   function addItem(c) { paper.items.push(c); save(); renderList(); }
 
   /* ---------- 預覽卡片 ---------- */
@@ -166,10 +187,13 @@
     if (card.replaceId) {
       var old = paper.items.filter(function (x) { return x.id === card.replaceId; })[0];
       if (old) {
-        c.id = old.id; c.title = old.title; c.pageBreak = old.pageBreak;
+        /* 標題：作者改過的保留；沒改過的換成新題目的標題（四部和聲的調號、找錯音的拍號等會跟著變） */
+        c.id = old.id; c.pageBreak = old.pageBreak;
+        if (old.autoTitle != null && old.title !== old.autoTitle) c.title = old.title;
         c.section = old.section;
         c.breaks = (old.breaks && old.data.barsCount === c.data.barsCount) ? old.breaks : null;
         c.perLine = old.perLine || null;
+        c.score = old.score != null ? old.score : null;
         if (old.data.bpm && c.data.bpm) c.data.bpm = old.data.bpm;   // 作者改過的 mp3 速度保留
         paper.items[paper.items.indexOf(old)] = c;
       }
@@ -182,7 +206,7 @@
     try {
       var w = await waitFrame(c.type);
       var data = w.__maker.regen(c.snapshot);
-      var n = buildCandidate(w, c.type, data, c.snapshot, c.title);
+      var n = buildCandidate(w, c.type, data, c.snapshot, autoTitleOf(w, data, c));
       card.cand = n; drawCardScore(); resetCardAudio();
     } catch (e) { $('cardMsg').textContent = '重抽失敗：' + e.message; $('cardMsg').className = 'msg err'; }
   };
@@ -231,6 +255,7 @@
   function renderList() {
     var box = $('list'); box.innerHTML = '';
     var groups = ordered();
+    var tot = paperTotal(); $('totalScore').textContent = tot == null ? '' : '總分：' + fmtScore(tot) + ' 分';
     if (!groups.length) {
       box.innerHTML = '<div class="empty">左邊選擇題型、設定好之後按「➕ 出題」，題目就會依類型自動放進大題。<br>大題名稱、小題標題都可以直接點來修改；拖曳 ≡ 可以在同一個大題裡調整順序。</div>';
       return;
@@ -241,7 +266,20 @@
       hn.innerHTML = '<span>' + CN[gi] + '、</span>';
       var inp = document.createElement('input'); inp.value = secName(g.sec);
       inp.onchange = function () { paper.sectionNames[g.sec] = inp.value.trim() || SECTIONS.filter(function (s) { return s.id === g.sec; })[0].name; save(); renderList(); };
-      hn.appendChild(inp); sec.appendChild(hn);
+      hn.appendChild(inp);
+      var sc = document.createElement('label'); sc.className = 'sc-in'; sc.title = '大題配分（空白＝不印）';
+      sc.innerHTML = '<span>配分</span>';
+      var si = document.createElement('input'); si.type = 'text'; si.inputMode = 'decimal';
+      si.value = paper.sectionScores[g.sec] != null ? fmtScore(paper.sectionScores[g.sec]) : '';
+      si.onchange = function () { var v = parseScore(si.value); if (v == null) delete paper.sectionScores[g.sec]; else paper.sectionScores[g.sec] = v; save(); renderList(); };
+      sc.appendChild(si); sc.appendChild(document.createTextNode('分')); hn.appendChild(sc);
+      sec.appendChild(hn);
+      var ss = paper.sectionScores[g.sec], is = itemSum(g.sec);
+      if (ss != null && is != null && Math.abs(ss - is) > 1e-9) {
+        var wn = document.createElement('div'); wn.className = 'sc-warn';
+        wn.textContent = '⚠ 小題配分合計 ' + fmtScore(is) + ' 分，與大題配分 ' + fmtScore(ss) + ' 分不同';
+        sec.appendChild(wn);
+      }
       g.items.forEach(function (o) {
         var it = o.it, row = document.createElement('div'); row.className = 'it'; row.draggable = false;
         row.dataset.id = it.id; row.dataset.sec = it.section;
@@ -274,6 +312,11 @@
           bi.onchange = function () { var v = Math.max(40, Math.min(160, parseInt(bi.value, 10) || it.data.bpm)); bi.value = v; it.data.bpm = v; save(); };
           sp.appendChild(bi); extra.push(sp);
         }
+        /* 小題配分：空白＝不印 */
+        var isc = document.createElement('label'); isc.className = 'it-sc'; isc.title = '小題配分（空白＝不印）';
+        var ii = document.createElement('input'); ii.type = 'text'; ii.inputMode = 'decimal'; ii.value = it.score != null ? fmtScore(it.score) : '';
+        ii.onchange = function () { it.score = parseScore(ii.value); save(); renderList(); };
+        isc.appendChild(ii); isc.appendChild(document.createTextNode('分')); extra.push(isc);
         [grip, num, ti, info].concat(extra, [rg, pb, del]).forEach(function (x) { row.appendChild(x); });
         grip.onmousedown = function () { row.draggable = true; };
         row.ondragstart = function (e) { dragId = it.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
@@ -305,7 +348,7 @@
     try {
       var w = await waitFrame(it.type);
       var data = w.__maker.regen(it.snapshot);
-      var c = buildCandidate(w, it.type, data, it.snapshot, it.title);
+      var c = buildCandidate(w, it.type, data, it.snapshot, autoTitleOf(w, data, it));
       busy(null); openCard(c, it.id);
     } catch (e) { busy(null); alert('重抽失敗：' + e.message); }
   }
@@ -333,7 +376,7 @@
     blocks.push({ el: head });
     ordered().forEach(function (g, gi) {
       var st = document.createElement('div'); st.className = 'sec-title';
-      st.style.fontSize = d.sec + 'px'; st.textContent = CN[gi] + '、' + secName(g.sec);
+      st.style.fontSize = d.sec + 'px'; st.textContent = CN[gi] + '、' + secName(g.sec) + scoreText(paper.sectionScores[g.sec]);
       st.style.marginTop = (gi ? d.secGap : 0) + 'px'; st.style.marginBottom = '2px';
       blocks.push({ el: st, keepNext: true, sec: true });
       var playable = interactive && mode === 'key';   // 預覽解答：每題標題後面有播放鈕（列印不會出現）
@@ -513,6 +556,141 @@
     } catch (e) { busy(null); alert('mp3 產生失敗：' + e.message); }
   };
 
+  /* ---------- 模板（v106.8）----------
+     內建：大學檔、高中檔，直接讀 App 的 exam-common.js（EXAM.PRESETS），每次套用重新隨機（拍號、譜號…）；
+     自訂：存每一題的設定快照、標題、配分、換行、換頁、速度，以及大題名稱與配分；套用時重新出題。 */
+  var TPL_STORE = 'earTrainer.maker.templates';
+  var BUILTIN = [{ id: 'standard', name: '大學檔' }, { id: 'highschool', name: '高中檔' }];
+  var EXAM_TYPE = { pitcherr1: 'pitcherr', pitcherr2: 'pitcherr', interval: 'interval', chord: 'chord',
+                    rhythm1: 'rhythm', rhythm2: 'rhythm', rhythm3: 'rhythm', melody1: 'melody', melody2: 'melody',
+                    twopart: 'twopart', fourpart: 'fourpart' };
+  function loadTpls() { try { return JSON.parse(localStorage.getItem(TPL_STORE) || '[]'); } catch (e) { return []; } }
+  function saveTpls(a) { try { localStorage.setItem(TPL_STORE, JSON.stringify(a)); return true; } catch (e) { alert('模板儲存失敗：' + e.message); return false; } }
+
+  function renderTplMenu() {
+    var m = $('tplMenu'); m.innerHTML = '';
+    function row(label, tag, onPick, onDel) {
+      var r = document.createElement('div'); r.className = 'tpl-row';
+      var b = document.createElement('button'); b.className = 'tpl-pick';
+      if (tag) { var t = document.createElement('span'); t.className = 'tpl-tag'; t.textContent = tag; b.appendChild(t); }
+      b.appendChild(document.createTextNode(label)); b.onclick = function () { closeTplMenu(); onPick(); };
+      r.appendChild(b);
+      if (onDel) { var d = document.createElement('button'); d.className = 'tpl-del'; d.textContent = '🗑'; d.title = '刪除這個模板'; d.onclick = function (e) { e.stopPropagation(); closeTplMenu(); onDel(); }; r.appendChild(d); }
+      m.appendChild(r);
+    }
+    BUILTIN.forEach(function (b) { row(b.name, '內建', function () { confirmApply(b.name, function () { applyBuiltin(b.id); }); }); });
+    var list = loadTpls();
+    if (list.length) {
+      m.appendChild(Object.assign(document.createElement('div'), { className: 'tpl-sep' }));
+      list.forEach(function (t) {
+        row(t.name, '', function () { confirmApply(t.name, function () { applyCustom(t); }); },
+            function () { ask('刪除模板「' + t.name + '」？', function () { saveTpls(loadTpls().filter(function (x) { return x.name !== t.name; })); flash('已刪除模板'); }); });
+      });
+    }
+    m.appendChild(Object.assign(document.createElement('div'), { className: 'tpl-sep' }));
+    row('＋ 把目前考卷存成新模板', '', openSaveTpl);
+  }
+  function closeTplMenu() { $('tplMenu').classList.remove('on'); }
+  $('btnTpl').onclick = function (e) {
+    e.stopPropagation();
+    if ($('tplMenu').classList.contains('on')) { closeTplMenu(); return; }
+    renderTplMenu(); $('tplMenu').classList.add('on');
+  };
+  document.addEventListener('click', function (e) { if (!e.target.closest('.tpl-wrap')) closeTplMenu(); });
+
+  function confirmApply(name, fn) {
+    if (!paper.items.length) { fn(); return; }
+    ask('套用「' + name + '」會清空目前考卷的 ' + paper.items.length + ' 題，確定嗎？', fn);
+  }
+  /* 依序出題；全部成功才換掉目前的考卷（中途失敗不會動到原本的題目） */
+  async function runTemplate(name, jobs, secNames, secScores) {
+    stopPlayer();
+    var out = [];
+    try {
+      for (var i = 0; i < jobs.length; i++) {
+        busy('套用「' + name + '」：出題中 ' + (i + 1) + '／' + jobs.length);
+        out.push(await jobs[i]());
+      }
+    } catch (e) { busy(null); alert('套用模板失敗：' + e.message + '\n原本的考卷沒有變動。'); return; }
+    paper.items = out; paper.sectionNames = secNames; paper.sectionScores = secScores;
+    save(); busy(null); setView('edit'); flash('✓ 已套用「' + name + '」，共 ' + out.length + ' 題');
+  }
+  /* 找錯音偶爾會出題失敗（頁面本來就會重抽），這裡最多試 8 次 */
+  function regenTry(w, snap) {
+    var err;
+    for (var k = 0; k < 8; k++) { try { return w.__maker.regen(snap); } catch (e) { err = e; } }
+    throw err;
+  }
+  async function applyBuiltin(id) {
+    busy('準備模板…');
+    var w0;
+    try { w0 = await waitFrame('interval'); } catch (e) { busy(null); alert(e.message); return; }
+    var P = w0.EXAM && w0.EXAM.PRESETS && w0.EXAM.PRESETS[id];
+    if (!P) { busy(null); alert('讀不到 App 的模擬考設定'); return; }
+    var cfg = P.buildConfig();
+    var jobs = P.queue.map(function (key) {
+      return async function () {
+        var type = EXAM_TYPE[key];
+        if (!type) throw new Error('不認得的段落：' + key);
+        var w = await waitFrame(type);
+        var fe = w.__maker.fromExam(cfg[key] || {});
+        var data = regenTry(w, fe.snapshot);
+        var title = fe.title || w.__maker.titleOf(data);
+        return buildCandidate(w, type, data, fe.snapshot, title);
+      };
+    });
+    var name = BUILTIN.filter(function (b) { return b.id === id; })[0].name;
+    runTemplate(name, jobs, {}, {});
+  }
+  async function applyCustom(t) {
+    var jobs = t.items.map(function (s) {
+      return async function () {
+        var w = await waitFrame(s.type);
+        var data = regenTry(w, s.snapshot);
+        if (s.bpm && data.bpm) data.bpm = s.bpm;
+        var auto = (w.__maker.titleOf ? w.__maker.titleOf(data) : null) || s.autoTitle || '';
+        var c = buildCandidate(w, s.type, data, s.snapshot, s.title || auto);
+        c.section = s.section || c.section;
+        c.pageBreak = !!s.pageBreak; c.breaks = s.breaks || null; c.perLine = s.perLine || null;
+        c.score = s.score != null ? s.score : null;
+        return c;
+      };
+    });
+    runTemplate(t.name, jobs, JSON.parse(JSON.stringify(t.sectionNames || {})), JSON.parse(JSON.stringify(t.sectionScores || {})));
+  }
+
+  function openSaveTpl() {
+    if (!paper.items.length) { flash('還沒有題目'); return; }
+    $('nameInput').value = ''; $('nameMask').classList.add('on');
+    setTimeout(function () { $('nameInput').focus(); }, 30);
+  }
+  $('nameNo').onclick = function () { $('nameMask').classList.remove('on'); };
+  $('nameInput').onkeydown = function (e) { if (e.key === 'Enter') $('nameOk').click(); };
+  $('nameOk').onclick = function () {
+    var name = $('nameInput').value.trim();
+    if (!name) { $('nameInput').focus(); return; }
+    if (BUILTIN.some(function (b) { return b.name === name; })) { alert('「' + name + '」是內建模板的名稱，請換一個名稱'); return; }
+    $('nameMask').classList.remove('on');
+    /* 依目前列表的順序存（大題順序固定，大題內照列表） */
+    var items = [];
+    ordered().forEach(function (g) { g.items.forEach(function (o) {
+      var it = o.it;
+      /* 標題沒改過（＝自動標題）就不存死：四部和聲的調、找錯音的拍號等，重新出題後要跟著新題目 */
+      var edited = it.autoTitle != null && it.title !== it.autoTitle;
+      items.push({ type: it.type, section: it.section, snapshot: it.snapshot, title: edited ? it.title : null, autoTitle: it.autoTitle || it.title, pageBreak: !!it.pageBreak,
+                   breaks: it.breaks || null, perLine: it.perLine || null, bpm: it.data.bpm || null, score: it.score != null ? it.score : null });
+    }); });
+    var tpl = { name: name, savedAt: Date.now(), items: items,
+                sectionNames: JSON.parse(JSON.stringify(paper.sectionNames)), sectionScores: JSON.parse(JSON.stringify(paper.sectionScores)) };
+    var list = loadTpls(), idx = -1;
+    list.forEach(function (x, i) { if (x.name === name) idx = i; });
+    function doSave() {
+      if (idx >= 0) list[idx] = tpl; else list.push(tpl);
+      if (saveTpls(list)) flash('✓ 已存成模板「' + name + '」（' + items.length + ' 題）');
+    }
+    if (idx >= 0) ask('已經有「' + name + '」這個模板，要覆蓋嗎？', doSave); else doSave();
+  };
+
   /* ---------- 上方欄位 ---------- */
   function bindHeader() {
     [['hdTitle', 'title'], ['hdAuthor', 'author'], ['hdDate', 'date']].forEach(function (p) {
@@ -529,5 +707,5 @@
 
   bindHeader(); buildTabs(); renderList();
   ensureFrame('rhythm');   // 先載入第二個練習頁，切換時不必等
-  window.__makerApp = { paper: paper, buildPages: buildPages, ordered: ordered, waitFrame: waitFrame, renderList: renderList, setView: setView, save: save };
+  window.__makerApp = { get paper() { return paper; }, loadTpls: loadTpls, buildPages: buildPages, ordered: ordered, waitFrame: waitFrame, renderList: renderList, setView: setView, save: save };
 })();

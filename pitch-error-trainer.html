@@ -2937,6 +2937,25 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     },
     events: function(d){ return peModule.exportEvents(d); }
   };
+  if(MAKER_MODE) window.__maker.fromExam = function(cfg){   /* v106.8 套用模板：照本頁模擬考（examBootstrap）的出題設定，換成出題模式的快照 */
+    const meter = cfg.meter || '4/4', meterType = cfg.meterType || 'simple';
+    const n = parseInt(meter.split('/')[0], 10), bpb = meterType === 'compound' ? n / 3 : n;
+    return { snapshot: { clef: cfg.clef || 'treble', tonal: cfg.tonal || 'tonal', krange: cfg.krange || '3', kmode: cfg.kmode || 'both',
+                         meter: meter, meterType: meterType, barsCount: cfg.bars || 4, beatsPerBar: bpb, bpm: cfg.bpm || 72,
+                         errCount: cfg.errCount || 5, noteBudget: cfg.noteBudget || null, noTwoBeat: true } };
+  };
+  if(MAKER_MODE) window.__maker.titleOf = function(d){ return makerTitle(d); };
+  /* 模擬考多兩個設定：音符數額度（noteBudget）、不用兩拍節奏型（noTwoBeat）；沒有這兩個欄位時與原本相同 */
+  if(MAKER_MODE){
+    const makerRegen0 = window.__maker.regen;
+    window.__maker.regen = function(snap){
+      const m = peModule, keepBudget = m.noteBudget, keepPool = m.rhythmPool;
+      if(snap.noteBudget) m.noteBudget = snap.noteBudget;
+      if(snap.noTwoBeat) m.rhythmPool = function(){ return (this.meterType === 'simple' ? SIMPLE_ORDER : COMPOUND_ORDER).filter(id => !isTwoBeat(id)); };
+      try{ return makerRegen0(snap); }
+      finally{ m.noteBudget = keepBudget; m.rhythmPool = keepPool; }
+    };
+  }
   function makerSetup(){
     document.body.classList.add('maker-mode');
     const st = document.createElement('style');

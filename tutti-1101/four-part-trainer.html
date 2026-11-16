@@ -3891,6 +3891,10 @@ function showPage(pageId) {
       return makerWith({ questionVoicings: data.questionVoicings, bpm: data.bpm }, function(m){ return m.buildExportEvents(); });
     }
   };
+  if(MAKER_MODE) window.__maker.fromExam = function(cfg){   /* v106.8 套用模板：照本頁模擬考（examBootstrap）的出題設定，換成出題模式的快照 */
+    return { snapshot: { keyPref: 'mix', bars: cfg.bars || 10, bpm: cfg.bpm || 100, levelId: cfg.levelId || 4 } };
+  };
+  if(MAKER_MODE) window.__maker.titleOf = function(d){ return makerTitle(d); };
   function makerSetup(){
     document.body.classList.add('maker-mode');
     const st = document.createElement('style');

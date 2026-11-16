@@ -23,7 +23,7 @@
   .topbar{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--panel-border); }
   .topbar label{ font-size:13px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; }
   .topbar input[type=text]{ border:1px solid var(--panel-border); border-radius:8px; padding:6px 9px; font-size:14px; background:#fff; }
-  #hdTitle{ width:300px; } #hdAuthor{ width:90px; } #hdDate{ width:100px; }
+  #hdTitle{ width:220px; } #hdAuthor{ width:90px; } #hdDate{ width:100px; }
   .seg{ display:inline-flex; border:1px solid var(--panel-border); border-radius:8px; overflow:hidden; }
   .seg button{ border:0; background:#fff; padding:6px 11px; font-size:13px; color:var(--ink-soft); }
   .seg button.on{ background:var(--accent); color:#fff; }
@@ -34,7 +34,7 @@
   .ver{ font-size:11px; color:var(--ink-soft); }
 
   /* ---- 出題畫面 ---- */
-  .main{ display:grid; grid-template-columns: minmax(520px, 1fr) 520px; height:calc(100vh - 58px); }
+  .main{ display:grid; grid-template-columns: minmax(520px, 1fr) 600px; height:calc(100vh - 58px); }
   .left{ display:flex; flex-direction:column; border-right:1px solid var(--panel-border); min-width:0; }
   .tabs{ display:flex; flex-wrap:wrap; gap:4px; padding:8px 10px 0; }
   .tabs button{ border:1px solid var(--panel-border); border-bottom:0; background:#f4f2ea; border-radius:8px 8px 0 0; padding:7px 13px; font-size:13.5px; color:var(--ink-soft); }
@@ -67,6 +67,21 @@
   .it-sel{ font-size:12px; border:1px solid var(--panel-border); border-radius:6px; background:#fff; padding:2px 3px; color:var(--ink-soft); }
   .it-bpm{ display:flex; align-items:center; gap:2px; font-size:12px; color:var(--ink-soft); white-space:nowrap; }
   .it-bpm input{ width:46px; flex:none; font-size:12px; padding:2px 3px; border:1px solid var(--panel-border); background:#fff; border-radius:6px; }
+  .sc-in, .it-sc{ display:flex; align-items:center; gap:3px; font-size:12px; font-weight:400; color:var(--ink-soft); white-space:nowrap; }
+  .sc-in input, .it-sc input{ width:38px; flex:none; font-size:12px; padding:2px 4px; border:1px solid var(--panel-border); background:#fff; border-radius:6px; text-align:right; }
+  .sc-in{ margin-left:4px; }
+  .sc-warn{ font-size:12px; color:#8a6200; background:#fff6d6; border:1px solid #ecd27a; border-radius:6px; padding:3px 8px; margin:-2px 0 6px; }
+  .total{ font-size:13px; font-weight:600; color:var(--ink); }
+  .tpl-wrap{ position:relative; }
+  .tpl-menu{ display:none; position:absolute; left:0; top:calc(100% + 4px); z-index:40; min-width:240px; background:#fff; border:1px solid var(--panel-border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:6px; }
+  .tpl-menu.on{ display:block; }
+  .tpl-row{ display:flex; align-items:center; gap:6px; }
+  .tpl-row button.tpl-pick{ flex:1; text-align:left; border:none; background:none; padding:7px 9px; border-radius:7px; font-size:13.5px; cursor:pointer; }
+  .tpl-row button.tpl-pick:hover{ background:var(--panel); }
+  .tpl-row .tpl-del{ border:none; background:none; cursor:pointer; padding:4px 6px; border-radius:6px; }
+  .tpl-row .tpl-del:hover{ background:#fbe9e9; }
+  .tpl-sep{ height:1px; background:var(--panel-border); margin:5px 2px; }
+  .tpl-tag{ font-size:11px; color:var(--ink-soft); margin-right:6px; }
   .it-note{ font-size:11.5px; color:var(--wrong); margin:-3px 0 6px 34px; }
 
   /* ---- 預覽畫面 ---- */
@@ -90,7 +105,7 @@
   .ov.numeral{ font-size:14px; font-family:'Times New Roman', Times, serif; }
   .ov.keyname{ font-size:12.5px; }
   .keyline{ display:inline-block; width:3em; border-bottom:1.2px solid #000; margin-right:2px; height:0.95em; vertical-align:baseline; }
-  .ov.errlabel{ font-size:10.5px; font-weight:700; }
+  .ov.errlabel{ font-size:10.5px; font-weight:700; color:#a6493b; }
   .stack-row{ display:flex; }
   .stack-cell{ flex:none; }
   .stack-title{ margin-left:2px; white-space:nowrap; }
@@ -134,12 +149,13 @@
   <label>署名 <input type="text" id="hdAuthor"></label>
   <label>上課日期 <input type="text" id="hdDate" placeholder="YYYYMMDD"></label>
   <label>間距 <span class="seg" id="density"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span></label>
+  <span class="tpl-wrap"><button class="tb-btn" id="btnTpl">📋 套用模板 ▾</button><div class="tpl-menu" id="tplMenu"></div></span>
   <span class="spacer"></span>
   <span class="seg" id="viewSeg"><button data-v="edit" class="on">出題</button><button data-v="blank">預覽作答卷</button><button data-v="key">預覽解答</button></span>
   <button class="tb-btn" id="btnPrintBlank">🖨 列印作答卷</button>
   <button class="tb-btn" id="btnPrintKey">🖨 列印解答</button>
   <button class="tb-btn primary" id="btnMp3">⬇️ 下載 mp3</button>
-  <span class="ver">出題工具 v6</span>
+  <span class="ver">出題工具 v7</span>
 </div>
 
 <div class="main" id="mainView">
@@ -149,7 +165,7 @@
   </div>
   <div class="right">
     <div class="list-head">
-      <span>題目列表</span><span class="spacer"></span>
+      <span>題目列表</span><span class="total" id="totalScore"></span><span class="spacer"></span>
       <label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="noPreviewTop"> 出題後直接加入</label>
       <button class="tb-btn" id="btnClear">清空考卷</button>
     </div>
@@ -184,6 +200,15 @@
   <div class="card" style="width:min(420px,92vw);">
     <h3 id="confirmText">確定？</h3>
     <div class="row"><button class="tb-btn primary" id="confirmOk">確定</button><button class="tb-btn" id="confirmNo">取消</button></div>
+  </div>
+</div>
+
+<div class="mask" id="nameMask">
+  <div class="card" style="width:min(420px,92vw);">
+    <h3>把目前考卷存成新模板</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin:4px 0 10px;">存的是每一題的設定、標題、配分、換行與換頁；套用時會重新出題。</p>
+    <input type="text" id="nameInput" placeholder="模板名稱" style="width:100%;box-sizing:border-box;border:1px solid var(--panel-border);border-radius:8px;padding:7px 9px;font-size:14px;">
+    <div class="row"><button class="tb-btn primary" id="nameOk">儲存</button><button class="tb-btn" id="nameNo">取消</button></div>
   </div>
 </div>
 

@@ -259,7 +259,7 @@
     var pre1 = preWidth(clefs[0], time, keySpec), pre2 = preWidth(clefs[0], null, keySpec);
     var showNotes = mode !== 'blank' || item.blankNotes;
     var marks = (mode === 'key' && item.answers && item.answers.marks) ? item.answers.marks : [];
-    var yT = marks.length ? 64 : 44;              // 找錯音的解答：上方要寫「應為 X」
+    var yT = (item.answers && item.answers.marks && item.answers.marks.length) ? 100 : 44;              // 找錯音的解答：上方要寫「應為 X」（最多兩排，交疊時上下錯開）
     var gapB = 100, H = yT + (nSt - 1) * gapB + 40 + (nSt > 1 ? 40 : 30);
     var widthOf = function (li) { var c = lines[li][1] - lines[li][0]; return (W - X0 - (li ? pre2 : pre1) - 2) / c; };
     var firstW = widthOf(0);
@@ -377,7 +377,10 @@
           if (o.nn.tieStart) pending = o;
         });
       });
-      /* 找錯音的解答：錯音加圓角框，上方寫「應為 X」（同 App 解答頁上方那張） */
+      /* 找錯音的解答：錯音加綠色圓角框（圈出錯音＝正確答案），上方用紅字寫「應為 X」。
+         標籤與外框之間留空隙；兩個標籤左右交疊時，後面那個往上錯開一排。 */
+      var LAB_PX = 10.5, labH = LAB_PX / k, rowsUsed = {};
+      function labW(t) { var w = 0; for (var i = 0; i < t.length; i++) w += /[\u2E80-\uFFFF]/.test(t[i]) && !/[♭♯𝄪𝄫]/.test(t[i]) ? 1 : 0.68; return w * LAB_PX / k; }
       marks.forEach(function (mk) {
         var nn = flat[mk.note]; if (!nn || !nn.vf) return;
         var mi = -1; for (var i = 0; i < n; i++) if ((ms[i].staves[0] || []).indexOf(nn) >= 0) { mi = i; break; }
@@ -386,13 +389,17 @@
         var accW = 0; nn.vf.getModifiers().forEach(function (m) { if (m.getCategory() === 'accidentals') accW = Math.max(accW, m.getWidth() + 2); });
         var x0 = b - 6 - accW, x1 = e + 6, y0 = st.getYForLine(0) - 22, y1 = st.getYForLine(4) + 22, r = 6;
         var c = sys.__ctx;
-        c.save(); c.setStrokeStyle('#000'); c.setLineWidth(1.2);
+        c.save(); c.setStrokeStyle('#4b7a5b'); c.setLineWidth(1.5);
         c.beginPath();
         c.moveTo(x0 + r, y0); c.lineTo(x1 - r, y0); c.quadraticCurveTo(x1, y0, x1, y0 + r);
         c.lineTo(x1, y1 - r); c.quadraticCurveTo(x1, y1, x1 - r, y1); c.lineTo(x0 + r, y1);
         c.quadraticCurveTo(x0, y1, x0, y1 - r); c.lineTo(x0, y0 + r); c.quadraticCurveTo(x0, y0, x0 + r, y0);
         c.closePath(); c.stroke(); c.restore();
-        overlay(sys, k, (x0 + x1) / 2, y0 - 20, mk.label, 'errlabel', 'center');
+        var text = String(mk.label).replace(/\s*[↑↓].*$/, ''), cx = (x0 + x1) / 2, w = labW(text) + 6;
+        var used = rowsUsed[lineOf[mi]] = rowsUsed[lineOf[mi]] || [[], []], row = 0;
+        while (row < 1 && used[row].some(function (u) { return cx - w / 2 < u[1] && cx + w / 2 > u[0]; })) row++;
+        used[row].push([cx - w / 2, cx + w / 2]);
+        overlay(sys, k, cx, y0 - 12 - labH * (row + 1) - row * 3, text, 'errlabel', 'center');
       });
     }
     function drawTie(ctx, a, b) {
@@ -400,6 +407,30 @@
       t.setDirection((a || b).getStemDirection());
       t.setContext(ctx).draw();
     }
+    /* v106.8：音域很寬時（符槓拉到譜表外），量每一行音符的最高、最低位置，超出就把那一行加高。
+       作答卷沒有音符，借解答的量測結果，兩邊的行高才會一樣（分頁相同） */
+    var ext;
+    if (showNotes) {
+      ext = systems.map(function () { return { lo: 1e9, hi: -1e9 }; });
+      allNotes.forEach(function (list) { list.forEach(function (o) {
+        var vf = o.nn.vf, e = ext[lineOf[o.mi]]; if (!vf || !e) return;
+        try { vf.getYs().forEach(function (y) { e.lo = Math.min(e.lo, y - 6); e.hi = Math.max(e.hi, y + 6); }); } catch (x) {}
+        try { if (vf.hasStem && vf.hasStem()) { var se = vf.getStemExtents(); e.lo = Math.min(e.lo, se.topY, se.baseY); e.hi = Math.max(e.hi, se.topY, se.baseY); } } catch (x) {}
+      }); });
+    } else {
+      ext = renderLines(item, 'key', d, null).map(function (sy) { return sy.__ext; });
+    }
+    systems.forEach(function (sys, li) {
+      var e = ext[li] || { lo: 1e9, hi: -1e9 };
+      var offTop = Math.max(0, 24 - e.lo), newH = Math.max(H, e.hi + 22) + offTop;
+      sys.__ext = e;
+      if (!offTop && newH === H) return;
+      var svg = sys.querySelector('svg');
+      svg.setAttribute('viewBox', '0 ' + (-offTop) + ' ' + W + ' ' + newH);
+      svg.setAttribute('height', (newH * k).toFixed(2)); svg.style.height = (newH * k).toFixed(2) + 'px';
+      sys.style.height = (newH * k) + 'px';
+      if (offTop) sys.querySelectorAll('.ov, .barhit').forEach(function (el) { el.style.top = (parseFloat(el.style.top) + offTop * k) + 'px'; });
+    });
     return systems;
   }
 
@@ -421,20 +452,37 @@
     var br = grandBreaks(n), lines = [], s0 = 0;
     br.concat([n]).forEach(function (b) { lines.push([s0, b]); s0 = b; });
     var keySpec = FIFTHS_KEY[String(ms[0].fifths || 0)];
-    var pre = preWidth('treble', null, keySpec);
+    var pre0 = preWidth('treble', 'C', keySpec), pre1 = preWidth('treble', null, keySpec);   // v106.8：第一行加 C 拍號（作者）
     /* 每一行都補滿到右邊界（v106.4，作者：和其他題型對齊；12 小節 6＋6、單行的 6、8 小節也一樣） */
     var yT = 40, yB = yT + 100, H = yB + 40 + 62;
     var ans = item.answers || {};
     var systems = [];
+    /* v106.8：級數那一排依這一行最低的音決定（作者選 b）：低音太低時往下移，與符頭保持距離。
+       用題目資料算，作答卷（沒有音符）與解答的位置、行高相同 */
+    var tmpB = stave(X0, yB, 200).addClef('bass'), botY = tmpB.getYForLine(4);
+    function numYOf(ln) {
+      var low = -1e9;
+      for (var mi = ln[0]; mi < ln[1]; mi++) {
+        var ch = chordOf(ms[mi].staves[1] || []); if (!ch) continue;
+        ch.pitches.forEach(function (p) {
+          var line = VF.keyProperties(String(p.step).toLowerCase() + '/' + p.oct, 'bass').line;
+          low = Math.max(low, tmpB.getYForNote(line));
+        });
+      }
+      return Math.max(botY + 22, low + 5 + 18);
+    }
     lines.forEach(function (ln, li) {
+      var numY = numYOf(ln), Hl = Math.max(H, numY + 40);
       var sys = document.createElement('div'); sys.className = 'sys';
-      sys.style.height = (H * k) + 'px';
+      sys.style.height = (Hl * k) + 'px';
       var host = document.createElement('div'); sys.appendChild(host);
-      var ctx = newCanvas(host, W, H, k);
+      var ctx = newCanvas(host, W, Hl, k);
+      var pre = li ? pre1 : pre0;
       var mW = (W - X0 - pre - 2) / (ln[1] - ln[0]);
       var right = X0 + pre + (ln[1] - ln[0]) * mW;
       var sT = stave(X0, yT, right - X0).addClef('treble'), sB = stave(X0, yB, right - X0).addClef('bass');
       if (keySpec !== 'C') { sT.addKeySignature(keySpec); sB.addKeySignature(keySpec); }
+      if (!li) { sT.addTimeSignature('C'); sB.addTimeSignature('C'); }
       sT.setContext(ctx).draw(); sB.setContext(ctx).draw();
       new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();
       new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(ctx).draw();
@@ -461,18 +509,18 @@
             voices.forEach(function (o) { o.v.draw(ctx, o.st); });
           }
           var num = (ans.numerals || [])[mi];
-          if (num) overlay(sys, k, cc, bot + 22, num, 'numeral', 'center');
+          if (num) overlay(sys, k, cc, numY, num, 'numeral', 'center');
         }
       }
       /* 調名／「＿＿調：」：第一行低音譜表下方，從譜表最左邊開始寫（同 SOP 的解答） */
       if (li === 0) {
         if (mode === 'blank') {
           /* 作答卷：一條約三個字寬的實線＋「調：」（v106.5，作者：兩個底線字元中間會斷開） */
-          var kb = overlay(sys, k, 0, bot + 22, '', 'keyname');
+          var kb = overlay(sys, k, 0, numY, '', 'keyname');
           kb.innerHTML = '<span class="keyline"></span>調：';
-        } else if (ans.key) overlay(sys, k, 0, bot + 22, ans.key, 'keyname');
+        } else if (ans.key) overlay(sys, k, 0, numY, ans.key, 'keyname');
       }
-      fitSvg(host, W, H, k);
+      fitSvg(host, W, Hl, k);
       sys.__meta = meta;
       systems.push(sys);
     });
@@ -505,7 +553,7 @@
       var m = item.measures[0];
       var cx0 = X0 + preW + i * cellW, cx1 = cx0 + cellW, cc = (cx0 + cx1) / 2;
       vline(ctx, cx1 - 6, top, bot, 1); vline(ctx, cx1 - 3, top, bot, 3);   // 每格各自是一題：終止線
-      numEls.push(nums[i] === '' ? null : overlay(sys, k, cx0 + 4, yT - 44, nums[i] + '.', 'cellnum'));
+      numEls.push(nums[i] === '' ? null : overlay(sys, k, cx0 + 4, yT - 44, nums[i] + '.' + (global.__makerScoreText ? global.__makerScoreText(item.score) : ''), 'cellnum'));
       meta.cells.push({ x0: cx0, x1: cx1, centre: cc });
       if (mode === 'blank') return;
       var clefs = m.clefs.length ? m.clefs : ['treble'], voices = [];
@@ -533,7 +581,7 @@
     var box = document.createElement('div'); box.className = 'item';
     var t = document.createElement('div'); t.className = 'item-title';
     t.style.fontSize = d.item + 'px';
-    t.textContent = numState.item + '. ' + item.title;
+    t.textContent = numState.item + '. ' + item.title + (global.__makerScoreText ? global.__makerScoreText(item.score) : '');
     box.appendChild(t);
     if (!item.measures) item.measures = parse(item.xml);
     var systems = (item.layout === 'stack') ? [renderStackRow([item], [''], mode, d)]   // 出題預覽卡：單題

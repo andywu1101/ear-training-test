@@ -1655,6 +1655,25 @@ function updateStaffHeader(pageId){
       answers: function(data){ return data.questions.map(q => QUALITIES[q.qualityKey] ? QUALITIES[q.qualityKey].label : q.qualityKey); },
       events: function(data){ return buildDictExportEvents({ questions: data.questions, playbackStyle: data.playbackStyle }); }
     };
+    if(MAKER_MODE) window.__maker.fromExam = function(cfg){   /* v106.8 套用模板：照本頁模擬考（examBootstrap）的出題設定，換成出題模式的快照 */
+      const lv5 = LEVELS.filter(function(l){ return l.id === 5; })[0];
+      const snap = { levelId: lv5.id, levelName: lv5.name, pool: lv5.pool.slice(), inversion: !!cfg.inversion,
+                     count: cfg.count || 10, allowRepeat: cfg.allowRepeat === true, playbackStyle: 'blockTriple' };
+      if(cfg.pool === 'HS9'){ snap.pool = snap.pool.filter(function(k){ return k !== 'augmented7'; }); snap.hs9 = true; }
+      return { snapshot: snap, title: String(lv5.name).replace(/^Lv\d+\s*/, '') };
+    };
+    /* 高中檔（hs9）：9 種各一次＋隨機補一題後打散，同 examBootstrap */
+    if(MAKER_MODE){
+      const makerRegen0 = window.__maker.regen;
+      window.__maker.regen = function(snap){
+        if(!snap.hs9) return makerRegen0(snap);
+        const a = makerRegen0(Object.assign({}, snap, { count: snap.pool.length, allowRepeat: false }));
+        const b = makerRegen0(Object.assign({}, snap, { count: 1, allowRepeat: true }));
+        const qs = a.questions.concat(b.questions);
+        for(let i = qs.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const t = qs[i]; qs[i] = qs[j]; qs[j] = t; }
+        return { questions: qs, playbackStyle: snap.playbackStyle };
+      };
+    }
     function makerSetup(){
       document.body.classList.add('maker-mode');
       const st = document.createElement('style');

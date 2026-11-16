@@ -1658,6 +1658,12 @@ function updateStaffHeader(pageId){
       answers: function(data){ return data.questions.map(q => QUALITIES[q.qualityKey] ? QUALITIES[q.qualityKey].label : q.qualityKey); },
       events: function(data){ return buildDictExportEvents(data.questions); }
     };
+    if(MAKER_MODE) window.__maker.fromExam = function(cfg){   /* v106.8 套用模板：照本頁模擬考（examBootstrap）的出題設定，換成出題模式的快照 */
+      let pool = Object.keys(QUALITIES);
+      if(cfg.pool === 'NO_P1') pool = pool.filter(function(k){ return k !== 'P1'; });
+      const snap = { levelId: CUSTOM_ID, levelName: '模擬測驗', pool: pool, count: cfg.count || 10, allowRepeat: cfg.allowRepeat !== false, compound: !!cfg.compound };
+      return { snapshot: snap, title: makerTitle(snap) };
+    };
     function makerSetup(){
       document.body.classList.add('maker-mode');
       const st = document.createElement('style');
