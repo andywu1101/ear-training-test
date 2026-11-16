@@ -4,9 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>出題工具</title>
+<title>音聽出考卷</title>
+<!-- v108：加入主畫面（手機、平板、電腦 Chrome 安裝）。不設 apple-mobile-web-app-status-bar-style、不用 viewport-fit=cover
+     （伍線譜掃描踩過：iOS 26 主畫面 App 底部空白、透明狀態列被蓋、iPad 上方被霧化） -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="音聽出考卷">
+<meta name="theme-color" content="#33415c">
+<meta name="description" content="一鍵產生聽寫考卷：作答卷、解答與音檔。音樂聽力練習 贊助者專屬工具。">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="音樂聽力練習">
+<meta property="og:title" content="音聽出考卷">
+<meta property="og:description" content="一鍵產生聽寫考卷：作答卷、解答與音檔。音樂聽力練習 贊助者專屬工具。">
+<meta property="og:image" content="https://andywu1101.github.io/ear-training/cadenza-1101/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://andywu1101.github.io/ear-training/cadenza-1101/og-image.png">
 <script src="../tutti-1101/vexflow-min.js"></script>
 <script src="engrave.js"></script>
+<script src="pdf-export.js"></script>
 <style>
   :root{
     --paper:#efeee6; --panel:#fbfaf6; --panel-border:#ddd8c9; --hairline:#e2ddce;
@@ -16,48 +37,76 @@
   }
   *{ box-sizing:border-box; }
   html,body{ margin:0; height:100%; background:var(--paper); color:var(--ink); font-family:var(--font); }
+  /* v108：工具列折成兩行時下面不會被擠出畫面（原本用 100vh - 58px） */
+  body{ display:flex; flex-direction:column; touch-action:manipulation; }
   button{ font-family:inherit; cursor:pointer; }
   input, select{ font-family:inherit; }
 
-  /* ---- 上方工具列 ---- */
-  .topbar{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--panel-border); }
-  .topbar label{ font-size:13px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; }
-  .topbar input[type=text]{ border:1px solid var(--panel-border); border-radius:8px; padding:6px 9px; font-size:14px; background:#fff; }
-  #hdTitle{ width:220px; } #hdAuthor{ width:90px; } #hdDate{ width:100px; }
-  .seg{ display:inline-flex; border:1px solid var(--panel-border); border-radius:8px; overflow:hidden; }
-  .seg button{ border:0; background:#fff; padding:6px 11px; font-size:13px; color:var(--ink-soft); }
+  /* ---- 共用元件 ---- */
+  .seg{ display:inline-flex; border:1px solid var(--panel-border); border-radius:10px; overflow:hidden; background:#fff; }
+  .seg button{ border:0; background:#fff; padding:7px 13px; font-size:13.5px; color:var(--ink-soft); }
   .seg button.on{ background:var(--accent); color:#fff; }
-  .tb-btn{ border:1px solid var(--panel-border); background:#fff; border-radius:8px; padding:7px 12px; font-size:13.5px; color:var(--ink); }
+  .tb-btn{ border:1px solid var(--panel-border); background:#fff; border-radius:10px; padding:8px 14px; font-size:13.5px; color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.04); }
   .tb-btn.primary{ background:var(--accent); color:#fff; border-color:var(--accent); }
   .tb-btn:disabled{ opacity:.45; cursor:default; }
   .spacer{ flex:1; }
   .ver{ font-size:11px; color:var(--ink-soft); }
+  .card-box{ background:#fff; border:1px solid var(--panel-border); border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,.05); }
+  .cb-h{ font-size:14px; font-weight:600; color:var(--ink-soft); margin-bottom:10px; display:flex; align-items:center; gap:8px; }
 
-  /* ---- 出題畫面 ---- */
-  .main{ display:grid; grid-template-columns: minmax(520px, 1fr) 600px; height:calc(100vh - 58px); }
-  .left{ display:flex; flex-direction:column; border-right:1px solid var(--panel-border); min-width:0; }
-  .tabs{ display:flex; flex-wrap:wrap; gap:4px; padding:8px 10px 0; }
-  .tabs button{ border:1px solid var(--panel-border); border-bottom:0; background:#f4f2ea; border-radius:8px 8px 0 0; padding:7px 13px; font-size:13.5px; color:var(--ink-soft); }
-  .tabs button.on{ background:#fff; color:var(--ink); font-weight:600; }
+  /* ---- 頁首（v108） ---- */
+  .hdr{ display:flex; align-items:center; gap:14px; padding:10px 18px; background:var(--panel); border-bottom:1px solid var(--panel-border); flex:none; }
+  .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px; white-space:nowrap; }
+  .brand img{ width:32px; height:32px; border-radius:8px; }
+  .hdr #viewSeg{ margin-left:14px; }
+  .ex-menu{ left:auto; right:0; min-width:220px; }
+  .ex-menu button{ display:block; width:100%; text-align:left; border:none; background:none; padding:8px 10px; border-radius:8px; font-size:13.5px; color:var(--ink); }
+  .ex-menu button:hover{ background:var(--panel); }
+  .m-only{ display:none; }
+
+  /* ---- 考卷設定卡片 ---- */
+  .set-card{ padding:14px 16px; margin-bottom:12px; }
+  .set-grid{ display:grid; grid-template-columns:auto 1fr auto 1fr; gap:10px; align-items:center; font-size:13px; color:var(--ink-soft); }
+  .set-grid input[type=text]{ border:1px solid var(--panel-border); border-radius:9px; padding:7px 10px; font-size:14px; background:var(--panel); width:100%; min-width:0; }
+  .set-grid .span3{ grid-column:span 3; }
+  .set-grid .seg{ justify-self:start; }
+
+  /* ---- 出題畫面：左練習頁卡片、分隔、右列表 ---- */
+  .main{ --rw:680px; display:grid; grid-template-columns: minmax(420px, 1fr) 16px var(--rw); flex:1; min-height:0; padding:14px 16px 0; }
+  .left{ display:flex; flex-direction:column; min-width:0; overflow:hidden; margin-bottom:14px; }
+  .tabs{ display:flex; flex-wrap:wrap; gap:6px; padding:10px 12px; background:var(--panel); border-bottom:1px solid var(--panel-border); }
+  .tabs button{ border:1px solid var(--panel-border); background:#fff; border-radius:999px; padding:6px 14px; font-size:13.5px; color:var(--ink-soft); }
+  .tabs button.on{ background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
   .tabs button:disabled{ opacity:.4; cursor:default; }
-  .frames{ flex:1; position:relative; background:#fff; border-top:1px solid var(--panel-border); }
+  .frames{ flex:1; position:relative; background:#fff; }
   /* 沒顯示的練習頁不可以用 display:none：裡面量不到尺寸，單旋律等頁面會畫不出譜（重抽、匯出 mp3 時要用到） */
   .frames iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; visibility:hidden; pointer-events:none; }
   .frames iframe.on{ visibility:visible; pointer-events:auto; }
+  /* 分隔：平常只有淡淡的把手，滑鼠移上去或拖曳中變深藍＋細線 */
+  .split{ position:relative; cursor:col-resize; margin-bottom:14px; touch-action:none; }
+  .split::before{ content:''; position:absolute; left:7px; top:0; bottom:0; width:2px; border-radius:2px; background:transparent; transition:background .15s; }
+  .split .knob{ position:absolute; left:4px; top:50%; transform:translateY(-50%); width:8px; height:44px; border-radius:6px; background:#d6d0bf;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; transition:background .15s; }
+  .split .knob i{ width:3px; height:3px; border-radius:50%; background:#fff; display:block; }
+  .split:hover::before, .split.drag::before{ background:var(--accent); }
+  .split:hover .knob, .split.drag .knob{ background:var(--accent); }
+  body.splitting{ cursor:col-resize; user-select:none; }
+  body.splitting iframe{ pointer-events:none !important; }
 
-  .right{ overflow:auto; padding:12px 14px 40px; }
-  .list-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:13px; color:var(--ink-soft); }
+  .right{ overflow:auto; padding:0 2px 40px; min-width:0; }
+  .list-head{ display:flex; align-items:center; gap:10px; margin:4px 2px 10px; font-size:13px; color:var(--ink-soft); }
   .empty{ color:var(--ink-soft); font-size:13.5px; padding:24px 6px; line-height:1.7; }
-  .sec{ margin-bottom:14px; }
-  .sec-name{ display:flex; align-items:center; gap:6px; font-weight:700; font-size:15px; margin-bottom:6px; }
+  .sec{ margin-bottom:12px; background:#fff; border:1px solid var(--panel-border); border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,.05); padding:12px 14px; }
+  .sec-name{ display:flex; align-items:center; gap:6px; font-weight:700; font-size:15px; margin-bottom:10px; }
   .sec-name input{ font:inherit; border:1px solid transparent; background:transparent; border-radius:6px; padding:2px 5px; width:200px; }
   .sec-name input:hover, .sec-name input:focus{ border-color:var(--panel-border); background:#fff; }
-  .it{ display:flex; align-items:center; gap:6px; background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:6px 8px; margin-bottom:6px; }
+  .it{ display:flex; align-items:center; gap:6px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:7px 10px; margin-bottom:8px; }
+  .it:last-child{ margin-bottom:0; }
   .it.dragging{ opacity:.4; }
   .it.drop-before{ box-shadow: 0 -3px 0 var(--accent); }
   .it.drop-after{ box-shadow: 0 3px 0 var(--accent); }
   .grip{ cursor:grab; color:var(--ink-soft); font-size:16px; padding:0 2px; user-select:none; }
-  .it-num{ font-weight:600; min-width:22px; text-align:right; }
+  .it-num{ font-weight:700; min-width:22px; text-align:right; }
   .it input{ flex:1; min-width:0; font:inherit; font-size:13.5px; border:1px solid transparent; background:transparent; border-radius:6px; padding:3px 5px; }
   .it input:hover, .it input:focus{ border-color:var(--panel-border); background:#fff; }
   .it-info{ font-size:11.5px; color:var(--ink-soft); white-space:nowrap; }
@@ -69,7 +118,7 @@
   .it-bpm input{ width:46px; flex:none; font-size:12px; padding:2px 3px; border:1px solid var(--panel-border); background:#fff; border-radius:6px; }
   .sc-in, .it-sc{ display:flex; align-items:center; gap:3px; font-size:12px; font-weight:400; color:var(--ink-soft); white-space:nowrap; }
   .sc-in input, .it-sc input{ width:38px; flex:none; font-size:12px; padding:2px 4px; border:1px solid var(--panel-border); background:#fff; border-radius:6px; text-align:right; }
-  .sc-in{ margin-left:4px; }
+  .sc-in{ margin-left:auto; }
   .sc-warn{ font-size:12px; color:#8a6200; background:#fff6d6; border:1px solid #ecd27a; border-radius:6px; padding:3px 8px; margin:-2px 0 6px; }
   .total{ font-size:13px; font-weight:600; color:var(--ink); }
   .tpl-wrap{ position:relative; }
@@ -85,7 +134,7 @@
   .it-note{ font-size:11.5px; color:var(--wrong); margin:-3px 0 6px 34px; }
 
   /* ---- 預覽畫面 ---- */
-  .pv{ display:none; height:calc(100vh - 58px); overflow:auto; padding:20px 0 60px; }
+  .pv{ display:none; flex:1; min-height:0; overflow:auto; padding:20px 0 60px; }
   .pv.on{ display:block; }
   .main.off{ display:none; }
   .pv-hint{ text-align:center; font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
@@ -131,6 +180,70 @@
   .msg{ font-size:13px; color:var(--ink-soft); }
   .msg.err{ color:var(--wrong); }
 
+  /* ---- 只有手機版用到的元素（電腦版隱藏） ---- */
+  #mNav, #mPvBar, #mSet{ display:none; }
+  .it .mv{ display:none; }
+  .dl-card p{ font-size:13.5px; color:var(--ink-soft); line-height:1.6; margin:4px 0 0; }
+  .a2-steps{ font-size:14px; line-height:1.8; padding-left:20px; margin:8px 0 0; }
+
+  /* ==== 手機版（v108，寬度小於 900px）==== */
+  body.m{ height:100dvh; overflow:hidden; }
+  body.m .d-only{ display:none !important; }
+  body.m .m-only{ display:inline-block; }
+  body.m .hdr{ gap:8px; padding:8px 12px; }
+  body.m .brand{ font-size:16px; gap:8px; flex:1; }
+  body.m .brand img{ width:26px; height:26px; border-radius:6px; }
+  body.m .hdr .spacer{ display:none; }
+  body.m .hdr .tb-btn{ padding:7px 10px; }
+  body.m .tpl-menu{ left:auto; right:0; min-width:min(300px, 86vw); }
+  /* 設定與匯出：整頁（不疊在別的畫面上） */
+  body.m #mSet{ position:fixed; inset:0; z-index:40; background:var(--paper); flex-direction:column; }
+  body.m[data-mtab=set] #mSet{ display:flex; }
+  body.m .mset-h{ display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--panel); border-bottom:1px solid var(--panel-border); font-size:16px; }
+  body.m .mset-body{ flex:1; overflow:auto; padding:14px 16px calc(24px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:12px; }
+  body.m .mset-body > .card-box{ padding:14px 16px; }
+  body.m .mset-btns{ display:flex; flex-direction:column; gap:10px; }
+  body.m .mset-btns .tb-btn{ padding:12px 14px; font-size:15px; }
+  body.m .set-card{ margin-bottom:0; }
+  body.m .set-grid{ grid-template-columns:auto 1fr; font-size:14px; }
+  body.m .set-grid .span3{ grid-column:auto; }
+  body.m .set-grid input[type=text]{ font-size:16px; }
+  body.m #mNav{ display:flex; flex:none; background:var(--panel); border-top:1px solid var(--panel-border); padding-bottom:env(safe-area-inset-bottom); }
+  body.m #mNav button{ flex:1; border:0; background:none; padding:10px 0 12px; font-size:14px; color:var(--ink-soft); }
+  body.m #mNav button.on{ color:var(--accent); font-weight:700; box-shadow:inset 0 3px 0 var(--accent); }
+  body.m .main{ display:block; position:relative; padding:0; }
+  body.m .main > .left, body.m .main > .right{ position:absolute; inset:0; }
+  body.m .main > .left{ margin:0; border-radius:0; border:0; box-shadow:none; }
+  body.m .main.off{ display:none; }
+  /* 列表分頁：練習頁不可以 display:none（量不到尺寸），改成藏在列表底下；iframe.on 自己設了 visible，要一起蓋掉 */
+  body.m[data-mtab=list] .main > .left, body.m[data-mtab=list] .frames iframe{ visibility:hidden !important; pointer-events:none !important; }
+  body.m .main > .right{ background:var(--paper); z-index:2; }
+  body.m[data-mtab=make] .main > .right{ display:none; }
+  body.m .tabs{ flex-wrap:nowrap; overflow-x:auto; padding:8px 8px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  body.m .tabs button{ flex:none; }
+  body.m .right{ padding:12px 12px 40px; -webkit-overflow-scrolling:touch; }
+  body.m .list-head{ flex-wrap:wrap; }
+  body.m .sec{ padding:10px 10px; }
+  body.m .it{ flex-wrap:wrap; row-gap:4px; padding:7px 8px; }
+  body.m .it > input{ flex:1 1 calc(100% - 140px); font-size:15px; }
+  body.m .it .grip{ font-size:20px; padding:4px 6px; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  body.m .it .mv{ display:inline-block; }
+  body.m .it .ib{ font-size:17px; padding:5px 7px; }
+  body.m .it .it-sel, body.m .it .it-bpm input, body.m .it-sc input, body.m .sc-in input{ font-size:15px; }
+  body.m .sec-name > input{ width:auto; flex:1; min-width:0; }
+  body.m .it-note{ margin-left:8px; }
+  body.m .pv{ padding:0 0 40px; touch-action:pan-x pan-y; -webkit-overflow-scrolling:touch; }
+  body.m #mPvBar{ display:flex; gap:8px; align-items:center; padding:8px 10px; position:sticky; top:0; left:0; z-index:5; background:var(--paper); }
+  body.m #mPvBar .seg button{ padding:8px 14px; font-size:14px; }
+  body.m .pv-hint{ display:none; }
+  body.m .pages{ align-items:flex-start; padding:0 8px; gap:10px; }
+  body.m .barhit{ display:none; }
+  body.m .mask .card{ width:100vw; max-width:none; height:100dvh; max-height:none; border-radius:0; padding:14px 14px calc(14px + env(safe-area-inset-bottom)); }
+  body.m .mask .card.small{ height:auto; border-radius:16px; width:min(420px, 92vw); }
+  body.m .card .pv-box{ padding:6px; }
+  body.m .card .row .tb-btn{ padding:11px 14px; font-size:15px; }
+  body.m .it.dragging{ opacity:.55; box-shadow:0 6px 18px rgba(0,0,0,.18); }
+
   #printArea{ display:none; }
   @page{ size:A4; margin:0; }
   @media print{
@@ -144,26 +257,65 @@
 </style>
 </head>
 <body>
-<div class="topbar">
-  <label>標題 <input type="text" id="hdTitle" placeholder="例：聽力模擬考試練習"></label>
-  <label>署名 <input type="text" id="hdAuthor"></label>
-  <label>上課日期 <input type="text" id="hdDate" placeholder="YYYYMMDD"></label>
-  <label>間距 <span class="seg" id="density"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span></label>
-  <span class="tpl-wrap"><button class="tb-btn" id="btnTpl">📋 套用模板 ▾</button><div class="tpl-menu" id="tplMenu"></div></span>
+<!-- v108：頁首（電腦、手機共用；手機只留圖示、名稱、套用模板、⋯） -->
+<div class="hdr" id="hdr">
+  <span class="brand"><img src="icon-192.png" alt="">音聽出考卷</span>
+  <span class="seg d-only" id="viewSeg"><button data-v="edit" class="on">出題</button><button data-v="blank">預覽作答卷</button><button data-v="key">預覽解答</button></span>
   <span class="spacer"></span>
-  <span class="seg" id="viewSeg"><button data-v="edit" class="on">出題</button><button data-v="blank">預覽作答卷</button><button data-v="key">預覽解答</button></span>
-  <button class="tb-btn" id="btnPrintBlank">🖨 列印作答卷</button>
-  <button class="tb-btn" id="btnPrintKey">🖨 列印解答</button>
-  <button class="tb-btn primary" id="btnMp3">⬇️ 下載 mp3</button>
-  <span class="ver">出題工具 v7</span>
+  <span class="tpl-wrap"><button class="tb-btn" id="btnTpl">📋 套用模板 ▾</button><div class="tpl-menu" id="tplMenu"></div></span>
+  <span class="tpl-wrap d-only"><button class="tb-btn primary" id="btnExport">📤 匯出 ▾</button>
+    <div class="tpl-menu ex-menu" id="exMenu">
+      <button id="btnPdfBlank">📄 PDF 作答卷</button><button id="btnPdfKey">📄 PDF 解答</button>
+      <div class="tpl-sep"></div>
+      <button id="btnPrintBlank">🖨 列印作答卷</button><button id="btnPrintKey">🖨 列印解答</button>
+      <div class="tpl-sep"></div>
+      <button id="btnMp3">⬇️ 下載 mp3（壓縮檔）</button>
+    </div></span>
+  <button class="tb-btn m-only" id="btnMore" aria-label="設定與匯出">⋯</button>
+  <span class="ver d-only">出題工具 v8</span>
+</div>
+
+<!-- 考卷設定卡片：電腦版放在右邊列表最上面，手機版放進「設定與匯出」頁（applyMode 搬動） -->
+<div class="card-box set-card" id="setCard">
+  <div class="cb-h">📝 考卷設定</div>
+  <div class="set-grid">
+    <label>標題</label><input type="text" id="hdTitle" placeholder="例：聽力模擬考試練習" class="span3">
+    <label>署名</label><input type="text" id="hdAuthor"><label>上課日期</label><input type="text" id="hdDate" placeholder="YYYYMMDD">
+    <label>間距</label><span class="seg span3" id="density"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span>
+  </div>
+</div>
+
+<!-- 手機版：設定與匯出（整頁） -->
+<div id="mSet">
+  <div class="mset-h"><button class="tb-btn" id="mSetBack">← 返回</button><b>設定與匯出</b></div>
+  <div class="mset-body">
+    <div id="setSlotM"></div>
+    <div class="card-box">
+      <div class="cb-h">📤 匯出</div>
+      <div class="mset-btns">
+        <button class="tb-btn" id="mPdfBlank">📄 PDF 作答卷</button><button class="tb-btn" id="mPdfKey">📄 PDF 解答</button>
+        <button class="tb-btn primary" id="mMp3">⬇️ 下載 mp3（壓縮檔）</button>
+      </div>
+    </div>
+    <div class="card-box">
+      <div class="mset-btns">
+        <button class="tb-btn" id="btnA2hs">📲 加入主畫面</button>
+        <button class="tb-btn" id="btnClearM">🗑 清空考卷</button>
+      </div>
+    </div>
+    <div class="ver" style="text-align:center;">出題工具 v8</div>
+  </div>
 </div>
 
 <div class="main" id="mainView">
-  <div class="left">
+  <div class="left card-box">
     <div class="tabs" id="tabs"></div>
     <div class="frames" id="frames"></div>
   </div>
+  <!-- v108：左右分隔（拖曳調整右邊寬度，雙擊恢復預設） -->
+  <div class="split d-only" id="split" title="拖曳調整寬度（雙擊恢復）"><span class="knob"><i></i><i></i><i></i></span></div>
   <div class="right">
+    <div id="setSlotD"></div>
     <div class="list-head">
       <span>題目列表</span><span class="total" id="totalScore"></span><span class="spacer"></span>
       <label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="noPreviewTop"> 出題後直接加入</label>
@@ -174,6 +326,8 @@
 </div>
 
 <div class="pv" id="pvView">
+  <div id="mPvBar"><span class="seg" id="mPvSeg"><button data-v="blank">作答卷</button><button data-v="key">解答</button></span>
+    <span class="spacer"></span><button class="tb-btn" id="btnPdfM">📄 匯出 PDF</button></div>
   <div class="pv-hint">單旋律、節奏：點小節線可以「從這裡換行」，點行尾的小節線可以「併回上一行」。紅字表示上一頁放不下而自動換頁。</div>
   <div class="pages" id="pvPages"></div>
 </div>
@@ -197,14 +351,14 @@
 </div>
 
 <div class="mask" id="confirmMask">
-  <div class="card" style="width:min(420px,92vw);">
+  <div class="card small" style="width:min(420px,92vw);">
     <h3 id="confirmText">確定？</h3>
     <div class="row"><button class="tb-btn primary" id="confirmOk">確定</button><button class="tb-btn" id="confirmNo">取消</button></div>
   </div>
 </div>
 
 <div class="mask" id="nameMask">
-  <div class="card" style="width:min(420px,92vw);">
+  <div class="card small" style="width:min(420px,92vw);">
     <h3>把目前考卷存成新模板</h3>
     <p style="font-size:13px;color:var(--ink-soft);margin:4px 0 10px;">存的是每一題的設定、標題、配分、換行與換頁；套用時會重新出題。</p>
     <input type="text" id="nameInput" placeholder="模板名稱" style="width:100%;box-sizing:border-box;border:1px solid var(--panel-border);border-radius:8px;padding:7px 9px;font-size:14px;">
@@ -212,12 +366,32 @@
   </div>
 </div>
 
+<!-- 檔案做好了：iPhone／iPad 要由使用者按一下才能分享或下載 -->
+<div class="mask" id="dlMask">
+  <div class="card small dl-card" style="width:min(420px,92vw);">
+    <h3 id="dlTitle">檔案已完成</h3>
+    <p id="dlText"></p>
+    <div class="row"><button class="tb-btn primary" id="dlBtn">分享／儲存</button><button class="tb-btn" id="dlNo">關閉</button></div>
+  </div>
+</div>
+
+<div class="mask" id="a2Mask">
+  <div class="card small" style="width:min(440px,92vw);">
+    <h3>把「音聽出考卷」加入主畫面</h3>
+    <div id="a2Body"></div>
+    <div class="row"><button class="tb-btn primary" id="a2Install" style="display:none;">安裝</button><button class="tb-btn" id="a2No">關閉</button></div>
+  </div>
+</div>
+
 <div class="mask" id="busyMask">
-  <div class="card" style="width:min(420px,92vw);">
+  <div class="card small" style="width:min(420px,92vw);">
     <h3>處理中</h3>
     <div class="msg" id="busyMsg">…</div>
   </div>
 </div>
+
+<!-- 手機版底部分頁 -->
+<div id="mNav"><button data-t="make" class="on">出題</button><button data-t="list" id="mNavList">列表</button><button data-t="pv">預覽</button></div>
 
 <div id="printArea"></div>
 

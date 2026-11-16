@@ -89,12 +89,30 @@
     var f = frames[type];
     return f && f.contentWindow && f.contentWindow.__maker ? f.contentWindow : null;
   }
+  /* v108：練習頁用到才載入。iPhone／iPad 記憶體有限（伍線譜掃描踩過：同時開太多重的東西 Safari 整個崩潰），
+     最多同時留 MAX_FRAMES 個，超過就關掉最久沒用、不是目前分頁的那個（它的設定會回到預設）。 */
+  var IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var MAX_FRAMES = (IS_IOS || /Android/.test(navigator.userAgent)) ? 2 : 8;
+  function evictFrames(keep) {
+    var ks = Object.keys(frames);
+    while (ks.length >= MAX_FRAMES) {
+      var cand = ks.filter(function (k) { return k !== curTab && k !== keep; })
+                   .sort(function (a, b) { return (frames[a].__usedAt || 0) - (frames[b].__usedAt || 0); })[0];
+      if (!cand) break;
+      var f = frames[cand];
+      try { f.src = 'about:blank'; } catch (e) {}
+      f.remove(); delete frames[cand];
+      ks = Object.keys(frames);
+    }
+  }
   function ensureFrame(type) {
-    if (frames[type]) return frames[type];
+    if (frames[type]) { frames[type].__usedAt = Date.now(); return frames[type]; }
+    evictFrames(type);
     var t = TYPES.filter(function (x) { return x.id === type; })[0];
     var f = document.createElement('iframe');
     f.src = '../tutti-1101/' + t.page + '?maker=1';
     f.addEventListener('load', function () { f.__loadedAt = Date.now(); });
+    f.__usedAt = Date.now();
     $('frames').appendChild(f);
     frames[type] = f;
     return f;
@@ -245,7 +263,7 @@
   var flashTimer = null;
   function flash(t) {
     var el = $('flash');
-    if (!el) { el = document.createElement('div'); el.id = 'flash'; el.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#262420;color:#fff;padding:9px 16px;border-radius:20px;font-size:13.5px;z-index:60;'; document.body.appendChild(el); }
+    if (!el) { el = document.createElement('div'); el.id = 'flash'; el.style.cssText = 'position:fixed;left:50%;bottom:' + (document.body.classList.contains('m') ? 84 : 26) + 'px;transform:translateX(-50%);background:#262420;color:#fff;padding:9px 16px;border-radius:20px;font-size:13.5px;z-index:60;'; document.body.appendChild(el); }
     el.textContent = t; el.style.display = '';
     clearTimeout(flashTimer); flashTimer = setTimeout(function () { el.style.display = 'none'; }, 1600);
   }
@@ -256,6 +274,7 @@
     var box = $('list'); box.innerHTML = '';
     var groups = ordered();
     var tot = paperTotal(); $('totalScore').textContent = tot == null ? '' : '總分：' + fmtScore(tot) + ' 分';
+    $('mNavList').textContent = '列表' + (paper.items.length ? '（' + paper.items.length + '）' : '');
     if (!groups.length) {
       box.innerHTML = '<div class="empty">左邊選擇題型、設定好之後按「➕ 出題」，題目就會依類型自動放進大題。<br>大題名稱、小題標題都可以直接點來修改；拖曳 ≡ 可以在同一個大題裡調整順序。</div>';
       return;
@@ -285,7 +304,7 @@
         row.dataset.id = it.id; row.dataset.sec = it.section;
         var grip = document.createElement('span'); grip.className = 'grip'; grip.textContent = '≡'; grip.title = '拖曳調整順序';
         var num = document.createElement('span'); num.className = 'it-num'; num.textContent = o.num + '.';
-        var ti = document.createElement('input'); ti.value = it.title;
+        var ti = document.createElement('input'); ti.value = it.title; ti.title = it.title;   // 太長時滑過去看全文
         ti.onchange = function () { it.title = ti.value.trim() || it.title; ti.value = it.title; save(); };
         var info = document.createElement('span'); info.className = 'it-info';
         info.textContent = it.layout === 'cells' ? (it.data.questions.length + ' 格') : (it.layout === 'grand' ? (it.answers && it.answers.key ? it.answers.key.replace('：', '') : '') : '');
@@ -317,7 +336,11 @@
         var ii = document.createElement('input'); ii.type = 'text'; ii.inputMode = 'decimal'; ii.value = it.score != null ? fmtScore(it.score) : '';
         ii.onchange = function () { it.score = parseScore(ii.value); save(); renderList(); };
         isc.appendChild(ii); isc.appendChild(document.createTextNode('分')); extra.push(isc);
-        [grip, num, ti, info].concat(extra, [rg, pb, del]).forEach(function (x) { row.appendChild(x); });
+        /* v108 手機：▲▼ 移動（電腦版隱藏）＋觸控拖曳 ≡ */
+        var up = btn('▲', '往上移', function () { moveItem(it, -1); }); up.classList.add('mv');
+        var dn = btn('▼', '往下移', function () { moveItem(it, 1); }); dn.classList.add('mv');
+        [grip, num, ti, info].concat(extra, [up, dn, rg, pb, del]).forEach(function (x) { row.appendChild(x); });
+        grip.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse') return; e.preventDefault(); touchDrag(e, row, it, grip); });
         grip.onmousedown = function () { row.draggable = true; };
         row.ondragstart = function (e) { dragId = it.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
         row.ondragend = function () { row.draggable = false; row.classList.remove('dragging'); clearDrop(); dragId = null; };
@@ -340,6 +363,39 @@
     });
   }
   var dragId = null;
+  function moveItem(it, dir) {
+    var arr = paper.items, same = arr.filter(function (x) { return x.section === it.section; });
+    var i = same.indexOf(it), j = i + dir; if (j < 0 || j >= same.length) return;
+    var a = arr.indexOf(it), b = arr.indexOf(same[j]); arr[a] = same[j]; arr[b] = it;
+    save(); renderList();
+  }
+  /* 手指拖曳 ≡（HTML 的拖放在手機上不能用）：只能在同一大題內；靠近列表上下緣自動捲動 */
+  function touchDrag(e, row, it, grip) {
+    var box = document.querySelector('.right'), target = null, before = false;
+    try { grip.setPointerCapture(e.pointerId); } catch (x) {}
+    row.classList.add('dragging');
+    function mv(ev) {
+      clearDrop(); target = null;
+      var el = document.elementFromPoint(ev.clientX, ev.clientY), r = el && el.closest('.it');
+      if (r && r !== row && r.dataset.sec === it.section) {
+        var rc = r.getBoundingClientRect(); before = ev.clientY < rc.top + rc.height / 2;
+        r.classList.add(before ? 'drop-before' : 'drop-after'); target = r;
+      }
+      var br = box.getBoundingClientRect();
+      if (ev.clientY < br.top + 50) box.scrollTop -= 12; else if (ev.clientY > br.bottom - 50) box.scrollTop += 12;
+    }
+    function upH() {
+      grip.removeEventListener('pointermove', mv); grip.removeEventListener('pointerup', upH); grip.removeEventListener('pointercancel', upH);
+      row.classList.remove('dragging'); clearDrop();
+      if (target) {
+        var t = byId(target.dataset.id);
+        paper.items.splice(paper.items.indexOf(it), 1);
+        paper.items.splice(paper.items.indexOf(t) + (before ? 0 : 1), 0, it);
+        save(); renderList();
+      }
+    }
+    grip.addEventListener('pointermove', mv); grip.addEventListener('pointerup', upH); grip.addEventListener('pointercancel', upH);
+  }
   function byId(id) { return paper.items.filter(function (x) { return x.id === id; })[0]; }
   function clearDrop() { document.querySelectorAll('.drop-before,.drop-after').forEach(function (x) { x.classList.remove('drop-before', 'drop-after'); }); }
   function btn(t, title, fn) { var b = document.createElement('button'); b.className = 'ib'; b.textContent = t; b.title = title; b.onclick = fn; return b; }
@@ -495,6 +551,7 @@
     document.querySelectorAll('#viewSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); });
     $('mainView').classList.toggle('off', v !== 'edit');
     $('pvView').classList.toggle('on', v !== 'edit');
+    if (v !== 'edit') { pvMode = v; document.querySelectorAll('#mPvSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); }); }
     if (v === 'edit') renderList(); else renderPreview();
   }
   function renderPreview() {
@@ -503,6 +560,7 @@
     box.innerHTML = '';
     if (!paper.items.length) { box.innerHTML = '<div class="empty">還沒有題目。</div>'; return; }
     buildPages(view, true).forEach(function (p) { box.appendChild(p); });
+    applyPvZoom();
     $('pvView').scrollTop = y;
   }
   document.querySelectorAll('#viewSeg button').forEach(function (b) { b.onclick = function () { setView(b.dataset.v); }; });
@@ -541,18 +599,16 @@
       for (var i = 0; i < list.length; i++) {
         var o = list[i], label = '第 ' + (i + 1) + '／' + list.length + ' 題';
         busy(label + '：產生聲音…');
-        var w = await waitFrame(o.it.type); zipWin = zipWin || w;
+        var w = await waitFrame(o.it.type); zipWin = w;   // v108：用最後一個（前面的練習頁可能已被關掉）
         var buf = await w.PianoEngine.renderOffline(w.__maker.events(o.it.data));
         var blob = await w.AudioExport.encodeMp3(buf, function (p) { busy(label + '：編碼中 ' + Math.round(p * 100) + '%'); });
         files.push({ name: o.num + '_' + safeName(o.sec) + '_' + safeName(o.it.title) + '.mp3', u8: new Uint8Array(await blob.arrayBuffer()) });
       }
       busy('打包中…');
       var zip = zipWin.ExportMenu.makeZip(files, new Date());
-      var a = document.createElement('a'); a.href = URL.createObjectURL(zip);
-      a.download = '聽寫課堂練習音檔_' + (paper.header.date || today()) + '.zip';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-      busy(null); flash('✓ 已下載 ' + files.length + ' 個 mp3');
+      files = null;
+      busy(null);
+      deliver(zip, '聽寫課堂練習音檔_' + (paper.header.date || today()) + '.zip', 'zip', list.length + ' 個 mp3');
     } catch (e) { busy(null); alert('mp3 產生失敗：' + e.message); }
   };
 
@@ -590,12 +646,18 @@
     m.appendChild(Object.assign(document.createElement('div'), { className: 'tpl-sep' }));
     row('＋ 把目前考卷存成新模板', '', openSaveTpl);
   }
-  function closeTplMenu() { $('tplMenu').classList.remove('on'); }
+  function closeTplMenu() { $('tplMenu').classList.remove('on'); $('exMenu').classList.remove('on'); }
   $('btnTpl').onclick = function (e) {
     e.stopPropagation();
     if ($('tplMenu').classList.contains('on')) { closeTplMenu(); return; }
-    renderTplMenu(); $('tplMenu').classList.add('on');
+    closeTplMenu(); renderTplMenu(); $('tplMenu').classList.add('on');
   };
+  /* v108：電腦版「📤 匯出 ▾」（PDF、列印、mp3） */
+  $('btnExport').onclick = function (e) {
+    e.stopPropagation();
+    var on = $('exMenu').classList.contains('on'); closeTplMenu(); if (!on) $('exMenu').classList.add('on');
+  };
+  $('exMenu').addEventListener('click', function (e) { if (e.target.closest('button')) closeTplMenu(); });
   document.addEventListener('click', function (e) { if (!e.target.closest('.tpl-wrap')) closeTplMenu(); });
 
   function confirmApply(name, fn) {
@@ -691,6 +753,172 @@
     if (idx >= 0) ask('已經有「' + name + '」這個模板，要覆蓋嗎？', doSave); else doSave();
   };
 
+  /* ---------- 交付檔案（v108）----------
+     電腦、Android：直接下載。iPhone／iPad：要由使用者按一下才能下載或分享（非同步做完之後瀏覽器不讓程式自己開），
+     PDF 走下載（會開系統的 PDF 預覽，右上角分享才有 LINE；伍線譜掃描實測 navigator.share 分享 PDF 時 LINE 不會出現），
+     壓縮檔走分享面板（可「儲存到檔案」）。 */
+  function download(blob, name) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 300000);
+  }
+  function deliver(blob, name, kind, desc) {
+    if (!IS_IOS) { download(blob, name); flash('✓ 已下載 ' + (desc || name)); return; }
+    $('dlTitle').textContent = kind === 'pdf' ? 'PDF 已完成' : 'mp3 壓縮檔已完成';
+    $('dlText').textContent = name + '（' + (blob.size / 1048576).toFixed(1) + ' MB）。' +
+      (kind === 'pdf' ? '按「開啟」會打開 PDF，從右上角的分享鈕可以存到「檔案」或傳 LINE。' : '按「分享／儲存」後選「儲存到檔案」，或傳給 LINE 等 App。');
+    $('dlBtn').textContent = kind === 'pdf' ? '開啟' : '分享／儲存';
+    $('dlMask').classList.add('on');
+    $('dlBtn').onclick = async function () {
+      if (kind !== 'pdf') {
+        var file = new File([blob], name, { type: blob.type || 'application/zip' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try { await navigator.share({ files: [file] }); $('dlMask').classList.remove('on'); }
+          catch (e) { if (e && e.name !== 'AbortError') download(blob, name); }
+          return;
+        }
+      }
+      download(blob, name); $('dlMask').classList.remove('on');
+    };
+    $('dlNo').onclick = function () { $('dlMask').classList.remove('on'); };
+  }
+
+  /* ---------- 匯出 PDF（v108，600dpi 圖片 PDF；細節見 pdf-export.js）---------- */
+  async function exportPdf(mode) {
+    if (!paper.items.length) { flash('還沒有題目'); return; }
+    stopPlayer();
+    busy('匯出 PDF：準備中…');
+    var area = document.createElement('div');
+    area.style.cssText = 'position:fixed; left:-30000px; top:0; pointer-events:none;';
+    document.body.appendChild(area);
+    var name = (mode === 'key' ? '聽寫課堂練習解答_' : '聽寫課堂練習作答卷_') + (paper.header.date || today());
+    try {
+      var pages = buildPages(mode, false);
+      pages.forEach(function (p) { area.appendChild(p); });
+      await new Promise(function (r) { setTimeout(r, 60); });
+      var blob = await MakerPdf.exportPages(pages, { dpi: 600, gray: mode !== 'key', title: name,
+        onProgress: function (p, n, s, S) { busy('匯出 PDF：第 ' + (p + 1) + '／' + n + ' 頁　' + Math.round(s / S * 100) + '%'); } });
+      area.remove(); busy(null);
+      deliver(blob, name + '.pdf', 'pdf');
+    } catch (e) { area.remove(); busy(null); alert('PDF 匯出失敗：' + (e && e.message || e) + (IS_IOS ? '\n（可能是記憶體不足：請關掉其他 App 後再試一次）' : '')); }
+  }
+  $('btnPdfBlank').onclick = function () { exportPdf('blank'); };
+  $('btnPdfKey').onclick = function () { exportPdf('key'); };
+  $('btnPdfM').onclick = function () { exportPdf(pvMode); };
+
+  /* ---------- 手機版（v108，寬度小於 900px）---------- */
+  var mq = window.matchMedia('(max-width: 899px)'), mtab = 'make', pvMode = 'blank', pvZoom = 1;
+  function isM() { return mq.matches; }
+  /* 考卷設定卡片：電腦版在右邊列表最上面，手機版在「設定與匯出」頁 */
+  function applyMode() {
+    var m = isM();
+    document.body.classList.toggle('m', m);
+    closeTplMenu();
+    if (m) { $('setSlotM').appendChild($('setCard')); setMTab(mtab === 'set' ? 'make' : mtab); }
+    else {
+      $('setSlotD').appendChild($('setCard'));
+      delete document.body.dataset.mtab;
+      $('pvPages').style.zoom = '';
+      if (view !== 'edit') renderPreview();
+      applySplit();
+    }
+  }
+  var lastTab = 'make';
+  function setMTab(t) {
+    if (t !== 'set') lastTab = t;
+    mtab = t; document.body.dataset.mtab = t;
+    document.querySelectorAll('#mNav button').forEach(function (b) { b.classList.toggle('on', b.dataset.t === t); });
+    if (t === 'set') return;
+    if (t === 'pv') setView(pvMode); else if (view !== 'edit') setView('edit');
+  }
+  document.querySelectorAll('#mNav button').forEach(function (b) { b.onclick = function () { setMTab(b.dataset.t); }; });
+  document.querySelectorAll('#mPvSeg button').forEach(function (b) { b.onclick = function () { setView(b.dataset.v); }; });
+  /* 手機「⋯」：整頁的「設定與匯出」（← 返回回到原本的分頁） */
+  $('btnMore').onclick = function (e) { e.stopPropagation(); closeTplMenu(); setMTab('set'); };
+  $('mSetBack').onclick = function () { setMTab(lastTab); };
+  $('btnClearM').onclick = function () { $('btnClear').click(); };
+  $('mPdfBlank').onclick = function () { exportPdf('blank'); };
+  $('mPdfKey').onclick = function () { exportPdf('key'); };
+  $('mMp3').onclick = function () { $('btnMp3').click(); };
+
+  /* ---------- 電腦版：左右分隔（v108）----------
+     拖曳調整右邊列表的寬度，記在瀏覽器；雙擊恢復預設。左邊至少 420、右邊至少 480 */
+  var SPLIT_KEY = 'earTrainer.maker.split', RW_DEF = 680, RW_MIN = 480, LW_MIN = 420;
+  function splitMax() { return $('mainView').clientWidth - 32 - 16 - LW_MIN; }
+  function applySplit(w) {
+    if (w == null) { try { w = parseFloat(localStorage.getItem(SPLIT_KEY)) || RW_DEF; } catch (e) { w = RW_DEF; } }
+    w = Math.max(RW_MIN, Math.min(w, Math.max(RW_MIN, splitMax())));
+    $('mainView').style.setProperty('--rw', w + 'px');
+    return w;
+  }
+  (function () {
+    var sp = $('split'), drag = null;
+    sp.addEventListener('pointerdown', function (e) {
+      e.preventDefault(); sp.setPointerCapture(e.pointerId);
+      drag = { x: e.clientX, w: $('mainView').querySelector('.right').getBoundingClientRect().width };
+      sp.classList.add('drag'); document.body.classList.add('splitting');
+    });
+    sp.addEventListener('pointermove', function (e) { if (drag) drag.cur = applySplit(drag.w - (e.clientX - drag.x)); });
+    function end() {
+      if (!drag) return;
+      if (drag.cur) { try { localStorage.setItem(SPLIT_KEY, String(drag.cur)); } catch (e) {} }
+      drag = null; sp.classList.remove('drag'); document.body.classList.remove('splitting');
+    }
+    sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+    sp.addEventListener('dblclick', function () { try { localStorage.removeItem(SPLIT_KEY); } catch (e) {} applySplit(RW_DEF); });
+    window.addEventListener('resize', function () { if (!isM()) applySplit(); });
+  })();
+  /* 預覽：A4 縮到螢幕寬（CSS zoom 會重新排版，放大後仍清楚）；兩指縮放 1～4 倍 */
+  var PAGE_PX = 210 / 25.4 * 96;
+  function applyPvZoom() {
+    if (!isM()) { $('pvPages').style.zoom = ''; return; }
+    var fit = Math.max(0.2, ($('pvView').clientWidth - 16) / PAGE_PX);
+    $('pvPages').style.zoom = (fit * pvZoom).toFixed(4);
+  }
+  (function () {
+    var pv = $('pvView'), pinch = null;
+    function dist(t) { return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
+    pv.addEventListener('touchstart', function (e) {
+      if (!isM() || e.touches.length !== 2) return;
+      var r = pv.getBoundingClientRect();
+      pinch = { d0: dist(e.touches), z0: pvZoom, cx: (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left, cy: (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top };
+      pinch.px = (pv.scrollLeft + pinch.cx) / pvZoom; pinch.py = (pv.scrollTop + pinch.cy) / pvZoom;
+    }, { passive: true });
+    pv.addEventListener('touchmove', function (e) {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      var z = Math.max(1, Math.min(4, pinch.z0 * dist(e.touches) / pinch.d0));
+      if (Math.abs(z - pvZoom) < 0.01) return;
+      pvZoom = z; applyPvZoom();
+      pv.scrollLeft = pinch.px * z - pinch.cx; pv.scrollTop = pinch.py * z - pinch.cy;
+    }, { passive: false });
+    pv.addEventListener('touchend', function (e) { if (e.touches.length < 2) pinch = null; });
+    window.addEventListener('resize', function () { if (view !== 'edit') applyPvZoom(); });
+  })();
+
+  /* ---------- 加入主畫面 ---------- */
+  var installEvt = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvt = e; });
+  $('btnA2hs').onclick = function () {
+    var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+    var ipad = IS_IOS && !/iPhone|iPod/.test(navigator.userAgent), html;
+    if (standalone) html = '<p class="msg">你已經是從主畫面打開的「音聽出考卷」了。</p>';
+    else if (IS_IOS) html = '<ol class="a2-steps"><li>請用 <b>Safari</b> 打開這個網址</li><li>點' + (ipad ? '右上角' : '下方') + '的分享鈕（方框加向上箭頭）</li>' +
+                            '<li>選「加入主畫面」</li><li>名稱是「音聽出考卷」，按「新增」</li></ol>' +
+                            '<p class="msg" style="margin-top:8px;">從主畫面打開的資料和 Safari 裡的是分開的：之前在 Safari 存的考卷、模板，主畫面那邊看不到。刪除主畫面圖示也會刪掉裡面的考卷與模板。</p>';
+    else html = installEvt ? '<p class="msg">按下「安裝」，就會出現在主畫面。</p>'
+                           : '<ol class="a2-steps"><li>請用 <b>Chrome</b> 打開這個網址</li><li>點右上角的 ⋮</li><li>選「加到主畫面」或「安裝應用程式」</li></ol>';
+    $('a2Body').innerHTML = html;
+    $('a2Install').style.display = (!standalone && !IS_IOS && installEvt) ? '' : 'none';
+    $('a2Mask').classList.add('on');
+  };
+  $('a2Install').onclick = async function () {
+    if (!installEvt) return;
+    installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {}
+    installEvt = null; $('a2Mask').classList.remove('on');
+  };
+  $('a2No').onclick = function () { $('a2Mask').classList.remove('on'); };
+
   /* ---------- 上方欄位 ---------- */
   function bindHeader() {
     [['hdTitle', 'title'], ['hdAuthor', 'author'], ['hdDate', 'date']].forEach(function (p) {
@@ -706,6 +934,6 @@
   }
 
   bindHeader(); buildTabs(); renderList();
-  ensureFrame('rhythm');   // 先載入第二個練習頁，切換時不必等
+  applyMode(); mq.addEventListener ? mq.addEventListener('change', applyMode) : mq.addListener(applyMode);
   window.__makerApp = { get paper() { return paper; }, loadTpls: loadTpls, buildPages: buildPages, ordered: ordered, waitFrame: waitFrame, renderList: renderList, setView: setView, save: save };
 })();

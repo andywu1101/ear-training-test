@@ -1,0 +1,14 @@
+{
+  "name": "音聽出考卷",
+  "short_name": "音聽出考卷",
+  "description": "一鍵產生聽寫考卷：作答卷、解答與音檔（音樂聽力練習 贊助者專屬工具）",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#efeee6",
+  "theme_color": "#33415c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
