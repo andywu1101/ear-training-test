@@ -12,6 +12,9 @@
     var m = document.querySelector('meta[name=viewport]');
     if (m) m.setAttribute('content', m.getAttribute('content').replace(/,\s*viewport-fit=cover/, ''));
     document.documentElement.classList.add('ipad');
+  } else if (/iPhone|iPod/.test(navigator.userAgent) && (navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches))) {
+    /* v108.4：iPhone 從主畫面打開時，系統霧化與點不到的範圍比安全區還往下延伸，多留 16 點（24 點太多；Safari 有自己的狀態列帶子，不需要） */
+    document.documentElement.classList.add('iphone-sa');
   }
 })();
 </script>
@@ -55,6 +58,7 @@
   /* v108.1：狀態列高度（主畫面 App 才有值；電腦、Safari 分頁是 0）。iPad 多留 24 點（同伍線譜掃描 1.34） */
   :root{ --st:env(safe-area-inset-top, 0px); --sb:env(safe-area-inset-bottom, 0px); }
   html.ipad{ --st:calc(env(safe-area-inset-top, 0px) + 24px); }
+  html.iphone-sa{ --st:calc(env(safe-area-inset-top, 0px) + 16px); }
   /* iOS 26 主畫面 App：網頁比畫面矮時底部會少畫一段（WebKit 301108），讓網頁本身高一點（同伍線譜掃描） */
   @media (display-mode: standalone){ html{ min-height:min(100lvh, calc(100% + env(safe-area-inset-top))); } }
   /* v108：工具列折成兩行時下面不會被擠出畫面（原本用 100vh - 58px） */
