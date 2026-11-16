@@ -90,7 +90,7 @@
         { no: '七', label: '四部和聲',     max: 20,  keys: ['fourpart'], perUnit: 1 }
       ],
       buildConfig: function () {
-        var r1 = pick(SIMPLE_METERS), m1 = pick(SIMPLE_METERS);
+        var r1 = pick(SIMPLE_METERS), m1 = pick(SIMPLE_METERS), t1 = pick(HS_METERS);   // v.107：兩聲部拍號隨機（同高中檔三選一）
         var pe1 = pick(PE_METERS), pe2 = pick(PE_METERS);
         var clefOf = function () { return Math.random() < 0.5 ? 'treble' : 'bass'; };
         return {
@@ -101,13 +101,13 @@
                        meter: pe2.meter, meterType: pe2.meterType, bars: 4, noteBudget: pe2.noteBudget,
                        bpm: 72, plays: 5, errCount: 5, tuningA: true },
           interval: { count: 10, allowRepeat: false, compound: true, pool: 'ALL13' },
-          chord:    { count: 10, allowRepeat: false, inversion: false, pool: 'LV5' },
+          chord:    { count: 10, allowRepeat: false, inversion: true, pool: 'LV5' },   // v.107：含轉位
           rhythm1: { meter: r1.meter, meterType: 'simple', bars: r1.bars, bpm: 80, plays: 5, pitchMode: 'single', tie: true, tieMin: 1, tieMax: 2 },
           rhythm2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 80, plays: 5, pitchMode: 'dual', tie: true, tieMin: 1, tieMax: 2 },
           melody1: { meter: m1.meter, meterType: 'simple', bars: m1.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true, tie: true, tieMin: 1, tieMax: 2 },
           melody2: { meter: COMPOUND_METER.meter, meterType: 'compound', bars: COMPOUND_METER.bars, bpm: 72, plays: 6, clef: 'treble', tuningA: true, tie: true, tieMin: 1, tieMax: 2 },
-          twopart:  { meter: '4/4', meterType: 'simple', bars: 2, bpm: 70, plays: 8, tuningA: true, tie: true, tieMin: 1, tieMax: 2 },
-          fourpart: { bars: 10, bpm: 100, plays: 6, levelId: 4, tuningA: true }
+          twopart:  { meter: t1.meter, meterType: t1.meterType, bars: t1.bars, bpm: 70, plays: 8, tuningA: true, tie: true, tieMin: 1, tieMax: 2 },
+          fourpart: { bars: 10, bpm: 80, plays: 6, levelId: 4, tuningA: true }   // v.107：速度 100 → 80
         };
       }
     },
@@ -128,15 +128,19 @@
       ],
       buildConfig: function () {
         var m1 = pick(HS_METERS), t1 = pick(HS_METERS);
+        /* v.107：連結線 0～1 條——每段各抽一次，一半沒有、一半固定 1 條
+           （練習頁的出題程式開了連結線就至少 1 條，所以在這裡決定開或不開） */
+        var tie01 = function (o) { return Math.random() < 0.5 ? o : Object.assign(o, { tie: true, tieMin: 1, tieMax: 1 }); };
         return {
           interval: { count: 10, allowRepeat: false, compound: true, pool: 'NO_P1' },
           chord:    { count: 10, allowRepeat: true, inversion: false, pool: 'HS9' },
-          rhythm1: { meter: '4/4', meterType: 'simple',   bars: 2, bpm: 72, plays: 5, pitchMode: 'single' },
-          rhythm2: { meter: '3/4', meterType: 'simple',   bars: 3, bpm: 72, plays: 5, pitchMode: 'single' },
-          rhythm3: { meter: '6/8', meterType: 'compound', bars: 3, bpm: 72, plays: 5, pitchMode: 'dual' },
-          melody1: { meter: m1.meter, meterType: m1.meterType, bars: m1.bars, bpm: 68, plays: 6, clef: 'treble', tuningA: true },
-          twopart:  { meter: t1.meter, meterType: t1.meterType, bars: t1.bars, bpm: 64, plays: 8, tuningA: true },
-          fourpart: { bars: 10, bpm: 80, plays: 6, levelId: 3, tuningA: true }
+          /* v.107：速度放慢（節奏 72→68、單旋律 68→64、兩聲部 64→60、四部和聲 80→64） */
+          rhythm1: tie01({ meter: '4/4', meterType: 'simple',   bars: 2, bpm: 68, plays: 5, pitchMode: 'single' }),
+          rhythm2: tie01({ meter: '3/4', meterType: 'simple',   bars: 3, bpm: 68, plays: 5, pitchMode: 'single' }),
+          rhythm3: tie01({ meter: '6/8', meterType: 'compound', bars: 3, bpm: 68, plays: 5, pitchMode: 'dual' }),
+          melody1: tie01({ meter: m1.meter, meterType: m1.meterType, bars: m1.bars, bpm: 64, plays: 6, clef: 'treble', tuningA: true }),
+          twopart:  tie01({ meter: t1.meter, meterType: t1.meterType, bars: t1.bars, bpm: 60, plays: 8, tuningA: true }),
+          fourpart: { bars: 10, bpm: 64, plays: 6, levelId: 3, tuningA: true }
         };
       }
     }
