@@ -1743,6 +1743,8 @@ function showPage(pageId) {
     pendingTimers.push(timerId);
   }
 
+  /* 出題模式（v106.5）：只給出題工具 cadenza-1101 用，網址帶 ?maker=1 才啟動，一般使用者完全不會執行 */
+  const MAKER_MODE = new URLSearchParams(location.search).get('maker') === '1';
   const tpModule = {
     mode: 'practice', meter: '2/4', meterType: 'simple', barsCount: 2, beatsPerBar: 2, bpm: 80, totalBeats: 4,
     selectedPatterns: new Set(),
@@ -2657,6 +2659,7 @@ function showPage(pageId) {
         this.activeSlotIdx = { top: 0, bottom: 0 }; this.activeNoteIdx = { top: 0, bottom: 0 }; this.lastEditedNoteIdx = { top: null, bottom: null };
 
         this.generateQuestion();
+        if(MAKER_MODE){ makerOffer(); return; }   // 出題模式：把題目交給出題工具，不進作答頁
         this.rebuildUserPitchArray('top'); this.rebuildUserPitchArray('bottom');
 
         document.getElementById('tp-playCaption').textContent = '';
@@ -2792,8 +2795,62 @@ function showPage(pageId) {
     }
   };
 
+  /* ===== 出題模式（v106.5，出題工具 cadenza-1101 專用；?maker=1 才會執行）=====
+     出題、繪譜、音檔一律呼叫本頁原本的函式，這裡只負責把結果交給出題工具。 */
+  const MAKER_FIELDS = ['meter','meterType','barsCount','beatsPerBar','totalBeats','bpm','tieEnabled','tieMin','tieMax','questionSeq','questionTie','questionPitch'];
+  const makerCopy = o => JSON.parse(JSON.stringify(o));
+  function makerData(m){
+    return { seq: makerCopy(m.questionSeq), tie: makerCopy(m.questionTie), pitch: makerCopy(m.questionPitch),
+             barsCount: m.barsCount, beatsPerBar: m.beatsPerBar, meter: m.meter, meterType: m.meterType, bpm: m.bpm };
+  }
+  function makerSnapshot(m){
+    return { meter: m.meter, meterType: m.meterType, barsCount: m.barsCount, beatsPerBar: m.beatsPerBar,
+             totalBeats: m.totalBeats, bpm: m.bpm, tieEnabled: m.tieEnabled, tieMin: m.tieMin, tieMax: m.tieMax, patterns: Array.from(m.selectedPatterns) };
+  }
+  function makerTitle(snap){ return snap.meter + '拍 ' + snap.barsCount + '小節'; }
+  function makerOffer(){
+    const snap = makerSnapshot(tpModule);
+    if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'twopart', data: makerData(tpModule), snapshot: snap, title: makerTitle(snap) });
+  }
+  if(MAKER_MODE) window.__maker = {
+    type: 'twopart',
+    /* 用快照暫時改寫模組狀態出一題，出完立刻還原（畫面上的設定不受影響） */
+    regen: function(snap){
+      const m = tpModule, keep = {}, keepPat = new Set(m.selectedPatterns);
+      MAKER_FIELDS.forEach(k => { keep[k] = m[k]; });
+      try{
+        ['meter','meterType','barsCount','beatsPerBar','totalBeats','bpm','tieEnabled','tieMin','tieMax'].forEach(k => { m[k] = snap[k]; });
+        m.questionSeq = { top: [], bottom: [] }; m.questionPitch = { top: [], bottom: [] }; m.questionTie = { top: [], bottom: [] };
+        m.selectedPatterns = new Set(snap.patterns);
+        m.generateQuestion();
+        return makerData(m);
+      } finally {
+        MAKER_FIELDS.forEach(k => { m[k] = keep[k]; });
+        m.selectedPatterns = keepPat;
+      }
+    },
+    /* 譜例：用本頁解答頁的大譜表繪譜畫在畫面外（同 doExportSheet），交給 MusicXML 記錄器 */
+    musicxml: function(data){
+      const made = offscreenStaff(id => renderStaticGrand(id, data.seq.top, data.seq.bottom, data.pitch.top, data.pitch.bottom,
+        null, null, null, null, data, data.tie, null));
+      try{ return window.SheetExport.buildMusicXML([{ svg: made.svg }], {}); }
+      finally{ made.holder.remove(); }
+    },
+    answers: function(){ return []; },
+    events: function(data){ return buildExportEvents(data.seq.top, data.seq.bottom, data.pitch.top, data.pitch.bottom, data, data.tie.top, data.tie.bottom); }
+  };
+  function makerSetup(){
+    document.body.classList.add('maker-mode');
+    const st = document.createElement('style');
+    st.textContent = 'body.maker-mode #pageTpSettings .nav-header-row, body.maker-mode #pageTpSettings .review-entry-btn,' +
+      ' body.maker-mode #pageTpSettings .switch-group:has(#tp-modeSwitch), body.maker-mode #testReplayWrapper { display:none !important; }';
+    document.head.appendChild(st);
+    const enter = document.getElementById('tp-enterBtn'); if(enter) enter.textContent = '➕ 出題';
+  }
+
   window.tpModule = tpModule;
   tpModule.initSettings(); tpModule.setupEvents(); tpModule.syncTieSwitch(); tpModule.refreshReviewCount(); loadPiano();
+  if(MAKER_MODE) makerSetup();   // 出題模式（v106.5）
   if(bootPaperReview(tpModule)){ /* 考卷回顧 */ }
   else if(window.EXAM && window.EXAM.isExamMode()){ tpModule.examBootstrap(); }
 

@@ -1808,6 +1808,9 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
   const ERR_DEFAULT_BY_BARS = { 1:1, 2:2, 3:2, 4:3 };
   const ALT_MAX_BY_BARS = { 1:2, 2:3, 3:4, 4:5 };
 
+  /* 出題模式（v106.5）：只給出題工具 cadenza-1101 用，網址帶 ?maker=1 才啟動，一般使用者完全不會執行 */
+  const MAKER_MODE = new URLSearchParams(location.search).get('maker') === '1';
+  let makerPrevSeq = null;
   const peModule = {
     mode:'practice', clef:'treble', tonal:'tonal', krange:'all', kmode:'both',
     meter:'2/4', meterType:'simple', barsCount:2, beatsPerBar:2, bpm:80,
@@ -1864,6 +1867,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         self.score = { c:0, t:0 };
         self.maxReplays = self.readReplayLimit();
         self.newQuestion();
+        if(MAKER_MODE){ makerOffer(); return; }   // 出題模式：把題目交給出題工具，不進作答頁
         showPage('pe-practice');
         ensureAudio();
       };
@@ -2882,10 +2886,71 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     }
   };
 
+  /* ===== 出題模式（v106.5，出題工具 cadenza-1101 專用；?maker=1 才會執行）=====
+     出題、繪譜、音檔一律呼叫本頁原本的函式，這裡只負責把結果交給出題工具。 */
+  const MAKER_SET = ['clef','tonal','krange','kmode','meter','meterType','barsCount','beatsPerBar','bpm','errCount'];
+  const MAKER_KEEP = MAKER_SET.concat(['key','seq','info','chordInfo','correctPitch','errPitch','errorIdx','errorGroups','altIdx','leadCount','selected','submitted']);
+  const MAKER_ACC = { 'n':'', '#':'♯', '##':'𝄪', 'b':'♭', 'bb':'𝄫' };
+  function makerData(m){
+    const d = JSON.parse(JSON.stringify(m.exportData()));
+    d.clef = m.clef; d.barsCount = m.barsCount; d.beatsPerBar = m.beatsPerBar;
+    return d;
+  }
+  function makerSnapshot(m){ const o = {}; MAKER_SET.forEach(k => { o[k] = m[k]; }); return o; }
+  function makerTitle(d){
+    return (d.clef === 'bass' ? '低音譜號' : '高音譜號') + ' ' + d.meter + '拍 ' + d.barsCount + '小節 共' + d.errorGroups.length + '個錯音';
+  }
+  function makerOffer(){
+    const m = peModule;
+    if(!m.seq || !m.seq.length || m.seq === makerPrevSeq || !m.errorGroups.length) return;   // 這組設定出題失敗（頁面上會顯示原因）
+    makerPrevSeq = m.seq;
+    const d = makerData(m);
+    if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'pitcherr', data: d, snapshot: makerSnapshot(m), title: makerTitle(d) });
+  }
+  if(MAKER_MODE) window.__maker = {
+    type: 'pitcherr',
+    /* 用快照暫時改寫模組狀態出一題，出完立刻還原 */
+    regen: function(snap){
+      const m = peModule, keep = {};
+      MAKER_KEEP.forEach(k => { keep[k] = m[k]; });
+      try{
+        MAKER_SET.forEach(k => { m[k] = snap[k]; });
+        m.seq = [];
+        m.newQuestion();
+        if(!m.seq.length) throw new Error('這組設定生成失敗');
+        return makerData(m);
+      } finally { MAKER_KEEP.forEach(k => { m[k] = keep[k]; }); }
+    },
+    /* 譜例：題目譜（含錯音、全黑、不標示），同「下載題目譜例」 */
+    musicxml: function(data){
+      const made = peModule.exportShot(data, false);
+      try{ return window.SheetExport.buildMusicXML([{ svg: made.svg }], {}); }
+      finally{ made.holder.remove(); }
+    },
+    /* 解答：每個錯音在第幾個音（譜上的順序）＋「應為 X ↑半音」（同解答頁上方那張） */
+    answers: function(d){
+      return { count: d.errorGroups.length, marks: d.errorGroups.map(g => {
+        const ni = d.groups[g].members[0], cp = d.correctPitch[ni], ep = d.errPitch[ni];
+        const diff = midiOf(cp) - midiOf(ep);
+        return { note: ni, label: '應為 ' + cp.step + (MAKER_ACC[cp.acc] || '') + ' ' + (diff > 0 ? '↑' : '↓') + (Math.abs(diff) === 1 ? '半音' : '全音') };
+      }) };
+    },
+    events: function(d){ return peModule.exportEvents(d); }
+  };
+  function makerSetup(){
+    document.body.classList.add('maker-mode');
+    const st = document.createElement('style');
+    st.textContent = 'body.maker-mode #pagePESettings .nav-header-row, body.maker-mode #pagePESettings .review-entry-btn,' +
+      ' body.maker-mode #pagePESettings .switch-group:has(#pe-modeSwitch), body.maker-mode #pe-testReplayWrapper { display:none !important; }';
+    document.head.appendChild(st);
+    const enter = document.getElementById('pe-enterBtn'); if(enter) enter.textContent = '➕ 出題';
+  }
+
   window.peModule = peModule;
 
   document.addEventListener('DOMContentLoaded', function(){
     peModule.initSettings();
+    if(MAKER_MODE) makerSetup();   // 出題模式（v106.5）
     const EXm = window.EXAM;
     const examMode = EXm && EXm.isExamMode();
     const _pp = new URLSearchParams(location.search);

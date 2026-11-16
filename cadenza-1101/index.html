@@ -89,6 +89,16 @@
   .ov.ans{ font-size:12.5px; }
   .ov.numeral{ font-size:14px; font-family:'Times New Roman', Times, serif; }
   .ov.keyname{ font-size:12.5px; }
+  .keyline{ display:inline-block; width:3em; border-bottom:1.2px solid #000; margin-right:2px; height:0.95em; vertical-align:baseline; }
+  .ov.errlabel{ font-size:10.5px; font-weight:700; }
+  .stack-row{ display:flex; }
+  .stack-cell{ flex:none; }
+  .stack-title{ margin-left:2px; white-space:nowrap; }
+  /* 高度鎖成一行字高：播放鈕不可以把標題撐高，否則預覽與列印的分頁會不同 */
+  .pv-ctl{ display:inline-flex; align-items:center; gap:6px; margin-left:14px; height:1em; vertical-align:top; overflow:visible; font-family:var(--font); }
+  .pv-play{ border:1px solid var(--panel-border); background:#fff; border-radius:4px; width:19px; height:16px; padding:0; font-size:8px; line-height:1; }
+  .pv-range{ width:110px; }
+  .pv-bpm{ font-size:11.5px; color:var(--ink-soft); min-width:44px; }
   .barhit{ position:absolute; width:12px; cursor:pointer; border-radius:3px; }
   .barhit:hover{ background:rgba(51,65,92,.18); }
   .barhit.at-break{ background:rgba(51,65,92,.08); }
@@ -114,7 +124,7 @@
     #printArea{ display:block; }
     #printArea .page{ box-shadow:none; page-break-after:always; break-after:page; }
     #printArea .page:last-child{ page-break-after:auto; break-after:auto; }
-    .barhit, .auto-break{ display:none !important; }
+    .barhit, .auto-break, .pv-ctl{ display:none !important; }
   }
 </style>
 </head>
@@ -129,7 +139,7 @@
   <button class="tb-btn" id="btnPrintBlank">🖨 列印作答卷</button>
   <button class="tb-btn" id="btnPrintKey">🖨 列印解答</button>
   <button class="tb-btn primary" id="btnMp3">⬇️ 下載 mp3</button>
-  <span class="ver">出題工具 v3</span>
+  <span class="ver">出題工具 v6</span>
 </div>
 
 <div class="main" id="mainView">

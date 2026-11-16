@@ -1316,6 +1316,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
      ============================================================ */
   const REVIEW_TYPE = 'pitchstack';
 
+  /* 出題模式（v106.5）：只給出題工具 cadenza-1101 用，網址帶 ?maker=1 才啟動，一般使用者完全不會執行 */
+  const MAKER_MODE = new URLSearchParams(location.search).get('maker') === '1';
   const psModule = {
     mode: 'practice', clef: 'treble', countSel: '3', maxReplays: Infinity, replaysLeft: Infinity,
     noteCount: 3, randomCount: false,
@@ -1358,6 +1360,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       this.randomCount = (this.countSel === 'random');
       this.maxReplays = (this.mode === 'test') ? Number(document.getElementById('ps-testReplaySelect').value) : Infinity;
       this.score = { c: 0, t: 0 };
+      if(MAKER_MODE){ makerOffer(); return; }   // 出題模式：把題目交給出題工具，不進作答頁
       showPage('ps-practice');
       this.newQuestion();
     },
@@ -1654,6 +1657,45 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       scrollReviewToBottom('pagePSReview');
     }
   };
+  /* ===== 出題模式（v106.5，出題工具 cadenza-1101 專用；?maker=1 才會執行）=====
+     出題（genStack／spellStack）、繪譜（drawStack）、音量（gainFor）一律用本頁原本的函式。 */
+  const MAKER_CLEF = { treble: '高音譜號', bass: '低音譜號', grand: '大譜表' };
+  function makerGen(snap){
+    const n = snap.countSel === 'random' ? (2 + Math.floor(Math.random() * 5)) : Number(snap.countSel);
+    let midis = genStack(snap.clef, n) || genStack(snap.clef, 2) || [60, 64];
+    midis = midis.slice().sort((a, b) => a - b);
+    return { clef: snap.clef, countSel: snap.countSel, midis: midis, pitches: spellStack(midis) };
+  }
+  function makerOffer(){
+    const snap = { clef: psModule.clef, countSel: psModule.countSel };
+    const title = (snap.countSel === 'random' ? '隨機音數' : snap.countSel + '音') + ' ' + MAKER_CLEF[snap.clef];
+    if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'pitchstack', data: makerGen(snap), snapshot: snap, title: title });
+  }
+  if(MAKER_MODE) window.__maker = {
+    type: 'pitchstack',
+    regen: function(snap){ return makerGen(snap); },
+    musicxml: function(data){
+      const made = offscreenStaff(id => drawStack(id, data.pitches, data.clef, {}));
+      try{ return window.SheetExport.buildMusicXML([{ svg: made.svg }], {}); }
+      finally{ made.holder.remove(); }
+    },
+    answers: function(){ return []; },
+    /* 同 App 導出：標準音 A 2 秒 → 1 秒 → 音堆一次 */
+    events: function(data){
+      const ev = [{ midi: 69, time: 0, duration: 2.0, gain: 3.5 }], n = data.midis.length;
+      data.midis.forEach(m => ev.push({ midi: m, time: 3.0, duration: STACK_SUSTAIN, gain: gainFor(m, n) }));
+      return ev;
+    }
+  };
+  function makerSetup(){
+    document.body.classList.add('maker-mode');
+    const st = document.createElement('style');
+    st.textContent = 'body.maker-mode #pagePSSettings .nav-header-row, body.maker-mode #pagePSSettings .review-entry-btn,' +
+      ' body.maker-mode #pagePSSettings .switch-group:has(#ps-modeSwitch), body.maker-mode #ps-testReplayWrapper { display:none !important; }';
+    document.head.appendChild(st);
+    const enter = document.getElementById('ps-enterBtn'); if(enter) enter.textContent = '➕ 出題';
+  }
+
   window.psModule = psModule;
 
   /* ============================================================
@@ -1661,6 +1703,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
      ============================================================ */
   document.addEventListener('DOMContentLoaded', function(){
     psModule.initSettings();
+    if(MAKER_MODE) makerSetup();   // 出題模式（v106.5）
 
     document.getElementById('ps-playBtn').onclick = () => psModule.play();
     document.getElementById('ps-tuningBtn').onclick = () => { if(PianoEngine.isLocked()) return; ensureAudio(); playTuningA(); };

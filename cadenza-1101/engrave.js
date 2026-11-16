@@ -167,8 +167,8 @@
       var meta = { cells: [] };
       row.forEach(function (m, i) {
         var cx0 = X0 + preW + i * cellW, cx1 = cx0 + cellW, cc = (cx0 + cx1) / 2;
-        /* 格間雙小節線（細＋細） */
-        vline(ctx, cx1 - 4, top, bot, 1); vline(ctx, cx1 - 1, top, bot, 1);
+        /* 每格各自是一題：格尾用終止線（細＋粗） */
+        vline(ctx, cx1 - 6, top, bot, 1); vline(ctx, cx1 - 3, top, bot, 3);
         var num = numStart.cell + r * CELLS_PER_ROW + i;
         overlay(sys, k, cx0 + 4, yT - 44, num + '.', 'cellnum');
         meta.cells.push({ x0: cx0, x1: cx1, centre: cc });
@@ -207,18 +207,24 @@
   function defaultBreaks(n, per) { var b = []; for (var i = per; i < n; i += per) b.push(i); return b; }
   /* 預設每行 4 小節；但音符太密（例如 12/8 有十六分音符又有臨時記號）放不下時，自動減少每行小節數。
      作者自己點過換行（item.breaks 有值）就照作者的。 */
-  function measureNeed(m, clef) {
-    var src = m.staves[0] || [];
-    if (!src.length) return 0;
-    var notes = src.map(function (nn) { return makeNote(nn, clef); }), tStart = -1;
-    src.forEach(function (nn, i) {
-      if (nn.tupStart) tStart = i;
-      if (nn.tupStop && tStart >= 0) { new VF.Tuplet(notes.slice(tStart, i + 1), { num_notes: nn.tupNum || 3, notes_occupied: nn.tupNorm || 2 }); tStart = -1; }
+  /* 一個小節排得下所需的最小寬度；大譜表兩行要一起排（上下對齊會互相推擠），所以合起來算 */
+  function measureNeed(m) {
+    var clefs = m.clefs.length ? m.clefs : ['treble'], voices = [];
+    clefs.forEach(function (clef, si) {
+      var src = m.staves[si] || [];
+      if (!src.length) return;
+      var notes = src.map(function (nn) { return makeNote(nn, clef); }), tStart = -1;
+      src.forEach(function (nn, i) {
+        if (nn.tupStart) tStart = i;
+        if (nn.tupStop && tStart >= 0) { new VF.Tuplet(notes.slice(tStart, i + 1), { num_notes: nn.tupNum || 3, notes_occupied: nn.tupNorm || 2 }); tStart = -1; }
+      });
+      var total = src.reduce(function (s, nn) { return s + nn.div; }, 0) || 96;
+      voices.push(new VF.Voice({ num_beats: total / 6, beat_value: 16 }).setMode(VF.Voice.Mode.SOFT).addTickables(notes));
     });
-    var total = src.reduce(function (s, nn) { return s + nn.div; }, 0) || 96;
-    var v = new VF.Voice({ num_beats: total / 6, beat_value: 16 }).setMode(VF.Voice.Mode.SOFT).addTickables(notes);
-    var f = new VF.Formatter().joinVoices([v]);
-    return f.preCalculateMinTotalWidth([v]);
+    if (!voices.length) return 0;
+    var f = new VF.Formatter();
+    voices.forEach(function (v) { f.joinVoices([v]); });
+    return f.preCalculateMinTotalWidth(voices);
   }
   /* 自動排法：行數不變的前提下平均分配（4 小節放不下一行時排 2+2，不排 3+1；7 小節排 4+3） */
   function balanced(n, per) { var lines = Math.ceil(n / per); return Math.ceil(n / lines); }
@@ -228,7 +234,7 @@
     var keySpec = FIFTHS_KEY[String(ms[0].fifths || 0)];
     var pre1 = preWidth(clef, ms[0].time, keySpec);
     var need = 0;
-    try { ms.forEach(function (m) { need = Math.max(need, measureNeed(m, clef)); }); } catch (e) { return 4; }
+    try { ms.forEach(function (m) { need = Math.max(need, measureNeed(m)); }); } catch (e) { return 4; }
     for (var per = 4; per > 1; per--) {
       var mW = (W - X0 - pre1 - 2) / Math.min(per, ms.length);
       if (need * NEED_K + 30 <= mW) return per;
@@ -236,6 +242,9 @@
     return 1;
   }
 
+  /* 節奏、單旋律、兩聲部（大譜表）、找錯音共用。
+     ‧ 每一行補滿到右邊界；只有一小節的行用第一行的小節寬（v106.5，作者：行尾一律對齊）
+     ‧ 找錯音：作答卷也畫音符（題目譜），解答再加錯音外框與「應為 X」 */
   function renderLines(item, mode, d, opt) {
     var k = d.k, W = contentPx(d) / k;
     var ms = item.measures, n = ms.length;
@@ -243,62 +252,98 @@
     item.shownBreaks = breaks.slice();   // 目前畫面上的換行位置（點小節線時以它為準）
     var lines = [], s0 = 0;
     breaks.concat([n]).forEach(function (b) { lines.push([s0, b]); s0 = b; });
-    var clef = ms[0].clefs[0] || 'treble';
+    var clefs = ms[0].clefs.length ? ms[0].clefs : ['treble'];
+    var nSt = clefs.length;                       // 1＝單一譜表、2＝大譜表（兩聲部）
     var keySpec = FIFTHS_KEY[String(ms[0].fifths || 0)];
     var time = ms[0].time;
-    var pre1 = preWidth(clef, time, keySpec), pre2 = preWidth(clef, null, keySpec);
-    var maxBars = Math.max.apply(null, lines.map(function (l) { return l[1] - l[0]; }));
-    var mW = (W - X0 - pre1 - 2) / maxBars;
-    var yT = 44, H = yT + 40 + 30;
-    var systems = [], allNotes = [], firstNoteOfMeasure = [], lastNoteOfMeasure = [], lineOf = [];
+    var pre1 = preWidth(clefs[0], time, keySpec), pre2 = preWidth(clefs[0], null, keySpec);
+    var showNotes = mode !== 'blank' || item.blankNotes;
+    var marks = (mode === 'key' && item.answers && item.answers.marks) ? item.answers.marks : [];
+    var yT = marks.length ? 64 : 44;              // 找錯音的解答：上方要寫「應為 X」
+    var gapB = 100, H = yT + (nSt - 1) * gapB + 40 + (nSt > 1 ? 40 : 30);
+    var widthOf = function (li) { var c = lines[li][1] - lines[li][0]; return (W - X0 - (li ? pre2 : pre1) - 2) / c; };
+    var firstW = widthOf(0);
+    var systems = [], allNotes = [[], []], lineOf = [], flat = [];
 
-    lines.forEach(function (ln, li) {
-      var sys = document.createElement('div'); sys.className = 'sys';
-      sys.style.height = (H * k) + 'px';
-      var host = document.createElement('div'); sys.appendChild(host);
-      var ctx = newCanvas(host, W, H, k);
-      var pre = li === 0 ? pre1 : pre2;
-      var ps = stave(X0, yT, pre).addClef(clef);
-      if (keySpec !== 'C') ps.addKeySignature(keySpec);
-      if (li === 0 && time) ps.addTimeSignature(time);
-      ps.setContext(ctx).draw();
-      var top = ps.getYForLine(0), bot = ps.getYForLine(4);
-      var meta = { bars: [], line: li };
-      for (var mi = ln[0]; mi < ln[1]; mi++) {
-        var x = X0 + pre + (mi - ln[0]) * mW;
-        var st = stave(x, yT, mW); st.setContext(ctx).draw();
-        var isLast = (mi === n - 1);
-        if (isLast) { vline(ctx, x + mW - 6, top, bot, 1); vline(ctx, x + mW - 3, top, bot, 3); }
-        else vline(ctx, x + mW - 1, top, bot, 1);
-        meta.bars.push({ index: mi, x0: x, x1: x + mW });
-        lineOf[mi] = li;
-        if (mode === 'blank') continue;
-        var src = ms[mi].staves[0] || [];
-        var notes = src.map(function (nn) { return makeNote(nn, clef).setStave(st); });
+    function buildMeasure(mi, sts, avail) {
+      var voices = [], drawLater = [], rec = [];
+      clefs.forEach(function (cl, si) {
+        var src = ms[mi].staves[si] || [];
+        if (!src.length) return;
+        var notes = src.map(function (nn) { return makeNote(nn, cl).setStave(sts[si]); });
         /* 三連音要在放進 voice 之前建立 */
-        var tuplets = [], tStart = -1;
+        var tStart = -1;
         src.forEach(function (nn, i) {
           if (nn.tupStart) tStart = i;
           if (nn.tupStop && tStart >= 0) {
-            tuplets.push(new VF.Tuplet(notes.slice(tStart, i + 1), { num_notes: nn.tupNum || 3, notes_occupied: nn.tupNorm || 2, bracketed: true, location: 1 }));
+            drawLater.push(new VF.Tuplet(notes.slice(tStart, i + 1), { num_notes: nn.tupNum || 3, notes_occupied: nn.tupNorm || 2, bracketed: true, location: si === 0 ? 1 : -1 }));
             tStart = -1;
           }
         });
         var total = src.reduce(function (s, nn) { return s + nn.div; }, 0) || 96;
         var v = new VF.Voice({ num_beats: total / 6, beat_value: 16 }).setMode(VF.Voice.Mode.SOFT).addTickables(notes);
-        var beams = [], grp = null;
+        var grp = null;
         src.forEach(function (nn, i) {
           if (nn.beam === 'begin') grp = [notes[i]];
           else if (nn.beam === 'continue' && grp) grp.push(notes[i]);
-          else if (nn.beam === 'end' && grp) { grp.push(notes[i]); beams.push(new VF.Beam(grp)); grp = null; }
+          else if (nn.beam === 'end' && grp) { grp.push(notes[i]); drawLater.unshift(new VF.Beam(grp)); grp = null; }
         });
-        new VF.Formatter().joinVoices([v]).format([v], st.getNoteEndX() - st.getNoteStartX() - 6);
-        v.draw(ctx, st);
-        beams.forEach(function (b) { b.setContext(ctx).draw(); });
-        tuplets.forEach(function (t) { t.setContext(ctx).draw(); });
-        src.forEach(function (nn) { allNotes.push(nn); });
-        firstNoteOfMeasure[mi] = src[0]; lastNoteOfMeasure[mi] = src[src.length - 1];
-        sys.__ctx = ctx;
+        voices.push({ v: v, st: sts[si], notes: notes });
+        rec.push(function () { src.forEach(function (nn) { allNotes[si].push({ nn: nn, mi: mi }); if (si === 0) flat.push(nn); }); });
+      });
+      if (!voices.length) return null;
+      /* 大譜表兩行一起排，上下對齊 */
+      var f = new VF.Formatter();
+      voices.forEach(function (o) { f.joinVoices([o.v]); });
+      f.format(voices.map(function (o) { return o.v; }), avail);
+      var maxEnd = -Infinity;
+      voices.forEach(function (o) { o.notes.forEach(function (n) { maxEnd = Math.max(maxEnd, n.getNoteHeadEndX()); }); });
+      return { voices: voices, drawLater: drawLater, maxEnd: maxEnd, record: function () { rec.forEach(function (r) { r(); }); } };
+    }
+
+    lines.forEach(function (ln, li) {
+      var cnt = ln[1] - ln[0];
+      var mW = (cnt === 1 && li > 0) ? Math.min(firstW, widthOf(li)) : widthOf(li);
+      var sys = document.createElement('div'); sys.className = 'sys';
+      sys.style.height = (H * k) + 'px';
+      var host = document.createElement('div'); sys.appendChild(host);
+      var ctx = newCanvas(host, W, H, k);
+      sys.__ctx = ctx;
+      var pre = li === 0 ? pre1 : pre2;
+      var preSt = clefs.map(function (cl, si) {
+        var ps = stave(X0, yT + si * gapB, pre).addClef(cl);
+        if (keySpec !== 'C') ps.addKeySignature(keySpec);
+        if (li === 0 && time) ps.addTimeSignature(time);
+        ps.setContext(ctx).draw();
+        return ps;
+      });
+      if (nSt > 1) {
+        new VF.StaveConnector(preSt[0], preSt[1]).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();
+        new VF.StaveConnector(preSt[0], preSt[1]).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(ctx).draw();
+      }
+      var top = preSt[0].getYForLine(0), bot = preSt[nSt - 1].getYForLine(4);
+      var meta = { bars: [], line: li };
+      for (var mi = ln[0]; mi < ln[1]; mi++) {
+        var x = X0 + pre + (mi - ln[0]) * mW;
+        var sts = clefs.map(function (cl, si) { var st = stave(x, yT + si * gapB, mW); st.setContext(ctx).draw(); return st; });
+        var isLast = (mi === n - 1);
+        if (isLast) { vline(ctx, x + mW - 6, top, bot, 1); vline(ctx, x + mW - 3, top, bot, 3); }
+        else vline(ctx, x + mW - 1, top, bot, 1);
+        meta.bars.push({ index: mi, x0: x, x1: x + mW });
+        lineOf[mi] = li;
+        if (!showNotes) continue;
+        /* 排一次、量最後一個符頭有沒有超出小節線，超出就縮小排版寬度重排（大譜表兩行一起排時，
+           另一行的附點、臨時記號會把音往右推；最多重排 4 次） */
+        var avail = sts[0].getNoteEndX() - sts[0].getNoteStartX() - 6, built = null;
+        for (var tries = 0; tries < 5; tries++) {
+          built = buildMeasure(mi, sts, avail);
+          if (!built || built.maxEnd <= x + mW - 5) break;
+          avail -= (built.maxEnd - (x + mW - 5)) + 2;
+        }
+        if (!built) continue;
+        built.voices.forEach(function (o) { o.v.draw(ctx, o.st); });
+        built.drawLater.forEach(function (b) { b.setContext(ctx).draw(); });
+        built.record();
       }
       /* 換行用的點擊區（只在螢幕預覽） */
       if (opt && opt.interactive) {
@@ -318,33 +363,45 @@
       systems.push(sys);
     });
 
-    /* 連結線：照 MusicXML 的 tie start／stop 依序配對；跨行時拆成兩段 */
-    if (mode !== 'blank') {
-      var pending = null, pendSys = -1;
-      allNotes.forEach(function (nn) {
-        if (nn.tieStop && pending) {
-          var la = sysIndexOf(pending), lb = sysIndexOf(nn);
-          if (la === lb) drawTie(systems[la].__ctx, pending.vf, nn.vf);
-          else { drawTie(systems[la].__ctx, pending.vf, null); drawTie(systems[lb].__ctx, null, nn.vf); }
-          pending = null;
-        }
-        if (nn.tieStart) pending = nn;
+    if (showNotes) {
+      /* 連結線：每個譜表各自照 MusicXML 的 tie start／stop 依序配對；跨行時拆成兩段 */
+      allNotes.forEach(function (list) {
+        var pending = null;
+        list.forEach(function (o) {
+          if (o.nn.tieStop && pending) {
+            var la = lineOf[pending.mi], lb = lineOf[o.mi];
+            if (la === lb) drawTie(systems[la].__ctx, pending.nn.vf, o.nn.vf);
+            else { drawTie(systems[la].__ctx, pending.nn.vf, null); drawTie(systems[lb].__ctx, null, o.nn.vf); }
+            pending = null;
+          }
+          if (o.nn.tieStart) pending = o;
+        });
       });
-    }
-    function sysIndexOf(nn) {
-      for (var mi = 0; mi < n; mi++) if ((ms[mi].staves[0] || []).indexOf(nn) >= 0) return lineOf[mi];
-      return 0;
+      /* 找錯音的解答：錯音加圓角框，上方寫「應為 X」（同 App 解答頁上方那張） */
+      marks.forEach(function (mk) {
+        var nn = flat[mk.note]; if (!nn || !nn.vf) return;
+        var mi = -1; for (var i = 0; i < n; i++) if ((ms[i].staves[0] || []).indexOf(nn) >= 0) { mi = i; break; }
+        var sys = systems[lineOf[mi]]; if (!sys) return;
+        var st = nn.vf.getStave(), b = nn.vf.getNoteHeadBeginX(), e = nn.vf.getNoteHeadEndX();
+        var accW = 0; nn.vf.getModifiers().forEach(function (m) { if (m.getCategory() === 'accidentals') accW = Math.max(accW, m.getWidth() + 2); });
+        var x0 = b - 6 - accW, x1 = e + 6, y0 = st.getYForLine(0) - 22, y1 = st.getYForLine(4) + 22, r = 6;
+        var c = sys.__ctx;
+        c.save(); c.setStrokeStyle('#000'); c.setLineWidth(1.2);
+        c.beginPath();
+        c.moveTo(x0 + r, y0); c.lineTo(x1 - r, y0); c.quadraticCurveTo(x1, y0, x1, y0 + r);
+        c.lineTo(x1, y1 - r); c.quadraticCurveTo(x1, y1, x1 - r, y1); c.lineTo(x0 + r, y1);
+        c.quadraticCurveTo(x0, y1, x0, y1 - r); c.lineTo(x0, y0 + r); c.quadraticCurveTo(x0, y0, x0 + r, y0);
+        c.closePath(); c.stroke(); c.restore();
+        overlay(sys, k, (x0 + x1) / 2, y0 - 20, mk.label, 'errlabel', 'center');
+      });
     }
     function drawTie(ctx, a, b) {
       var t = new VF.StaveTie({ first_note: a, last_note: b, first_indices: [0], last_indices: [0] });
-      var dir = (a || b).getStemDirection ? -(a || b).getStemDirection() : -1;
       t.setDirection((a || b).getStemDirection());
       t.setContext(ctx).draw();
-      return dir;
     }
     return systems;
   }
-
 
   /* ---------- 四部和聲：大譜表、每小節一個全音符和絃置中、調名與級數 ---------- */
   var GRAND_PER_LINE = 10;
@@ -409,14 +466,66 @@
       }
       /* 調名／「＿＿調：」：第一行低音譜表下方，從譜表最左邊開始寫（同 SOP 的解答） */
       if (li === 0) {
-        var keyText = mode === 'blank' ? '＿＿調：' : (ans.key || '');
-        if (keyText) overlay(sys, k, 0, bot + 22, keyText, 'keyname');
+        if (mode === 'blank') {
+          /* 作答卷：一條約三個字寬的實線＋「調：」（v106.5，作者：兩個底線字元中間會斷開） */
+          var kb = overlay(sys, k, 0, bot + 22, '', 'keyname');
+          kb.innerHTML = '<span class="keyline"></span>調：';
+        } else if (ans.key) overlay(sys, k, 0, bot + 22, ans.key, 'keyname');
       }
       fitSvg(host, W, H, k);
       sys.__meta = meta;
       systems.push(sys);
     });
     return systems;
+  }
+
+
+  /* ---------- 音堆：一格一題（一行三格，排在 maker.js），一個小節、全音符音堆置中 ---------- */
+  var STACK_PER_ROW = 3;
+  /* 音堆：一律大譜表，同一大題的題目接成一行三格，每格以終止線結束，格內只印題號（同音程／和絃）。
+     App 的音域：高音譜號題 C4–B5、低音譜號題 C2–B3，所以照原本的譜號放上／下譜表即可。 */
+  function renderStackRow(items, nums, mode, d) {
+    var k = d.k, W = contentPx(d) / k;
+    var preW = preWidth('treble', null, null);
+    var cellW = (W - X0 - preW - 4) / STACK_PER_ROW;
+    var yT = 46, yB = yT + 100, H = yB + 40 + 34;
+    var sys = document.createElement('div'); sys.className = 'sys';
+    sys.style.height = (H * k) + 'px';
+    var host = document.createElement('div'); sys.appendChild(host);
+    var ctx = newCanvas(host, W, H, k);
+    var right = X0 + preW + items.length * cellW;
+    var sT = stave(X0, yT, right - X0).addClef('treble'), sB = stave(X0, yB, right - X0).addClef('bass');
+    sT.setContext(ctx).draw(); sB.setContext(ctx).draw();
+    new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();
+    new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(ctx).draw();
+    var top = sT.getYForLine(0), bot = sB.getYForLine(4);
+    var meta = { cells: [] }, numEls = [];
+    items.forEach(function (item, i) {
+      if (!item.measures) item.measures = parse(item.xml);
+      var m = item.measures[0];
+      var cx0 = X0 + preW + i * cellW, cx1 = cx0 + cellW, cc = (cx0 + cx1) / 2;
+      vline(ctx, cx1 - 6, top, bot, 1); vline(ctx, cx1 - 3, top, bot, 3);   // 每格各自是一題：終止線
+      numEls.push(nums[i] === '' ? null : overlay(sys, k, cx0 + 4, yT - 44, nums[i] + '.', 'cellnum'));
+      meta.cells.push({ x0: cx0, x1: cx1, centre: cc });
+      if (mode === 'blank') return;
+      var clefs = m.clefs.length ? m.clefs : ['treble'], voices = [];
+      clefs.forEach(function (cl, si) {
+        var ch = chordOf(m.staves[si] || []); if (!ch) return;
+        var clef = (cl === 'bass') ? 'bass' : 'treble', st = clef === 'bass' ? sB : sT;
+        var note = makeNote(ch, clef).setStave(st);
+        voices.push({ v: new VF.Voice({ num_beats: 4, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT).addTickables([note]), st: st, notes: [note] });
+      });
+      if (voices.length) {
+        var f = new VF.Formatter();
+        voices.forEach(function (o) { f.joinVoices([o.v]); });
+        f.format(voices.map(function (o) { return o.v; }), 0);
+        centreAt(voices, cc);
+        voices.forEach(function (o) { o.v.draw(ctx, o.st); });
+      }
+    });
+    fitSvg(host, W, H, k);
+    sys.__meta = meta; sys.__numEls = numEls;
+    return sys;
   }
 
   /* ---------- 一個小題（標題＋譜） ---------- */
@@ -427,12 +536,13 @@
     t.textContent = numState.item + '. ' + item.title;
     box.appendChild(t);
     if (!item.measures) item.measures = parse(item.xml);
-    var systems = (item.layout === 'cells') ? renderCells(item, mode, d, numState)
+    var systems = (item.layout === 'stack') ? [renderStackRow([item], [''], mode, d)]   // 出題預覽卡：單題
+                : (item.layout === 'cells') ? renderCells(item, mode, d, numState)
                 : (item.layout === 'grand') ? renderGrand(item, mode, d) : renderLines(item, mode, d, opt);
     systems.forEach(function (s) { s.style.marginTop = d.sysGap + 'px'; box.appendChild(s); });
     return box;
   }
 
-  global.Engrave = { debugNotes: null, setNeedK: function (v) { NEED_K = v; }, parse: parse, renderItem: renderItem, DENSITY: DENSITY, contentPx: contentPx, MM: MM,
+  global.Engrave = { renderStackRow: renderStackRow, STACK_PER_ROW: STACK_PER_ROW, debugNotes: null, setNeedK: function (v) { NEED_K = v; }, parse: parse, renderItem: renderItem, DENSITY: DENSITY, contentPx: contentPx, MM: MM,
                      defaultBreaks: defaultBreaks, CELLS_PER_ROW: CELLS_PER_ROW };
 })(window);

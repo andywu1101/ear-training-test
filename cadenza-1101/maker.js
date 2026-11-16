@@ -5,15 +5,15 @@
   'use strict';
   var STORE = 'earTrainer.maker.paper', NOPV = 'earTrainer.maker.noPreview';
 
-  /* 題型：第二階段開放音程、和絃、節奏、單旋律、四部和聲 */
+  /* 題型：第三階段起全部開放 */
   var TYPES = [
     { id: 'interval', label: '音程', page: 'interval-trainer.html', on: true },
     { id: 'chord', label: '和絃', page: 'chord-trainer.html', on: true },
     { id: 'rhythm', label: '節奏', page: 'rhythm-trainer.html', on: true },
     { id: 'melody', label: '單旋律', page: 'melody-trainer.html', on: true },
-    { id: 'twopart', label: '兩聲部', page: 'two-part-trainer.html' },
-    { id: 'pitcherr', label: '找錯音', page: 'pitch-error-trainer.html' },
-    { id: 'pitchstack', label: '音堆', page: 'pitch-stack-trainer.html' },
+    { id: 'twopart', label: '兩聲部', page: 'two-part-trainer.html', on: true },
+    { id: 'pitcherr', label: '找錯音', page: 'pitch-error-trainer.html', on: true },
+    { id: 'pitchstack', label: '音堆', page: 'pitch-stack-trainer.html', on: true },
     { id: 'fourpart', label: '四部和聲', page: 'four-part-trainer.html', on: true }
   ];
   /* 大題：順序固定 */
@@ -21,8 +21,8 @@
     { id: 'interval', name: '音程聽寫' }, { id: 'chord', name: '和絃辨認' },
     { id: 'rhythm', name: '節奏聽寫' }, { id: 'memRhythm', name: '記憶節奏' },
     { id: 'melody', name: '單旋律聽寫' }, { id: 'memMelody', name: '記憶旋律' },
-    { id: 'twopart', name: '兩聲部聽寫' }, { id: 'pitcherr', name: '找錯音' },
-    { id: 'pitchstack', name: '音堆' }, { id: 'fourpart', name: '四部和聲' }
+    { id: 'twopart', name: '兩聲部聽寫' }, { id: 'memTwopart', name: '記憶兩聲部' },
+    { id: 'pitcherr', name: '音高辨認' }, { id: 'pitchstack', name: '音堆聽寫' }, { id: 'fourpart', name: '四部和聲' }
   ];
   var CN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
@@ -49,6 +49,7 @@
   function sectionOf(type, data) {
     if (type === 'rhythm') return data.barsCount === 1 ? 'memRhythm' : 'rhythm';
     if (type === 'melody') return data.barsCount === 1 ? 'memMelody' : 'melody';
+    if (type === 'twopart') return data.barsCount === 1 ? 'memTwopart' : 'twopart';
     return type;
   }
   /* 依大題順序排好的題目，附上編號 */
@@ -87,11 +88,16 @@
         var w = frameWin(type), f = frames[type];
         /* ⚠ MusicXML 記錄器要等 VexFlow 載入後才掛得上（sheet-export.js 每 0.25 秒試一次），
            所以頁面載入完成後再多等一下，否則剛開的練習頁會「沒有樂譜資料」 */
-        if (w && w.SheetExport && w.PianoEngine && f.__loadedAt && Date.now() - f.__loadedAt > 800) return res(w);
-        if (Date.now() - t0 > 20000) return rej(new Error('練習頁載入逾時'));
+        if (w && w.SheetExport && w.PianoEngine && f.__loadedAt && Date.now() - f.__loadedAt > 300 && recorderReady(w)) return res(w);
+        if (Date.now() - t0 > 30000) return rej(new Error('練習頁載入逾時，請重新整理'));
         setTimeout(poll, 150);
       })();
     });
+  }
+  /* 記錄器掛上之後，VexFlow 的 StaveNote.draw 會被包一層（sheet-export.js 的 wrap）。
+     v106.5：只等固定 0.8 秒不夠——練習頁的計時器被延後時會掛得更晚，改成確認掛好了才算 */
+  function recorderReady(w) {
+    try { return String(w.Vex.Flow.StaveNote.prototype.draw).indexOf('orig.apply') >= 0; } catch (e) { return false; }
   }
   function showTab(type) {
     curTab = type;
@@ -122,7 +128,8 @@
   function buildCandidate(w, type, data, snapshot, title) {
     var xml = w.__maker.musicxml(data);
     return { id: uid(), type: type, section: sectionOf(type, data), title: title, data: data, snapshot: snapshot,
-             xml: xml, answers: w.__maker.answers(data), layout: (type === 'interval' || type === 'chord') ? 'cells' : (type === 'fourpart' ? 'grand' : 'lines'),
+             xml: xml, answers: w.__maker.answers(data), layout: (type === 'interval' || type === 'chord') ? 'cells' : (type === 'fourpart' ? 'grand' : (type === 'pitchstack' ? 'stack' : 'lines')),
+             blankNotes: type === 'pitcherr',   // 找錯音：作答卷要印題目譜
              pageBreak: false, breaks: null };
   }
   function addItem(c) { paper.items.push(c); save(); renderList(); }
@@ -329,12 +336,29 @@
       st.style.fontSize = d.sec + 'px'; st.textContent = CN[gi] + '、' + secName(g.sec);
       st.style.marginTop = (gi ? d.secGap : 0) + 'px'; st.style.marginBottom = '2px';
       blocks.push({ el: st, keepNext: true, sec: true });
+      var playable = interactive && mode === 'key';   // 預覽解答：每題標題後面有播放鈕（列印不會出現）
+      if (g.sec === 'pitchstack') {
+        /* 音堆：一律大譜表接成一行三格，每格一題、只印題號；⤓ 的題目從新的一行（新的一頁）開始 */
+        var rows = [];
+        g.items.forEach(function (o) {
+          var last = rows[rows.length - 1];
+          if (!last || last.length >= Engrave.STACK_PER_ROW || o.it.pageBreak) rows.push([o]); else last.push(o);
+        });
+        rows.forEach(function (row, ri) {
+          var rel = Engrave.renderStackRow(row.map(function (o) { return o.it; }), row.map(function (o) { return o.num; }), mode, d);
+          if (playable) row.forEach(function (o, i) { addPlayControls(rel.__numEls[i], o.it); });
+          rel.style.marginTop = (ri ? d.itemGap : 2) + 'px';
+          blocks.push({ el: rel, item: row[0].it, firstInSec: ri === 0 });
+        });
+        return;
+      }
       g.items.forEach(function (o, ii) {
         var it = o.it;
         var el = Engrave.renderItem(it, mode, d, { item: o.num, cell: 1 }, interactive ? {
           interactive: true,
           onBreak: function (bar) { toggleBreak(it, bar); }
         } : null);
+        if (playable) addPlayControls(el.querySelector('.item-title'), it);
         el.style.marginTop = (ii ? d.itemGap : 2) + 'px';
         blocks.push({ el: el, item: it, firstInSec: ii === 0 });
       });
@@ -373,6 +397,45 @@
       return page;
     });
   }
+  /* ---------- 預覽解答的播放鈕＋速度拉桿（只在螢幕上）---------- */
+  var player = { audio: null, id: null, btn: null };
+  function stopPlayer() {
+    if (player.audio) { player.audio.pause(); URL.revokeObjectURL(player.audio.src); }
+    if (player.btn) player.btn.textContent = '▶';
+    player.audio = null; player.id = null; player.btn = null;
+  }
+  function addPlayControls(titleEl, it) {
+    if (!titleEl) return;
+    var wrap = document.createElement('span'); wrap.className = 'pv-ctl';
+    var b = document.createElement('button'); b.className = 'pv-play'; b.textContent = (player.id === it.id) ? '■' : '▶'; b.title = '播放這一題（與 mp3 相同）';
+    if (player.id === it.id) player.btn = b;
+    b.onclick = async function () {
+      if (player.id === it.id) { stopPlayer(); return; }
+      stopPlayer();
+      player.id = it.id; player.btn = b; b.textContent = '⏳';
+      try {
+        var w = await waitFrame(it.type);
+        var buf = await w.PianoEngine.renderOffline(w.__maker.events(it.data));
+        if (player.id !== it.id) return;   // 等待中按了別題
+        var a = new Audio(URL.createObjectURL(wavBlob(buf)));
+        player.audio = a; b.textContent = '■';
+        a.onended = function () { if (player.audio === a) stopPlayer(); };
+        a.play().catch(function () { stopPlayer(); });
+      } catch (e) { stopPlayer(); flash('播放失敗：' + e.message); }
+    };
+    wrap.appendChild(b);
+    if (it.data.bpm) {
+      /* 速度拉桿：與列表的速度欄、匯出的 mp3 連動 */
+      var sym = (it.data.meterType === 'compound') ? '♪' : '♩';
+      var lab = document.createElement('span'); lab.className = 'pv-bpm'; lab.textContent = sym + '=' + it.data.bpm;
+      var r = document.createElement('input'); r.type = 'range'; r.min = 40; r.max = 160; r.step = 1; r.value = it.data.bpm; r.className = 'pv-range';
+      r.oninput = function () { lab.textContent = sym + '=' + r.value; };
+      r.onchange = function () { it.data.bpm = parseInt(r.value, 10); save(); if (player.id === it.id) stopPlayer(); };
+      wrap.appendChild(r); wrap.appendChild(lab);
+    }
+    titleEl.appendChild(wrap);
+  }
+
   function toggleBreak(it, bar) {
     var n = it.data.barsCount;
     var br = (it.breaks || it.shownBreaks || Engrave.defaultBreaks(n, 4)).slice();
@@ -384,6 +447,7 @@
 
   var view = 'edit';
   function setView(v) {
+    stopPlayer();
     view = v;
     document.querySelectorAll('#viewSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); });
     $('mainView').classList.toggle('off', v !== 'edit');
