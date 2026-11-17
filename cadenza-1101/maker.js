@@ -276,7 +276,7 @@
     var tot = paperTotal(); $('totalScore').textContent = tot == null ? '' : '總分：' + fmtScore(tot) + ' 分';
     $('mNavList').textContent = '列表' + (paper.items.length ? '（' + paper.items.length + '）' : '');
     if (!groups.length) {
-      box.innerHTML = '<div class="empty">左邊選擇題型、設定好之後按「➕ 出題」，題目就會依類型自動放進大題。<br>大題名稱、小題標題都可以直接點來修改；拖曳 ≡ 可以在同一個大題裡調整順序。</div>';
+      box.innerHTML = '<div class="empty">' + (window.matchMedia('(max-width: 899px)').matches ? '在「出題」頁選擇題型' : '左邊選擇題型') + '、設定好之後按「➕ 出題」，題目就會依類型自動放進大題。<br>大題名稱、小題標題都可以直接點來修改；拖曳 ≡ 可以在同一個大題裡調整順序。</div>';
       return;
     }
     groups.forEach(function (g, gi) {
@@ -646,7 +646,7 @@
     m.appendChild(Object.assign(document.createElement('div'), { className: 'tpl-sep' }));
     row('＋ 把目前考卷存成新模板', '', openSaveTpl);
   }
-  function closeTplMenu() { $('tplMenu').classList.remove('on'); $('exMenu').classList.remove('on'); }
+  function closeTplMenu() { $('tplMenu').classList.remove('on'); $('exMenu').classList.remove('on'); $('mExMenu').classList.remove('on'); }
   $('btnTpl').onclick = function (e) {
     e.stopPropagation();
     if ($('tplMenu').classList.contains('on')) { closeTplMenu(); return; }
@@ -804,7 +804,15 @@
   }
   $('btnPdfBlank').onclick = function () { exportPdf('blank'); };
   $('btnPdfKey').onclick = function () { exportPdf('key'); };
-  $('btnPdfM').onclick = function () { exportPdf(pvMode); };
+  /* v108.5：手機預覽頁「📤 匯出 ▾」：和設定頁一樣的三個選項 */
+  $('btnExportM').onclick = function (e) {
+    e.stopPropagation();
+    var on = $('mExMenu').classList.contains('on'); closeTplMenu(); if (!on) $('mExMenu').classList.add('on');
+  };
+  $('mExMenu').addEventListener('click', function (e) { if (e.target.closest('button')) closeTplMenu(); });
+  $('mxPdfBlank').onclick = function () { exportPdf('blank'); };
+  $('mxPdfKey').onclick = function () { exportPdf('key'); };
+  $('mxMp3').onclick = function () { $('btnMp3').click(); };
 
   /* ---------- 手機版（v108，寬度小於 900px）---------- */
   var mq = window.matchMedia('(max-width: 899px)'), mtab = 'make', pvMode = 'blank', pvZoom = 1;
@@ -837,6 +845,11 @@
   $('btnMore').onclick = function (e) { e.stopPropagation(); closeTplMenu(); setMTab('set'); };
   $('mSetBack').onclick = function () { setMTab(lastTab); };
   $('btnClearM').onclick = function () { $('btnClear').click(); };
+  /* v108.5：回到封面（左上角 ‹ 返回、設定頁按鈕）；題目都還在，按「開始出題」回來 */
+  function goCover() { closeTplMenu(); if (mtab === 'set') setMTab(lastTab); if (window.showCover) showCover(); }
+  $('brandHome').onclick = goCover;
+  $('brandHome').onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goCover(); } };
+  $('btnCoverM').onclick = goCover;
   $('mPdfBlank').onclick = function () { exportPdf('blank'); };
   $('mPdfKey').onclick = function () { exportPdf('key'); };
   $('mMp3').onclick = function () { $('btnMp3').click(); };

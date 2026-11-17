@@ -57,3 +57,4 @@ function copyText(e, text){
 }
 document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDonate(); closeAuthor(); closeGoldInfo(); } });
 function startMaker(){ document.getElementById('coverPage').classList.add('off'); }
+function showCover(){ var c=document.getElementById('coverPage'); c.classList.remove('off'); c.scrollTop=0; }
