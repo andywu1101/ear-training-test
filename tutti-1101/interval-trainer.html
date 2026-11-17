@@ -2190,6 +2190,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
 <!-- 造訪統計（Cloudflare Web Analytics）：只記錄造訪次數與頁面，
      不使用 cookie、不記錄個人資料，也不碰使用者的練習紀錄。
      Service Worker 只攔截同源與指定 CDN 的請求，這支外部 script 會直接放行。 -->
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "117f126a522645cc8e07654815a0e3c6"}'></script>
+<!-- v.108：Cloudflare 統計。網址帶 ?maker=1（被「音聽出考卷」嵌入）時不載入，避免出考卷的使用量算進這一頁 -->
+<script>if (!/[?&]maker=1(&|$)/.test(location.search)) { (function(){ var s = document.createElement('script'); s.defer = true; s.src = 'https://static.cloudflareinsights.com/beacon.min.js'; s.setAttribute('data-cf-beacon', '{"token": "117f126a522645cc8e07654815a0e3c6"}'); document.body.appendChild(s); })(); }</script>
 </body>
 </html>

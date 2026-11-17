@@ -472,7 +472,7 @@ window.addEventListener('appinstalled', function(){
         <span class="cover-note" style="top:40%; right:8%; font-size:40px;">♪</span>
       </div>
       <div class="cover-card">
-        <div class="scan-bubble-wrap"><a class="scan-bubble" href="https://andywu1101.github.io/scanner/" target="_blank" rel="noopener"><span class="sb-new">全新登場!!</span><span class="sb-name"><span class="sb-cam">📷 </span>伍線譜樂譜掃描</span><span class="sb-go">點我看看 ▸</span></a></div>
+        <div class="scan-bubble-wrap"><a class="scan-bubble" href="https://andywu1101.github.io/scanner/" target="_blank" rel="noopener"><span class="sb-name"><span class="sb-cam">📷 </span>伍線譜樂譜掃描</span><span class="sb-go">點擊查看 ▸</span></a></div>
         <div class="cover-clef">𝄞</div>
         <h1 class="cover-title">音樂聽力練習</h1>
         <div class="cover-sub">Ear Training</div>
@@ -1433,7 +1433,7 @@ window.CHANGELOG = [
   { v: 'v.105', items: ['優化 Yamaha C5 音色的四部和聲音量平衡，讓低音聲部更清楚', '修正手機轉向後，四部和聲鍵盤消失的問題'] },
   { v: 'v.106', items: ['音程與和絃辨認不再出現音高完全相同的題目（連續聽寫與單題作答）', '節奏、單旋律、兩聲部、找錯音的速度加上 ♩ 或 ♪ 標示；修正錯題本速度拉桿過短', '節奏、單旋律、兩聲部新增二分音符、附點四分＋八分、八分＋附點四分三種兩拍節奏型', '!!贊助者版：譜例可匯出 MusicXML 格式，可用 MuseScore 等打譜軟體開啟編輯'] },
   { v: 'v.107', items: ['模擬測驗題目與速度調整優化'] },
-  { v: 'v.108', items: [{ t: '!!新增贊助者專屬工具 音聽出考卷，', link: { text: '點擊查看使用介紹影片!', href: 'https://youtu.be/zx8_0atMWAk' } }] }
+  { v: 'v.108', items: [{ t: '!!全新登場!贊助者專屬工具 音聽出考卷，', link: { text: '點擊查看使用介紹影片!', href: 'https://youtu.be/zx8_0atMWAk' } }] }
 ];
 
 function showChangelog(){
@@ -1829,6 +1829,7 @@ if('serviceWorker' in navigator){
 <!-- 造訪統計（Cloudflare Web Analytics）：只記錄造訪次數與頁面，
      不使用 cookie、不記錄個人資料，也不碰使用者的練習紀錄。
      Service Worker 只攔截同源與指定 CDN 的請求，這支外部 script 會直接放行。 -->
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "117f126a522645cc8e07654815a0e3c6"}'></script>
+<!-- v.108：Cloudflare 統計。網址帶 ?maker=1（被「音聽出考卷」嵌入）時不載入，避免出考卷的使用量算進這一頁 -->
+<script>if (!/[?&]maker=1(&|$)/.test(location.search)) { (function(){ var s = document.createElement('script'); s.defer = true; s.src = 'https://static.cloudflareinsights.com/beacon.min.js'; s.setAttribute('data-cf-beacon', '{"token": "117f126a522645cc8e07654815a0e3c6"}'); document.body.appendChild(s); })(); }</script>
 </body>
 </html>
