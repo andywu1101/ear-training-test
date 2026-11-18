@@ -279,7 +279,10 @@
       box.innerHTML = '<div class="empty">' + (window.matchMedia('(max-width: 899px)').matches ? '在「出題」頁選擇題型' : '左邊選擇題型') + '、設定好之後按「➕ 出題」，題目就會依類型自動放進大題。<br>大題名稱、小題標題都可以直接點來修改；拖曳 ≡ 可以在同一個大題裡調整順序。</div>';
       return;
     }
+    var starts = pageStarts();
+    $('btnPbReset').style.display = paper.items.some(function (x) { return x.pageBreak; }) ? '' : 'none';
     groups.forEach(function (g, gi) {
+      if (gi) box.appendChild(pageGap(g.items[0].it, starts));
       var sec = document.createElement('div'); sec.className = 'sec';
       var hn = document.createElement('div'); hn.className = 'sec-name';
       hn.innerHTML = '<span>' + CN[gi] + '、</span>';
@@ -310,8 +313,6 @@
         info.textContent = it.layout === 'cells' ? (it.data.questions.length + ' 格') : (it.layout === 'grand' ? (it.answers && it.answers.key ? it.answers.key.replace('：', '') : '') : '');
         var rg = btn('🔄', '重抽', function () { regenItem(it); });
         var del = btn('🗑', '刪除', function () { ask('刪除第 ' + o.num + ' 題「' + it.title + '」？', function () { paper.items.splice(paper.items.indexOf(it), 1); save(); renderList(); }); });
-        var pb = btn('⤓', it.pageBreak ? '取消「從這題換頁」' : '從這題換頁', function () { it.pageBreak = !it.pageBreak; save(); renderList(); });
-        if (it.pageBreak) pb.classList.add('pb-on');
         var extra = [];
         /* 每行小節數（節奏、單旋律）：自動／1～4；點過小節線就是「自訂」 */
         if (it.layout === 'lines' && it.data.barsCount > 1) {
@@ -354,7 +355,7 @@
         /* v108 手機：▲▼ 移動（電腦版隱藏）＋觸控拖曳 ≡ */
         var up = btn('▲', '往上移', function () { moveItem(it, -1); }); up.classList.add('mv');
         var dn = btn('▼', '往下移', function () { moveItem(it, 1); }); dn.classList.add('mv');
-        [grip, num, ti, info].concat(extra, [up, dn, rg, pb, del]).forEach(function (x) { row.appendChild(x); });
+        [grip, num, ti, info].concat(extra, [up, dn, rg, del]).forEach(function (x) { row.appendChild(x); });
         grip.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse') return; e.preventDefault(); touchDrag(e, row, it, grip); });
         grip.onmousedown = function () { row.draggable = true; };
         row.ondragstart = function (e) { dragId = it.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
@@ -371,8 +372,8 @@
           paper.items.splice(paper.items.indexOf(it) + (before ? 0 : 1), 0, src);
           save(); renderList();
         };
+        if (o !== g.items[0]) sec.appendChild(pageGap(it, starts));
         sec.appendChild(row);
-        if (autoBreakIds[it.id]) { var nt = document.createElement('div'); nt.className = 'it-note'; nt.textContent = '上一頁放不下，自動從這題換頁'; sec.appendChild(nt); }
       });
       box.appendChild(sec);
     });
@@ -423,12 +424,80 @@
       busy(null); openCard(c, it.id);
     } catch (e) { busy(null); alert('重抽失敗：' + e.message); }
   }
+  $('btnPbReset').onclick = function () {
+    paper.items.forEach(function (x) { x.pageBreak = false; }); save(); renderList(); renderPreview(); flash('換頁已全部回到自動');
+  };
   $('btnClear').onclick = function () {
     if (!paper.items.length) return;
     ask('清空整份考卷的題目？（標題與設定會保留）', function () { paper.items = []; save(); renderList(); });
   };
 
   /* ---------- A4 排版與分頁 ---------- */
+  /* ---------- v109.3 換頁線（題目列表）----------
+     每個換頁的位置（自動、手動）在兩題之間畫一條虛線「第 N 頁」；拖動線＝把換頁移到別的兩題之間（變成手動，存在 it.pageBreak），
+     手動的線可以「↺ 復原」回自動；兩題之間的空隙可以「＋ 在這裡換頁」。分頁以作答卷的排版計算。 */
+  function pageStarts() {
+    var out = {};
+    if (!paper.items.length) return out;
+    var keep = autoBreakIds; buildPages('blank', false); var auto = autoBreakIds; autoBreakIds = keep;
+    var n = 1;
+    ordered().forEach(function (g) { g.items.forEach(function (o) {
+      if (o.num > 1 && (auto[o.it.id] || o.it.pageBreak)) out[o.it.id] = { page: ++n, manual: !!o.it.pageBreak };
+    }); });
+    return out;
+  }
+  function pageGap(it, starts) {
+    var gap = document.createElement('div'); gap.className = 'pg-gap'; gap.dataset.id = it.id;
+    var st = starts[it.id];
+    if (st) {
+      var ln = document.createElement('div'); ln.className = 'pg-line' + (st.manual ? ' manual' : '');
+      ln.title = '拖動這條線，可以把換頁移到別的兩題之間';
+      ln.innerHTML = '<span class="pg-lab">第 ' + st.page + ' 頁' + (st.manual ? '' : '（自動）') + '</span>';
+      if (st.manual) {
+        var rv = document.createElement('button'); rv.type = 'button'; rv.className = 'pg-rv'; rv.textContent = '↺ 復原'; rv.title = '回到自動換頁';
+        rv.onclick = function (e) { e.stopPropagation(); it.pageBreak = false; save(); renderList(); renderPreview(); };
+        rv.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+        ln.appendChild(rv);
+      }
+      ln.addEventListener('pointerdown', function (e) { if (e.button) return; e.preventDefault(); dragLine(e, ln, it); });
+      gap.appendChild(ln);
+    } else {
+      var add = document.createElement('button'); add.type = 'button'; add.className = 'pg-add'; add.textContent = '＋ 在這裡換頁';
+      add.onclick = function () { it.pageBreak = true; save(); renderList(); renderPreview(); };
+      gap.appendChild(add);
+    }
+    return gap;
+  }
+  function dragLine(e, ln, it) {
+    var ghost = ln.cloneNode(true); ghost.classList.add('pg-ghost');
+    var r0 = ln.getBoundingClientRect();
+    ghost.style.cssText = 'position:fixed; left:' + r0.left + 'px; width:' + r0.width + 'px; top:' + r0.top + 'px; z-index:90; pointer-events:none;';
+    document.body.appendChild(ghost); ln.classList.add('pg-src');
+    var dy = e.clientY - r0.top, target = null;
+    function nearest(y) {
+      var best = null, bd = 1e9;
+      document.querySelectorAll('#list .pg-gap').forEach(function (g) { var r = g.getBoundingClientRect(), c = r.top + r.height / 2, dd = Math.abs(c - y); if (dd < bd) { bd = dd; best = g; } });
+      return best;
+    }
+    function move(ev) {
+      ghost.style.top = (ev.clientY - dy) + 'px';
+      var g = nearest(ev.clientY);
+      document.querySelectorAll('#list .pg-gap.drop').forEach(function (x) { x.classList.remove('drop'); });
+      if (g) g.classList.add('drop'); target = g;
+      /* 拖到列表上下緣時自動捲動 */
+      var sc = ln.closest('.right') || document.scrollingElement;
+      var rr = sc === document.scrollingElement ? { top: 0, bottom: innerHeight } : sc.getBoundingClientRect();
+      if (ev.clientY < rr.top + 40) sc.scrollTop -= 12; else if (ev.clientY > Math.min(rr.bottom, innerHeight) - 40) sc.scrollTop += 12;
+    }
+    function up() {
+      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+      ghost.remove(); ln.classList.remove('pg-src');
+      var to = target ? byId(target.dataset.id) : null;
+      if (to && to !== it) { it.pageBreak = false; to.pageBreak = true; save(); renderList(); renderPreview(); }
+      else renderList();
+    }
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+  }
   function buildPages(mode, interactive) {
     var d = Engrave.DENSITY[paper.density] || Engrave.DENSITY.dense;
     var MM = Engrave.MM, cw = Engrave.contentPx(d);

@@ -168,6 +168,23 @@
   .tpl-sep{ height:1px; background:var(--panel-border); margin:5px 2px; }
   .tpl-tag{ font-size:11px; color:var(--ink-soft); margin-right:6px; }
   .it-note{ font-size:11.5px; color:var(--wrong); margin:-3px 0 6px 34px; }
+  /* v109.3：換頁線（題目列表裡兩題之間）——自動＝淡灰虛線，手動＝深色虛線＋「↺ 復原」；可拖動；空隙可「＋ 在這裡換頁」 */
+  .pg-gap{ position:relative; min-height:12px; margin:-6px 0 2px; display:flex; align-items:center; }
+  .pg-gap.drop{ background:rgba(51,65,92,0.08); border-radius:8px; }
+  .pg-gap.drop .pg-add{ opacity:1; }
+  .pg-add{ width:100%; border:0; background:none; font-size:11.5px; color:var(--accent); opacity:0; cursor:pointer; padding:2px 0; transition:opacity .15s; }
+  .pg-gap:hover .pg-add{ opacity:.85; }
+  @media (hover:none){ .pg-add{ opacity:.45; } }
+  .pg-line{ flex:1; display:flex; align-items:center; justify-content:center; gap:8px; position:relative; padding:5px 0; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .pg-line::before{ content:''; position:absolute; left:0; right:0; top:50%; border-top:2px dashed #b9b4a6; }
+  .pg-line.manual::before{ border-top-color:var(--accent); }
+  .pg-lab{ position:relative; background:var(--paper); padding:0 8px; font-size:12px; color:#8e887a; font-weight:600; }
+  .pg-line.manual .pg-lab{ color:var(--accent); }
+  .sec .pg-lab{ background:#fff; }
+  .pg-rv{ position:relative; font-size:11.5px; border:1px solid var(--panel-border); background:#fff; border-radius:999px; padding:1px 8px; color:var(--ink-soft); cursor:pointer; }
+  .pg-line.pg-src{ opacity:.35; }
+  .pg-ghost{ opacity:.9; }
+  .pg-ghost::before{ border-top-color:var(--accent) !important; }
 
   /* ---- 預覽畫面 ---- */
   .pv{ display:none; flex:1; min-height:0; overflow:auto; padding:20px 0 60px; }
@@ -276,6 +293,7 @@
   body.m .tabs button{ flex:none; }
   body.m .right{ padding:12px 12px 40px; -webkit-overflow-scrolling:touch; }
   body.m .list-head{ flex-wrap:wrap; }
+  body.m .list-head{ gap:6px; } body.m .list-head .tb-btn{ padding:6px 9px; font-size:13px; }   /* v109.3：多了「換頁復原」也排得下一行 */
   body.m .sec{ padding:10px 10px; }
   body.m .it{ flex-wrap:wrap; row-gap:4px; padding:7px 8px; }
   body.m .it > input{ flex:1 1 calc(100% - 140px); font-size:15px; }
@@ -403,7 +421,7 @@
     <div class="list-head">
       <span>題目列表</span><span class="total" id="totalScore"></span><span class="spacer"></span>
       <label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="noPreviewTop"> 出題後直接加入</label>
-      <button class="tb-btn" id="btnClear">清空考卷</button>
+      <button class="tb-btn pb-reset" id="btnPbReset" title="把所有手動換頁都回到自動" style="display:none">↺ 換頁復原</button><button class="tb-btn" id="btnClear">清空考卷</button>
     </div>
     <div id="list"></div>
   </div>
