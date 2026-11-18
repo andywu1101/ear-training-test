@@ -636,7 +636,8 @@
       var lyricAt = {}, wordsAt = {};
       function addWords(ci, s) { (wordsAt[ci] = wordsAt[ci] || []).push(s); }
       (it.overlays || []).forEach(function (o) {
-        if (!o || !o.text) return;
+        if (!o || !o.text || o.noXml) return;   // v.109：四部和聲數字低音的分段文字不寫進 MusicXML（由 xmlText 寫一行）
+        o = o.xmlText ? Object.assign({}, o, { text: o.xmlText }) : o;
         var ci = 0, best = Infinity;
         md.cols.forEach(function (c, k) {
           var s = c.staves[0], x0 = s.x, x1 = s.x + (s.width || 0);

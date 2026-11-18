@@ -446,6 +446,59 @@
     }); });
     return ps.length ? { rest: false, pitches: ps, type: 'w', dots: 0 } : null;
   }
+  /* ===== v109 數字低音（作者的寫法）=====
+     數字＝低音往上的音程；原位三和絃的 5、3 與六和絃的 3 省略；上方的音跟調號不同時，在它的數字右邊加記號（6♯、7♭），
+     原本省略的數字這時要寫回來；只有 3 被改變時不寫 3、只寫記號（放在最下層／單獨時接在級數正右方）；低音本身的變化不標；
+     重升用 𝄪、降記號調裡升高的音用 ♮。增六寫 It⁺6／Fr⁺6／Ger⁺6、拿坡里寫 N6（和聲作業的作答卷照實際音算）。
+     ⚠ 與四部和聲頁（four-part-trainer.html）的 figuredBass 規則相同，改規則兩邊要一起改。 */
+  var FB_ACC = { '1': '♯', '-1': '♭', '0': '♮', '2': '𝄪', '-2': '𝄫' };
+  function figuredBass(meas, sym) {
+    var KS = {}, f = meas.fifths || 0, order = f > 0 ? 'FCGDAEB' : 'BEADGCF';
+    for (var i = 0; i < Math.abs(f); i++) KS[order[i]] = f > 0 ? 1 : -1;
+    var ps = [];
+    (meas.staves || []).forEach(function (st) { st.forEach(function (n) { if (!n.rest) n.pitches.forEach(function (p) { ps.push(p); }); }); });
+    if (!ps.length || !sym) return null;
+    var val = function (p) { return p.oct * 7 + 'CDEFGAB'.indexOf(String(p.step).toUpperCase()); };
+    var bass = ps.reduce(function (a, p) { return val(p) < val(a) ? p : a; });
+    var acc = {}, iv = {};
+    ps.forEach(function (p) {
+      var d = (val(p) - val(bass)) % 7; if (val(p) === val(bass) || !d) return;
+      var n = d + 1, L = String(p.step).toUpperCase(); iv[n] = 1;
+      if ((p.alter || 0) !== (KS[L] || 0)) acc[n] = FB_ACC[String(p.alter || 0)] || '';
+    });
+    var main = sym.split('/')[0], sec = sym.indexOf('/') >= 0 ? sym.slice(sym.indexOf('/')) : '';
+    var special = /^(It|Fr|Ger)/.test(main) ? 'aug' : (main === 'N6' ? 'n6' : null);
+    var std;
+    if (special === 'aug') std = Object.keys(iv).map(Number).filter(function (n) { return n !== 3 || iv[4]; }).sort(function (a, b) { return b - a; });
+    else {
+      var m = main.match(/(\d+)$/), dg = m ? m[1] : '';
+      std = { '': [], '6': [6], '64': [6, 4], '7': [7], '65': [6, 5], '43': [4, 3], '42': [4, 2] }[dg] || dg.split('').map(Number);
+    }
+    var rows = std.map(function (n) { return { n: n, a: acc[n] || '' }; });
+    Object.keys(acc).map(Number).forEach(function (n) { if (std.indexOf(n) < 0) rows.push({ n: n === 3 ? 0 : n, a: acc[n], k: n }); });
+    rows.sort(function (a, b) { return (b.k || b.n) - (a.k || a.n); });
+    return { roman: main.replace(/\d+$/, ''), rows: rows, sec: sec, special: special };
+  }
+  function fbStack(rows, cls) {
+    return '<span class="fb-s' + (cls ? ' ' + cls : '') + '">' + rows.map(function (r) {
+      return '<span class="fb-row">' + (r.n ? '<span class="fb-d">' + r.n + (r.a ? '<span class="fb-a">' + r.a + '</span>' : '') + '</span>'
+                                             : '<span class="fb-d fb-3">' + r.a + '</span>') + '</span>';
+    }).join('') + '</span>';
+  }
+  /* 解答卷：一般級數＝羅馬數字正對低音（數字疊在右上、不佔寬度）；副屬和絃＝整串置中 */
+  function fbKeyHtml(f, raw) {
+    var e = function (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+    if (!f) return e(raw);
+    if (f.special === 'aug') return e(f.roman) + '<sup class="fb-plus">+</sup>6';
+    if (f.special === 'n6') return 'N6';
+    var lone = f.rows.length === 1 && !f.rows[0].n;
+    var fig = !f.rows.length ? '' : (lone ? '<span class="fb-lone">' + f.rows[0].a + '</span>' : fbStack(f.rows));
+    if (f.sec) return '<span class="fb-sec">' + e(f.roman) + fig + e(f.sec) + '</span>';
+    return '<span class="fb-r">' + e(f.roman) + (fig ? '<span class="fb-x">' + fig + '</span>' : '') + '</span>';
+  }
+  /* 和聲作業的作答卷：只印數字與記號，數字欄正對低音（右邊的記號不佔寬度） */
+  function fbHwHtml(f) { return (f && f.rows.length) ? fbStack(f.rows, 'fb-hw') : ''; }
+
   function renderGrand(item, mode, d) {
     var k = d.k, W = contentPx(d) / k;
     var ms = item.measures, n = ms.length;
@@ -473,6 +526,12 @@
     }
     lines.forEach(function (ln, li) {
       var numY = numYOf(ln), Hl = Math.max(H, numY + 40);
+      /* v109：數字疊到三層（例如 6♯/4/3）時，這一行加高，不壓到下一行 */
+      if (mode !== 'blank' || (item.data && item.data.hw)) {
+        var maxRows = 0;
+        for (var mj = ln[0]; mj < ln[1]; mj++) { var fq = figuredBass(ms[mj], (ans.numerals || [])[mj] || ''); if (fq && !fq.special) maxRows = Math.max(maxRows, fq.rows.length); else if (fq && mode === 'blank') maxRows = Math.max(maxRows, fq.rows.length); }
+        if (maxRows > 2) Hl = Math.max(Hl, numY + 40 + (maxRows - 2) * 10);
+      }
       var sys = document.createElement('div'); sys.className = 'sys';
       sys.style.height = (Hl * k) + 'px';
       var host = document.createElement('div'); sys.appendChild(host);
@@ -493,10 +552,20 @@
         if (mi === n - 1) { vline(ctx, x1 - 6, top, bot, 1); vline(ctx, x1 - 3, top, bot, 3); }
         else vline(ctx, x1 - 1, top, bot, 1);
         meta.bars.push({ index: mi, x0: x0, x1: x1, centre: cc });
-        if (mode !== 'blank') {
+        /* v109：和聲作業（item.data.hw）的作答卷：第一小節完整四部，其餘小節只留低音（第四部），級數與調名照樣空白 */
+        var hw = mode === 'blank' && item.data && item.data.hw;
+        if (mode !== 'blank' || hw) {
           var voices = [];
           [0, 1].forEach(function (si) {
             var ch = chordOf(ms[mi].staves[si] || []); if (!ch) return;
+            if (hw && mi > 0) {
+              if (si === 0) return;
+              var lo = ch.pitches.reduce(function (a, p) {
+                var va = a.oct * 7 + 'CDEFGAB'.indexOf(String(a.step).toUpperCase()), vp = p.oct * 7 + 'CDEFGAB'.indexOf(String(p.step).toUpperCase());
+                return (vp < va || (vp === va && (p.alter || 0) < (a.alter || 0))) ? p : a;
+              });
+              ch = { rest: false, pitches: [lo], type: 'w', dots: 0 };
+            }
             var clef = si === 0 ? 'treble' : 'bass', st = si === 0 ? sT : sB;
             var note = makeNote(ch, clef).setStave(st);
             voices.push({ v: new VF.Voice({ num_beats: 4, beat_value: 4 }).setMode(VF.Voice.Mode.SOFT).addTickables([note]), st: st, notes: [note] });
@@ -508,8 +577,13 @@
             centreAt(voices, cc);
             voices.forEach(function (o) { o.v.draw(ctx, o.st); });
           }
+          /* v109：級數改成數字低音寫法（解答卷）；和聲作業的作答卷只印數字與記號 */
           var num = (ans.numerals || [])[mi];
-          if (num) overlay(sys, k, cc, numY, num, 'numeral', 'center');
+          if (num) {
+            var fb = figuredBass(ms[mi], num);
+            var html = mode === 'blank' ? fbHwHtml(fb) : fbKeyHtml(fb, num);
+            if (html) overlay(sys, k, cc, numY, '', 'numeral', 'center').innerHTML = html;
+          }
         }
       }
       /* 調名／「＿＿調：」：第一行低音譜表下方，從譜表最左邊開始寫（同 SOP 的解答） */

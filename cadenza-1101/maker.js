@@ -548,6 +548,7 @@
   function setView(v) {
     stopPlayer();
     view = v;
+    document.body.classList.toggle('pvon', v !== 'edit');
     document.querySelectorAll('#viewSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); });
     $('mainView').classList.toggle('off', v !== 'edit');
     $('pvView').classList.toggle('on', v !== 'edit');
@@ -941,9 +942,10 @@
       el.oninput = function () { paper.header[p[1]] = el.value; save(); };
       el.onchange = function () { renderPreview(); };
     });
-    document.querySelectorAll('#density button').forEach(function (b) {
+    /* v109：間距按鈕在預覽頁（電腦版頁首、手機預覽列各一組，同步） */
+    document.querySelectorAll('.density-seg button').forEach(function (b) {
       b.classList.toggle('on', b.dataset.d === paper.density);
-      b.onclick = function () { paper.density = b.dataset.d; save(); document.querySelectorAll('#density button').forEach(function (x) { x.classList.toggle('on', x === b); }); renderPreview(); };
+      b.onclick = function () { paper.density = b.dataset.d; save(); document.querySelectorAll('.density-seg button').forEach(function (x) { x.classList.toggle('on', x.dataset.d === paper.density); }); renderPreview(); };
     });
     $('noPreviewTop').checked = !!paper.noPreview;
   }

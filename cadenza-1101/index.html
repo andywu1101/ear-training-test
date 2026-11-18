@@ -89,6 +89,10 @@
   button.back-cover{ font-family:inherit; cursor:pointer; touch-action:manipulation; }
   button.back-cover:hover, button.back-cover:active{ border-color:var(--accent); color:var(--accent); }
   .hdr #viewSeg{ margin-left:14px; }
+  /* v109：間距只在預覽時出現（電腦版在「匯出」左邊；手機在預覽頁上方那條） */
+  #densityD{ display:none; align-items:center; gap:6px; }
+  body.pvon #densityD{ display:inline-flex; }
+  .pv-dens-l{ font-size:13px; color:var(--ink-soft); }
   .ex-menu{ left:auto; right:0; min-width:220px; }
   .ex-menu button{ display:block; width:100%; text-align:left; border:none; background:none; padding:8px 10px; border-radius:8px; font-size:13.5px; color:var(--ink); }
   .ex-menu button:hover{ background:var(--panel); }
@@ -182,6 +186,22 @@
   .ov.cellnum{ font-size:11px; }
   .ov.ans{ font-size:12.5px; }
   .ov.numeral{ font-size:14px; font-family:'Times New Roman', Times, serif; }
+  /* v109：數字低音（engrave.js 的 fbKeyHtml／fbHwHtml） */
+  .ov.numeral{ white-space:nowrap; }
+  .fb-r{ position:relative; display:inline-block; }
+  .fb-x{ position:absolute; left:100%; top:-2px; margin-left:0; }
+  .fb-x .fb-s{ margin-left:0.5px; }
+  .fb-lone{ display:inline-block; font-size:12px; margin-left:1px; position:relative; top:1px; }
+  .fb-x .fb-lone{ margin-left:0; top:3px; }
+  .fb-s{ display:inline-block; vertical-align:top; font-size:10px; line-height:10px; margin-left:1px; text-align:left; position:relative; top:-2px; }
+  .fb-row{ display:block; height:10px; }
+  .fb-d{ display:inline-block; position:relative; min-width:0.55em; text-align:center; }
+  .fb-a{ position:absolute; left:100%; top:0; margin-left:0.5px; font-size:9.5px; }
+  .fb-3{ font-size:9.5px; }
+  .fb-hw{ margin-left:0; top:0; }
+  .fb-plus{ font-size:0.6em; }
+  .fb-sec .fb-a{ position:static; margin-left:0.5px; }   /* 副屬和絃整串置中：記號要佔寬度，才不會壓到後面的 /V */
+  .fb-sec .fb-lone{ top:1px; }
   .ov.keyname{ font-size:12.5px; }
   .keyline{ display:inline-block; width:3em; border-bottom:1.2px solid #000; margin-right:2px; height:0.95em; vertical-align:baseline; }
   .ov.errlabel{ font-size:10.5px; font-weight:700; color:#a6493b; }
@@ -265,6 +285,8 @@
   body.m .pv{ padding:0 0 40px; touch-action:pan-x pan-y; -webkit-overflow-scrolling:touch; }
   body.m #mPvBar{ display:flex; gap:8px; align-items:center; padding:8px 10px; position:sticky; top:0; left:0; z-index:5; background:var(--paper); }
   body.m #mPvBar .seg button{ padding:8px 14px; font-size:14px; }
+  body.m #mPvBar #densityM button{ padding:8px 10px; }
+  @media (max-width:400px){ body.m #mPvBar{ gap:6px; padding:8px 8px; } body.m #mPvBar .seg button{ padding:7px 8px; font-size:13px; } body.m #mPvBar #btnExportM{ padding-left:9px; padding-right:9px; font-size:13px; } }
   body.m .pv-hint{ font-size:12px; margin:0 12px 8px; text-align:left; }
   body.m .pages{ align-items:flex-start; padding:0 8px; gap:10px; }
   /* v108.1 手機：小節線的點擊範圍加寬（約一個手指寬）並一直顯示虛線框；已經換行的位置顏色較深 */
@@ -321,6 +343,7 @@
   <span class="seg d-only" id="viewSeg"><button data-v="edit" class="on">出題</button><button data-v="blank">預覽作答卷</button><button data-v="key">預覽解答</button></span>
   <span class="spacer"></span>
   <span class="tpl-wrap"><button class="tb-btn" id="btnTpl">📋 套用模板 ▾</button><div class="tpl-menu" id="tplMenu"></div></span>
+  <span class="pv-dens d-only" id="densityD"><span class="pv-dens-l">間距</span><span class="seg density-seg"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span></span>
   <span class="tpl-wrap d-only"><button class="tb-btn primary" id="btnExport">📤 匯出 ▾</button>
     <div class="tpl-menu ex-menu" id="exMenu">
       <button id="btnPdfBlank">📄 PDF 作答卷</button><button id="btnPdfKey">📄 PDF 解答</button>
@@ -329,8 +352,8 @@
       <div class="tpl-sep"></div>
       <button id="btnMp3">⬇️ 下載 mp3（壓縮檔）</button>
     </div></span>
-  <button class="tb-btn m-only" id="btnMore" aria-label="設定與匯出">⋯</button>
-  <span class="ver d-only">出題工具 v8</span>
+  <button class="tb-btn m-only" id="btnMore" aria-label="設定與匯出" title="設定與匯出">⚙️</button>
+  <span class="ver d-only">出題工具 v9</span>
 </div>
 
 <!-- 考卷設定卡片：電腦版放在右邊列表最上面，手機版放進「設定與匯出」頁（applyMode 搬動） -->
@@ -339,7 +362,6 @@
   <div class="set-grid">
     <label>標題</label><input type="text" id="hdTitle" placeholder="例：聽力模擬考試練習" class="span3">
     <label>署名</label><input type="text" id="hdAuthor"><label>上課日期</label><input type="text" id="hdDate" placeholder="YYYYMMDD">
-    <label>間距</label><span class="seg span3" id="density"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span>
   </div>
 </div>
 
@@ -362,7 +384,7 @@
         <button class="tb-btn" id="btnCoverM">🏠 回到封面</button>
       </div>
     </div>
-    <div class="ver" style="text-align:center;">出題工具 v8</div>
+    <div class="ver" style="text-align:center;">出題工具 v9</div>
   </div>
 </div>
 
@@ -386,7 +408,7 @@
 
 <div class="pv" id="pvView">
   <div id="mPvBar"><span class="seg" id="mPvSeg"><button data-v="blank">作答卷</button><button data-v="key">解答</button></span>
-    <span class="spacer"></span><span class="tpl-wrap"><button class="tb-btn" id="btnExportM">📤 匯出 ▾</button>
+    <span class="spacer"></span><span class="seg density-seg" id="densityM"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span><span class="tpl-wrap"><button class="tb-btn" id="btnExportM">📤 匯出 ▾</button>
       <div class="tpl-menu ex-menu" id="mExMenu"><button id="mxPdfBlank">📄 PDF 作答卷</button><button id="mxPdfKey">📄 PDF 解答</button><button id="mxMp3">⬇️ 下載 mp3（壓縮檔）</button></div></span></div>
   <div class="pv-hint">節奏、單旋律、兩聲部、找錯音：點小節線（手機上是虛線框）可以「從這裡換行」，點行尾的（紅色框）可以「併回上一行」。紅字表示上一頁放不下而自動換頁。</div>
   <div class="pages" id="pvPages"></div>

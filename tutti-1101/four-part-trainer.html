@@ -169,6 +169,20 @@
   .slot-bar-num { font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft); margin-bottom: 4px; }
   /* 羅馬級數用 Times New Roman——和聲分析的慣用字體 */
   .slot-value { font-family: 'Times New Roman', Times, serif; font-size: 17px; font-weight: 600; color: var(--ink); min-height: 20px; }
+  /* v.109 數字低音（正解）：一般級數＝羅馬數字置中、數字疊在右上；副屬和絃＝整串置中 */
+  .slot-value { white-space: nowrap; }
+  .fb-r { position: relative; display: inline-block; }
+  .fb-x { position: absolute; left: 100%; top: -0.12em; }
+  .fb-x .fb-s { margin-left: 0.04em; }
+  .fb-lone { display: inline-block; font-size: 0.85em; margin-left: 0.06em; position: relative; top: 0.06em; }
+  .fb-x .fb-lone { margin-left: 0; top: 0.2em; }
+  .fb-s { display: inline-block; vertical-align: top; font-size: 0.72em; line-height: 0.95; margin-left: 0.06em; text-align: left; position: relative; top: -0.15em; }
+  .fb-row { display: block; }
+  .fb-d { display: inline-block; position: relative; min-width: 0.55em; text-align: center; }
+  .fb-a { position: absolute; left: 100%; top: 0; margin-left: 0.03em; font-size: 0.95em; }
+  .fb-3 { font-size: 0.95em; }
+  .fb-sec .fb-a { position: static; }
+  .fb-plus { font-size: 0.6em; }
   
   /* 全直行感應區 (上五線譜、下作答格) */
   .hitbox-top { position: absolute; top: 0; height: 230px; cursor: pointer; z-index: 10; pointer-events: auto; }
@@ -437,9 +451,9 @@
         <!-- 變化和絃列：拿坡里六（Lv4 起）與增六三種（Lv5 起） -->
         <div class="kb-row" id="kb-row-aug6" style="display:none;">
           <button class="kb-btn deg-btn" id="btn-deg-N" style="display:none; background:#eef4f0; border-color:#bcd;" data-deg="N6">N6</button>
-          <button class="kb-btn aug6-btn" data-aug6="It6" style="background:#eef4f0; border-color:#bcd;">It+6</button>
-          <button class="kb-btn aug6-btn" data-aug6="Fr6" style="background:#eef4f0; border-color:#bcd;">Fr+6</button>
-          <button class="kb-btn aug6-btn" data-aug6="Ger6" style="background:#eef4f0; border-color:#bcd;">Ger+6</button>
+          <button class="kb-btn aug6-btn" data-aug6="It6" style="background:#eef4f0; border-color:#bcd;">It<sup class="fb-plus">+</sup>6</button>
+          <button class="kb-btn aug6-btn" data-aug6="Fr6" style="background:#eef4f0; border-color:#bcd;">Fr<sup class="fb-plus">+</sup>6</button>
+          <button class="kb-btn aug6-btn" data-aug6="Ger6" style="background:#eef4f0; border-color:#bcd;">Ger<sup class="fb-plus">+</sup>6</button>
         </div>
         <div class="kb-row">
           <button class="kb-btn mod-btn" data-mod="°">° (減)</button>
@@ -1217,6 +1231,108 @@ function showPage(pageId) {
                    : (base === 'vii°' || base === 'viiø');
   }
   /* 顯示用：半減七的 ° 換成 ø（其餘原樣） */
+  /* ===== v.109 數字低音（作者的寫法）=====
+     數字＝低音往上的音程；原位三和絃的 5、3 與六和絃的 3 省略；上方的音跟調號不同時，在它的數字右邊加記號（6♯、7♭），
+     原本省略的數字這時要寫回來；只有 3 被改變時不寫 3、只寫記號（放在最下層／單獨時接在級數正右方）；低音本身的變化不標；
+     重升用 𝄪、降記號調裡升高的音用 ♮。增六寫 It⁺6／Fr⁺6／Ger⁺6、拿坡里寫 N6。
+     只用在「正解」的顯示與導出譜例；學生作答格、評分都不變。
+     ⚠ figuredBass 與出題工具（cadenza-1101/engrave.js）的同名函式完全相同，改規則兩邊要一起改。 */
+  var FB_ACC = { '1': '♯', '-1': '♭', '0': '♮', '2': '𝄪', '-2': '𝄫' };
+  function figuredBass(meas, sym) {
+    var KS = {}, f = meas.fifths || 0, order = f > 0 ? 'FCGDAEB' : 'BEADGCF';
+    for (var i = 0; i < Math.abs(f); i++) KS[order[i]] = f > 0 ? 1 : -1;
+    var ps = [];
+    (meas.staves || []).forEach(function (st) { st.forEach(function (n) { if (!n.rest) n.pitches.forEach(function (p) { ps.push(p); }); }); });
+    if (!ps.length || !sym) return null;
+    var val = function (p) { return p.oct * 7 + 'CDEFGAB'.indexOf(String(p.step).toUpperCase()); };
+    var bass = ps.reduce(function (a, p) { return val(p) < val(a) ? p : a; });
+    var acc = {}, iv = {};
+    ps.forEach(function (p) {
+      var d = (val(p) - val(bass)) % 7; if (val(p) === val(bass) || !d) return;
+      var n = d + 1, L = String(p.step).toUpperCase(); iv[n] = 1;
+      if ((p.alter || 0) !== (KS[L] || 0)) acc[n] = FB_ACC[String(p.alter || 0)] || '';
+    });
+    var main = sym.split('/')[0], sec = sym.indexOf('/') >= 0 ? sym.slice(sym.indexOf('/')) : '';
+    var special = /^(It|Fr|Ger)/.test(main) ? 'aug' : (main === 'N6' ? 'n6' : null);
+    var std;
+    if (special === 'aug') std = Object.keys(iv).map(Number).filter(function (n) { return n !== 3 || iv[4]; }).sort(function (a, b) { return b - a; });
+    else {
+      var m = main.match(/(\d+)$/), dg = m ? m[1] : '';
+      std = { '': [], '6': [6], '64': [6, 4], '7': [7], '65': [6, 5], '43': [4, 3], '42': [4, 2] }[dg] || dg.split('').map(Number);
+    }
+    var rows = std.map(function (n) { return { n: n, a: acc[n] || '' }; });
+    Object.keys(acc).map(Number).forEach(function (n) { if (std.indexOf(n) < 0) rows.push({ n: n === 3 ? 0 : n, a: acc[n], k: n }); });
+    rows.sort(function (a, b) { return (b.k || b.n) - (a.k || a.n); });
+    return { roman: main.replace(/\d+$/, ''), rows: rows, sec: sec, special: special };
+  }
+  function fbStack(rows, cls) {
+    return '<span class="fb-s' + (cls ? ' ' + cls : '') + '">' + rows.map(function (r) {
+      return '<span class="fb-row">' + (r.n ? '<span class="fb-d">' + r.n + (r.a ? '<span class="fb-a">' + r.a + '</span>' : '') + '</span>'
+                                             : '<span class="fb-d fb-3">' + r.a + '</span>') + '</span>';
+    }).join('') + '</span>';
+  }
+  /* 本頁的拼寫（keyStr，例如 'c#/4'）＋調號 → 上面 figuredBass 要的小節格式 */
+  function figuredBassOfSpells(spells, keyObj, sym){
+    const sigs = (keyObj && keyObj.sigs) || [];
+    const fifths = sigs.length ? sigs.length * (sigs[0][1] === '#' ? 1 : -1) : 0;
+    const pitches = spells.map(function(sp){
+      const m = String(sp.keyStr || '').match(/^([a-g])([#b]*)\/(-?\d+)$/i); if(!m) return null;
+      return { step: m[1], alter: m[2].split('').reduce(function(a, c){ return a + (c === '#' ? 1 : -1); }, 0), oct: parseInt(m[3], 10) };
+    }).filter(Boolean);
+    return figuredBass({ fifths: fifths, staves: [[{ rest: false, pitches: pitches }]] }, sym);
+  }
+  function fbEsc(t){ return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  function fbStack(rows){
+    return '<span class="fb-s">' + rows.map(function(r){
+      return '<span class="fb-row">' + (r.n ? '<span class="fb-d">' + r.n + (r.a ? '<span class="fb-a">' + r.a + '</span>' : '') + '</span>'
+                                             : '<span class="fb-d fb-3">' + r.a + '</span>') + '</span>';
+    }).join('') + '</span>';
+  }
+  /* 一般級數：羅馬數字置中、數字疊在右上（不佔寬度）；副屬和絃：整串置中 */
+  function figuredHtml(f, raw){
+    if(!f) return fbEsc(raw);
+    if(f.special === 'aug') return fbEsc(f.roman) + '<sup class="fb-plus">+</sup>6';
+    if(f.special === 'n6') return 'N6';
+    const lone = f.rows.length === 1 && !f.rows[0].n;
+    const fig = !f.rows.length ? '' : (lone ? '<span class="fb-lone">' + f.rows[0].a + '</span>' : fbStack(f.rows));
+    if(f.sec) return '<span class="fb-sec">' + fbEsc(f.roman) + fig + fbEsc(f.sec) + '</span>';
+    return '<span class="fb-r">' + fbEsc(f.roman) + (fig ? '<span class="fb-x">' + fig + '</span>' : '') + '</span>';
+  }
+  /* 導出譜例用：同樣的排法換成畫在圖上的文字（每一段各自的位置），MusicXML 仍寫一行文字 */
+  function figuredOverlays(f, raw, x, y, size, font){
+    const cv = figuredOverlays._c || (figuredOverlays._c = document.createElement('canvas').getContext('2d'));
+    const W = function(t, sz){ cv.font = 'bold ' + sz + 'px ' + font; return cv.measureText(t).width; };
+    const fs = Math.round(size * 0.72), out = [];
+    const T = function(t, xx, yy, sz, extra){ out.push(Object.assign({ x: xx, y: yy, text: t, size: sz, align: 'left', bold: true, font: font, noXml: true }, extra || {})); };
+    if(!f || f.special){
+      const txt = !f ? raw : (f.special === 'n6' ? 'N6' : null);
+      if(txt){ out.push({ x: x, y: y, text: txt, size: size, align: 'center', bold: true, font: font, xmlText: raw }); return out; }
+      const w1 = W(f.roman, size), w2 = W('+', fs), w3 = W('6', size), x0 = x - (w1 + w2 + w3) / 2;
+      T(f.roman, x0, y, size, { noXml: false, xmlText: raw }); T('+', x0 + w1, y - size * 0.45, fs); T('6', x0 + w1 + w2, y, size);
+      return out;
+    }
+    const lone = f.rows.length === 1 && !f.rows[0].n;
+    const rowW = function(r){ return r.n ? W(String(r.n), fs) + (r.a ? W(r.a, fs) : 0) : W(r.a, fs); };
+    const stackW = lone ? W(f.rows[0].a, size * 0.85) : f.rows.reduce(function(m, r){ return Math.max(m, rowW(r)); }, 0);
+    const romW = W(f.roman, size);
+    let x0;
+    if(f.sec){ const secW = W(f.sec, size); x0 = x - (romW + 1 + stackW + (stackW ? 1 : 0) + secW) / 2; }
+    else x0 = x - romW / 2;
+    T(f.roman, x0, y, size, { noXml: false, xmlText: raw });
+    const xs = x0 + romW + 1;
+    if(lone) T(f.rows[0].a, xs, y, Math.round(size * 0.85));
+    else {
+      const dW = W('6', fs);
+      f.rows.forEach(function(r, k){
+        const yy = y - size * 0.42 + k * fs * 0.95;
+        if(r.n){ T(String(r.n), xs, yy, fs); if(r.a) T(r.a, xs + dW, yy, fs); }
+        else T(r.a, xs + (dW - W(r.a, fs)) / 2, yy, fs);   // 只有記號（代表 3）：放在上面數字的正下方
+      });
+    }
+    if(f.sec) T(f.sec, xs + stackW + (stackW ? 1 : 0), y, size);
+    return out;
+  }
+
   function displayChord(sym, isMinor) {
     if (!sym) return sym;
     if (!isHalfDim7(sym, isMinor)) return sym;
@@ -3081,6 +3197,13 @@ function showPage(pageId) {
           let [s, a, t, b] = vDraw[i];
           let bSpell = spellFn(b); let tSpell = spellFn(t);
           let aSpell = spellFn(a); let sSpell = spellFn(s);
+          /* v.109：正解的級數改成數字低音寫法（學生作答格不變） */
+          if (opt.forceCorrectSlots) {
+            let fbSym = displayChord(userSeq[i] || this.questionSeq[i] || '', (opt.keyObj || this.keyObj || {}).isMin) || '';
+            let fb = fbSym ? figuredBassOfSpells([bSpell, tSpell, aSpell, sSpell], keyObj, fbSym) : null;
+            let sv = slot.querySelector('.slot-value'); if (sv && fb) sv.innerHTML = figuredHtml(fb, fbSym);
+            if (opt.outFigs) opt.outFigs[i] = { fb: fb, raw: fbSym };
+          }
 
           let nS = new VF.StaveNote({ clef: 'treble', keys: [sSpell.keyStr], duration: 'w', stem_direction: 1 });
           let nA = new VF.StaveNote({ clef: 'treble', keys: [aSpell.keyStr], duration: 'w', stem_direction: -1 });
@@ -3355,12 +3478,12 @@ function showPage(pageId) {
       holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:1400px;';
       holder.innerHTML = '<div id="' + id + '"></div>';
       document.body.appendChild(holder);
-      var self = this, slots = [], keyRect = {};
+      var self = this, slots = [], keyRect = {}, figs = [];
       try{
         self.renderStaff({ targetSvgId: id, bars: item.bars, keyObj: item.keyObj,
           userSeq: item.questionSeq, userBass: item.userBass, userKeyAns: item.keyObj.name,
           isSubmitted: true, showAnswer: true, customVoicings: item.questionVoicings,
-          forceCorrectSlots: true, outSlots: slots, outKeyRect: keyRect });
+          forceCorrectSlots: true, outSlots: slots, outKeyRect: keyRect, outFigs: figs });
       }catch(e){}
       var svg = holder.querySelector('svg');
       var done = function(txt){
@@ -3373,8 +3496,8 @@ function showPage(pageId) {
       (item.questionSeq || []).forEach(function(sym, i){
         var r = slots[i]; if(!r) return;
         var txt = displayChord(sym, isMin); if(!txt) return;
-        overlays.push({ x: r.left + r.width / 2, y: r.top + 20, text: txt, size: 17,
-                        align: 'center', bold: true, font: "'Times New Roman', Times, serif" });
+        var fg = figs[i] || {};   // v.109：數字低音（各段分開畫；MusicXML 仍是一行文字）
+        Array.prototype.push.apply(overlays, figuredOverlays(fg.fb, txt, r.left + r.width / 2, r.top + 20, 17, "'Times New Roman', Times, serif"));
       });
       if(keyRect.width){
         var keyName = (item.keyObj && item.keyObj.name) ? item.keyObj.name.replace(' ', '') : '';
@@ -3399,12 +3522,12 @@ function showPage(pageId) {
       holder.innerHTML = '<div id="' + id + '"></div>';
       document.body.appendChild(holder);
       var self = this;
-      var slots = [], keyRect = {};
+      var slots = [], keyRect = {}, figs = [];
       try{
         self.renderStaff({ targetSvgId: id, bars: self.bars, keyObj: self.keyObj,
           userSeq: self.questionSeq, userBass: self.userBass, userKeyAns: self.keyObj.name,
           isSubmitted: true, showAnswer: true, customVoicings: self.questionVoicings, forceCorrectSlots: true,
-          outSlots: slots, outKeyRect: keyRect });
+          outSlots: slots, outKeyRect: keyRect, outFigs: figs });
       }catch(e){}
       var svg = holder.querySelector('svg');
       var done = function(txt){
@@ -3419,8 +3542,8 @@ function showPage(pageId) {
       (self.questionSeq || []).forEach(function(sym, i){
         var r = slots[i]; if(!r) return;
         var txt = displayChord(sym, isMin); if(!txt) return;
-        overlays.push({ x: r.left + r.width / 2, y: r.top + 20, text: txt, size: 18,
-                        align: 'center', bold: true, font: "'Times New Roman', Times, serif" });
+        var fg = figs[i] || {};   // v.109：數字低音（各段分開畫；MusicXML 仍是一行文字）
+        Array.prototype.push.apply(overlays, figuredOverlays(fg.fb, txt, r.left + r.width / 2, r.top + 20, 18, "'Times New Roman', Times, serif"));
       });
       if(keyRect.width){
         var keyName = (self.keyObj && self.keyObj.name) ? self.keyObj.name.replace(' ', '') : '';
@@ -3852,9 +3975,12 @@ function showPage(pageId) {
     const kind = n ? (sigs[0][1] === '#' ? '升' : '降') : '';
     return (n ? MAKER_CN[n] + '個' + kind + '記號' : '無升降記號') + ' 4/4拍 ' + d.bars + '小節';
   }
+  /* v109：作答卷樣式（出題工具才看得到）：false＝聽寫（全部空白）；true＝和聲作業（保留第一個和絃＋其餘小節的低音） */
+  let makerHw = false;
   function makerOffer(){
     const m = fptModule, data = makerData(m);
-    const snap = { keyPref: m.keyPref, bars: m.bars, bpm: m.bpm, levelId: m.curLevel.id };
+    const snap = { keyPref: m.keyPref, bars: m.bars, bpm: m.bpm, levelId: m.curLevel.id, hw: makerHw };
+    data.hw = makerHw;
     if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'fourpart', data: data, snapshot: snap, title: makerTitle(data) });
   }
   /* 暫時把某一題放進模組狀態，做完立刻還原 */
@@ -3868,7 +3994,9 @@ function showPage(pageId) {
     type: 'fourpart',
     regen: function(snap){
       const lv = LEVELS.find(l => l.id === snap.levelId) || LEVELS[0];
-      return makerWith({ keyPref: snap.keyPref, bars: snap.bars, bpm: snap.bpm, curLevel: lv }, function(m){ m.generateQuestion(); return makerData(m); });
+      const d = makerWith({ keyPref: snap.keyPref, bars: snap.bars, bpm: snap.bpm, curLevel: lv }, function(m){ m.generateQuestion(); return makerData(m); });
+      d.hw = !!snap.hw;   // v109：重抽、套用模板沿用作答卷樣式
+      return d;
     },
     /* 譜例：用本頁解答的繪譜畫在畫面外（同 exportSheet），交給 MusicXML 記錄器 */
     musicxml: function(data){
@@ -3903,6 +4031,19 @@ function showPage(pageId) {
       ' body.maker-mode #pageFptSettings .switch-group:has(#fpt-modeSwitch), body.maker-mode #testReplayWrapper { display:none !important; }';
     document.head.appendChild(st);
     const enter = document.getElementById('fpt-enterBtn'); if(enter) enter.textContent = '➕ 出題';
+    /* v109：作答卷樣式（只在出題模式加進設定頁） */
+    const keyGrp = document.getElementById('fpt-keySwitch');
+    if(keyGrp){
+      const g = document.createElement('div'); g.className = 'switch-group';
+      g.innerHTML = '<div class="switch-group-label">作答卷樣式</div><div class="switch-btns" id="fpt-hwSwitch">' +
+        '<button class="mode-btn active" data-hw="0">聽寫（全部空白）</button>' +
+        '<button class="mode-btn" data-hw="1">和聲作業（保留第一個和絃＋低音）</button></div>';
+      keyGrp.parentNode.parentNode.insertBefore(g, keyGrp.parentNode.nextSibling);
+      g.querySelectorAll('.mode-btn').forEach(b => b.onclick = () => {
+        makerHw = b.dataset.hw === '1';
+        g.querySelectorAll('.mode-btn').forEach(x => x.classList.toggle('active', x === b));
+      });
+    }
   }
 
   window.fptModule = fptModule;
