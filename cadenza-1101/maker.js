@@ -331,6 +331,21 @@
           bi.onchange = function () { var v = Math.max(40, Math.min(160, parseInt(bi.value, 10) || it.data.bpm)); bi.value = v; it.data.bpm = v; save(); };
           sp.appendChild(bi); extra.push(sp);
         }
+        /* v109.1：四部和聲的作答卷樣式（已出好的題目也能切換；只改作答卷顯示，和絃、音檔、解答不變；存模板時一起記住） */
+        if (it.type === 'fourpart') {
+          var hs = document.createElement('span'); hs.className = 'seg it-seg'; hs.title = '作答卷樣式';
+          [['0', '聽寫'], ['1', '和聲作業']].forEach(function (o2) {
+            var hb = document.createElement('button'); hb.type = 'button'; hb.textContent = o2[1];
+            var on = (o2[0] === '1') === !!it.data.hw; if (on) hb.classList.add('on');
+            hb.onclick = function () {
+              var v = o2[0] === '1'; if (!!it.data.hw === v) return;
+              it.data.hw = v; it.snapshot = Object.assign({}, it.snapshot || {}, { hw: v });
+              save(); renderList(); renderPreview();
+            };
+            hs.appendChild(hb);
+          });
+          extra.push(hs);
+        }
         /* 小題配分：空白＝不印 */
         var isc = document.createElement('label'); isc.className = 'it-sc'; isc.title = '小題配分（空白＝不印）';
         var ii = document.createElement('input'); ii.type = 'text'; ii.inputMode = 'decimal'; ii.value = it.score != null ? fmtScore(it.score) : '';
