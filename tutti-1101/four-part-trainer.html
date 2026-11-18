@@ -169,19 +169,22 @@
   .slot-bar-num { font-family: var(--font-mono); font-size: 10px; color: var(--ink-soft); margin-bottom: 4px; }
   /* 羅馬級數用 Times New Roman——和聲分析的慣用字體 */
   .slot-value { font-family: 'Times New Roman', Times, serif; font-size: 17px; font-weight: 600; color: var(--ink); min-height: 20px; }
-  /* v.109 數字低音（正解）：一般級數＝羅馬數字置中、數字疊在右上；副屬和絃＝整串置中 */
+  /* v.109 數字低音（正解）：一般級數＝羅馬數字置中、數字疊在右上；副屬和絃＝整串置中。
+     v.109.2：數字加大到約 85%；只有一個數字或記號時寫在級數正右方 */
   .slot-value { white-space: nowrap; }
   .fb-r { position: relative; display: inline-block; }
-  .fb-x { position: absolute; left: 100%; top: -0.12em; }
+  .fb-x { position: absolute; left: 100%; top: -0.12em; white-space: nowrap; }
   .fb-x .fb-s { margin-left: 0.04em; }
-  .fb-lone { display: inline-block; font-size: 0.85em; margin-left: 0.06em; position: relative; top: 0.06em; }
-  .fb-x .fb-lone { margin-left: 0; top: 0.2em; }
-  .fb-s { display: inline-block; vertical-align: top; font-size: 0.72em; line-height: 0.95; margin-left: 0.06em; text-align: left; position: relative; top: -0.15em; }
+  .fb-lone, .fb-one { display: inline-block; font-size: 0.85em; margin-left: 0.06em; position: relative; top: 0; }
+  .fb-x .fb-lone, .fb-x .fb-one { margin-left: 0.03em; top: 0.14em; }
+  .fb-oa { font-size: 0.95em; margin-left: 0.03em; }
+  .fb-s { display: inline-block; vertical-align: top; font-size: 0.85em; line-height: 0.95; margin-left: 0.06em; text-align: left; position: relative; top: -0.15em; }
   .fb-row { display: block; }
   .fb-d { display: inline-block; position: relative; min-width: 0.55em; text-align: center; }
   .fb-a { position: absolute; left: 100%; top: 0; margin-left: 0.03em; font-size: 0.95em; }
   .fb-3 { font-size: 0.95em; }
   .fb-sec .fb-a { position: static; }
+  .fb-sec .fb-lone, .fb-sec .fb-one { top: 0; }
   .fb-plus { font-size: 0.6em; }
   
   /* 全直行感應區 (上五線譜、下作答格) */
@@ -1294,7 +1297,10 @@ function showPage(pageId) {
     if(f.special === 'aug') return fbEsc(f.roman) + '<sup class="fb-plus">+</sup>6';
     if(f.special === 'n6') return 'N6';
     const lone = f.rows.length === 1 && !f.rows[0].n;
-    const fig = !f.rows.length ? '' : (lone ? '<span class="fb-lone">' + f.rows[0].a + '</span>' : fbStack(f.rows));
+    /* v.109.2：只有一個數字、或只有一個記號時，寫在級數的正右方（和級數字母同高置中）；兩層以上才疊放 */
+    const one = f.rows.length === 1 && f.rows[0].n;
+    const fig = !f.rows.length ? '' : (lone ? '<span class="fb-lone">' + f.rows[0].a + '</span>'
+            : (one ? '<span class="fb-one">' + f.rows[0].n + (f.rows[0].a ? '<span class="fb-oa">' + f.rows[0].a + '</span>' : '') + '</span>' : fbStack(f.rows)));
     if(f.sec) return '<span class="fb-sec">' + fbEsc(f.roman) + fig + fbEsc(f.sec) + '</span>';
     return '<span class="fb-r">' + fbEsc(f.roman) + (fig ? '<span class="fb-x">' + fig + '</span>' : '') + '</span>';
   }
@@ -1302,7 +1308,7 @@ function showPage(pageId) {
   function figuredOverlays(f, raw, x, y, size, font){
     const cv = figuredOverlays._c || (figuredOverlays._c = document.createElement('canvas').getContext('2d'));
     const W = function(t, sz){ cv.font = 'bold ' + sz + 'px ' + font; return cv.measureText(t).width; };
-    const fs = Math.round(size * 0.72), out = [];
+    const fs = Math.round(size * 0.85), out = [];
     const T = function(t, xx, yy, sz, extra){ out.push(Object.assign({ x: xx, y: yy, text: t, size: sz, align: 'left', bold: true, font: font, noXml: true }, extra || {})); };
     if(!f || f.special){
       const txt = !f ? raw : (f.special === 'n6' ? 'N6' : null);
@@ -1311,20 +1317,22 @@ function showPage(pageId) {
       T(f.roman, x0, y, size, { noXml: false, xmlText: raw }); T('+', x0 + w1, y - size * 0.45, fs); T('6', x0 + w1 + w2, y, size);
       return out;
     }
-    const lone = f.rows.length === 1 && !f.rows[0].n;
+    const lone = f.rows.length === 1 && !f.rows[0].n, one = f.rows.length === 1 && !!f.rows[0].n;
     const rowW = function(r){ return r.n ? W(String(r.n), fs) + (r.a ? W(r.a, fs) : 0) : W(r.a, fs); };
-    const stackW = lone ? W(f.rows[0].a, size * 0.85) : f.rows.reduce(function(m, r){ return Math.max(m, rowW(r)); }, 0);
+    const stackW = lone ? W(f.rows[0].a, fs) : f.rows.reduce(function(m, r){ return Math.max(m, rowW(r)); }, 0);
     const romW = W(f.roman, size);
     let x0;
     if(f.sec){ const secW = W(f.sec, size); x0 = x - (romW + 1 + stackW + (stackW ? 1 : 0) + secW) / 2; }
     else x0 = x - romW / 2;
     T(f.roman, x0, y, size, { noXml: false, xmlText: raw });
     const xs = x0 + romW + 1;
-    if(lone) T(f.rows[0].a, xs, y, Math.round(size * 0.85));
+    const yMid = y - (size - fs) * 0.35;   // 正右方：和級數字母同高置中
+    if(lone) T(f.rows[0].a, xs, yMid, fs);
+    else if(one){ T(String(f.rows[0].n), xs, yMid, fs); if(f.rows[0].a) T(f.rows[0].a, xs + W(String(f.rows[0].n), fs), yMid, fs); }
     else {
       const dW = W('6', fs);
       f.rows.forEach(function(r, k){
-        const yy = y - size * 0.42 + k * fs * 0.95;
+        const yy = y - size * 0.38 + k * fs * 0.92;
         if(r.n){ T(String(r.n), xs, yy, fs); if(r.a) T(r.a, xs + dW, yy, fs); }
         else T(r.a, xs + (dW - W(r.a, fs)) / 2, yy, fs);   // 只有記號（代表 3）：放在上面數字的正下方
       });

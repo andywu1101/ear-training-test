@@ -492,7 +492,10 @@
     if (f.special === 'aug') return e(f.roman) + '<sup class="fb-plus">+</sup>6';
     if (f.special === 'n6') return 'N6';
     var lone = f.rows.length === 1 && !f.rows[0].n;
-    var fig = !f.rows.length ? '' : (lone ? '<span class="fb-lone">' + f.rows[0].a + '</span>' : fbStack(f.rows));
+    /* v109.2：只有一個數字、或只有一個記號時，寫在級數的正右方（和級數字母同高置中）；兩層以上才疊放 */
+    var one = f.rows.length === 1 && f.rows[0].n;
+    var fig = !f.rows.length ? '' : (lone ? '<span class="fb-lone">' + f.rows[0].a + '</span>'
+            : (one ? '<span class="fb-one">' + f.rows[0].n + (f.rows[0].a ? '<span class="fb-oa">' + f.rows[0].a + '</span>' : '') + '</span>' : fbStack(f.rows)));
     if (f.sec) return '<span class="fb-sec">' + e(f.roman) + fig + e(f.sec) + '</span>';
     return '<span class="fb-r">' + e(f.roman) + (fig ? '<span class="fb-x">' + fig + '</span>' : '') + '</span>';
   }
@@ -530,7 +533,7 @@
       if (mode !== 'blank' || (item.data && item.data.hw)) {
         var maxRows = 0;
         for (var mj = ln[0]; mj < ln[1]; mj++) { var fq = figuredBass(ms[mj], (ans.numerals || [])[mj] || ''); if (fq && !fq.special) maxRows = Math.max(maxRows, fq.rows.length); else if (fq && mode === 'blank') maxRows = Math.max(maxRows, fq.rows.length); }
-        if (maxRows > 2) Hl = Math.max(Hl, numY + 40 + (maxRows - 2) * 10);
+        if (maxRows > 2) Hl = Math.max(Hl, numY + 50 + (maxRows - 2) * 12);
       }
       var sys = document.createElement('div'); sys.className = 'sys';
       sys.style.height = (Hl * k) + 'px';
