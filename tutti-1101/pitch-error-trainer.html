@@ -1828,7 +1828,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
      模擬測驗一律用鋼琴。導出 mp3 的事件標上 inst，PianoEngine.renderOffline 會用同樣的音色與殘響。 */
   const TIMBRE_PAGE = 'pitcherr';
   let windInst = null, windLoading = null;
-  function useWinds(){ return !(window.EXAM && window.EXAM.isExamMode && window.EXAM.isExamMode()) && !!(window.PianoEngine && PianoEngine.getTimbre) && PianoEngine.getTimbre(TIMBRE_PAGE) === 'winds'; }
+  let timbreOverride = null;   // v110.1：出考卷算某一題的音檔時，用那一題自己記的音色
+  function useWinds(){ if(timbreOverride) return timbreOverride === 'winds'; return !(window.EXAM && window.EXAM.isExamMode && window.EXAM.isExamMode()) && !!(window.PianoEngine && PianoEngine.getTimbre) && PianoEngine.getTimbre(TIMBRE_PAGE) === 'winds'; }
   function windName(clef){ return clef === 'bass' ? 'bassoon' : 'flute'; }
   function voiceOf(clef){ return (useWinds() && windInst) ? windInst[windName(clef)] : pianoInst; }
   function withInst(ev, clef){ if(useWinds() && ev && ev.midi != null) ev.inst = windName(clef); return ev; }
@@ -2963,7 +2964,13 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     if(!m.seq || !m.seq.length || m.seq === makerPrevSeq || !m.errorGroups.length) return;   // 這組設定出題失敗（頁面上會顯示原因）
     makerPrevSeq = m.seq;
     const d = makerData(m);
-    if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'pitcherr', data: d, snapshot: makerSnapshot(m), title: makerTitle(d) });
+    if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer(withTimbre({ type: 'pitcherr', data: d, snapshot: makerSnapshot(m), title: makerTitle(d) }));
+  }
+  /* v110.1：每一題記住出題當下的音色（鋼琴／長笛低音管），之後換設定也不影響已經出好的題目 */
+  function withTimbre(o){
+    const t = (window.PianoEngine && PianoEngine.getTimbre) ? PianoEngine.getTimbre(TIMBRE_PAGE) : 'piano';
+    if(o.data) o.data.timbre = t; if(o.snapshot) o.snapshot.timbre = t;
+    return o;
   }
   if(MAKER_MODE) window.__maker = {
     type: 'pitcherr',
@@ -2995,6 +3002,14 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     },
     events: function(d){ return peModule.exportEvents(d); }
   };
+  if(MAKER_MODE){
+    const _regen = window.__maker.regen, _events = window.__maker.events;
+    window.__maker.regen = function(snap){ const d = _regen(snap); d.timbre = (snap && snap.timbre === 'winds') ? 'winds' : 'piano'; return d; };   // 舊題目沒有記＝鋼琴
+    window.__maker.events = function(data){
+      timbreOverride = (data && data.timbre === 'winds') ? 'winds' : 'piano';
+      try{ return _events(data); } finally { timbreOverride = null; }
+    };
+  }
   if(MAKER_MODE) window.__maker.fromExam = function(cfg){   /* v106.8 套用模板：照本頁模擬考（examBootstrap）的出題設定，換成出題模式的快照 */
     const meter = cfg.meter || '4/4', meterType = cfg.meterType || 'simple';
     const n = parseInt(meter.split('/')[0], 10), bpb = meterType === 'compound' ? n / 3 : n;
