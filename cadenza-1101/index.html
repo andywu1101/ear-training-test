@@ -343,6 +343,33 @@
   body.m .card .row .tb-btn{ padding:11px 14px; font-size:15px; }
   body.m .it.dragging{ opacity:.55; box-shadow:0 6px 18px rgba(0,0,0,.18); }
 
+  /* v110.2 題目卡片：第 1 行題號與名稱，設定（電腦一行、手機兩行），最後一行 🔄 🗑；控制項字級、高度統一 */
+  .it{ display:block; padding:10px 12px; }
+  .it-r1{ display:flex; align-items:center; gap:6px; }
+  .it-set{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; margin-top:8px; }
+  .it-r2, .it-r3{ display:contents; }
+  .it-r3:empty{ display:none; }
+  .it-grp, .it-bpm, .it-sc{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:13px; color:var(--ink-soft); flex:none; }
+  .it .it-sel, .it .it-bpm input, .it .it-sc input{ font-size:13px; height:28px; box-sizing:border-box; padding:0 6px; border:1px solid var(--panel-border); border-radius:7px; background:#fff; color:var(--ink); flex:none; }
+  .it .it-bpm input{ width:54px; text-align:center; }
+  .it .it-sc input{ width:50px; text-align:center; }
+  .it .it-seg{ height:28px; box-sizing:border-box; border-radius:7px; display:inline-flex; }
+  .it .it-seg button{ font-size:13px; height:26px; padding:0 10px; }
+  .it-acts{ display:flex; gap:8px; margin-top:8px; }
+  .it-acts .ib{ border:1px solid var(--panel-border); background:#fff; border-radius:7px; height:30px; padding:0 10px; font-size:15px; }
+  body.m .it{ padding:12px 14px; }
+  body.m .it-r1 > input{ flex:1; min-width:0; font-size:15px; font-weight:600; }
+  body.m .it-set{ display:block; margin-top:6px; }
+  body.m .it-r2, body.m .it-r3{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; margin-top:10px; }
+  body.m .it-grp, body.m .it-bpm, body.m .it-sc{ font-size:14px; }
+  body.m .it .it-sel, body.m .it .it-bpm input, body.m .it .it-sc input{ font-size:14px; height:32px; padding:0 8px; }
+  body.m .it .it-bpm input{ width:58px; }
+  body.m .it .it-sc input{ width:58px; }
+  body.m .it .it-seg{ height:32px; }
+  body.m .it .it-seg button{ font-size:14px; height:30px; padding:0 12px; }
+  body.m .it-acts{ margin-top:10px; }
+  body.m .it .it-acts .ib{ height:32px; font-size:17px; padding:0 10px; }
+
   #printArea{ display:none; }
   @page{ size:A4; margin:0; }
   @media print{

@@ -270,7 +270,24 @@
 
   /* ---------- 題目列表 ---------- */
   var autoBreakIds = {};
+  function grp(label, el, after, rowName) {
+    var g = document.createElement('label'); g.className = 'it-grp'; g.dataset.row = rowName;
+    g.appendChild(document.createTextNode(label)); g.appendChild(el); if (after) g.appendChild(document.createTextNode(after));
+    return g;
+  }
+  /* v110.2：重畫列表時記住捲動位置（清空的那一瞬間高度歸零，瀏覽器會把捲動拉回頂端） */
   function renderList() {
+    var keep = [], e = $('list');
+    while (e) { if (e.scrollHeight > e.clientHeight && e.scrollTop) keep.push([e, e.scrollTop]); e = e.parentElement; }
+    var wy = window.scrollY || 0, minH = $('list').offsetHeight;
+    $('list').style.minHeight = minH + 'px';   // 先撐住高度，重畫時不塌陷
+    try { renderListRaw(); } finally {
+      $('list').style.minHeight = '';
+      keep.forEach(function (p) { p[0].scrollTop = p[1]; });
+      if (wy && (window.scrollY || 0) !== wy) window.scrollTo(0, wy);
+    }
+  }
+  function renderListRaw() {
     var box = $('list'); box.innerHTML = '';
     var groups = ordered();
     var tot = paperTotal(); $('totalScore').textContent = tot == null ? '' : '總分：' + fmtScore(tot) + ' 分';
@@ -317,17 +334,17 @@
         /* 每行小節數（節奏、單旋律）：自動／1～4；點過小節線就是「自訂」 */
         if (it.layout === 'lines' && it.data.barsCount > 1) {
           var pl = document.createElement('select'); pl.className = 'it-sel'; pl.title = '每行小節數';
-          pl.innerHTML = '<option value="auto">每行 自動</option>' + [1, 2, 3, 4].map(function (v) { return '<option value="' + v + '">每行 ' + v + ' 小節</option>'; }).join('') +
-                         '<option value="custom" disabled>每行 自訂</option>';
+          pl.innerHTML = '<option value="auto">自動</option>' + [1, 2, 3, 4].map(function (v) { return '<option value="' + v + '">' + v + '</option>'; }).join('') +
+                         '<option value="custom" disabled>自訂</option>';
           pl.value = it.breaks ? 'custom' : (it.perLine ? String(it.perLine) : 'auto');
           pl.onchange = function () { it.breaks = null; it.perLine = pl.value === 'auto' ? null : parseInt(pl.value, 10); save(); renderPreview(); };
-          extra.push(pl);
+          extra.push(grp('每行小節數', pl, null, 'r2'));
         }
         /* mp3 速度（節奏、單旋律、四部和聲）：只影響音檔與預覽播放，譜例不變 */
         if (it.data.bpm) {
           var sp = document.createElement('label'); sp.className = 'it-bpm'; sp.title = 'mp3 速度（只影響音檔，譜例不變）';
           var sym = (it.data.meterType === 'compound') ? '♪' : '♩';
-          sp.innerHTML = '<span>' + sym + '=</span>';
+          sp.innerHTML = '<span>播放速度 ' + sym + '=</span>'; sp.dataset.row = 'r2';
           var bi = document.createElement('input'); bi.type = 'number'; bi.min = 40; bi.max = 160; bi.step = 1; bi.value = it.data.bpm;
           bi.onchange = function () { var v = Math.max(40, Math.min(160, parseInt(bi.value, 10) || it.data.bpm)); bi.value = v; it.data.bpm = v; save(); };
           sp.appendChild(bi); extra.push(sp);
@@ -345,7 +362,7 @@
             };
             hs.appendChild(hb);
           });
-          extra.push(hs);
+          hs.dataset.row = 'r3'; extra.push(hs);
         }
         /* v110.1：單旋律、兩聲部、找錯音的音色（每一題自己記；沒有記的舊題目＝鋼琴）。只影響播放與 mp3，譜例不變；存模板時一起記住 */
         if (it.type === 'melody' || it.type === 'twopart' || it.type === 'pitcherr') {
@@ -357,21 +374,29 @@
               if ((it.data.timbre === 'winds' ? 'winds' : 'piano') === o2[0]) return;
               stopPlayer();
               it.data.timbre = o2[0]; it.snapshot = Object.assign({}, it.snapshot || {}, { timbre: o2[0] });
-              save(); renderList();
+              save();   // v110.2：只換這兩顆按鈕的樣子，不重畫列表（不會跳回頂端）
+              ts.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === tb); });
             };
             ts.appendChild(tb);
           });
-          extra.push(ts);
+          ts.dataset.row = 'r3'; extra.push(ts);
         }
         /* 小題配分：空白＝不印 */
         var isc = document.createElement('label'); isc.className = 'it-sc'; isc.title = '小題配分（空白＝不印）';
         var ii = document.createElement('input'); ii.type = 'text'; ii.inputMode = 'decimal'; ii.value = it.score != null ? fmtScore(it.score) : '';
         ii.onchange = function () { it.score = parseScore(ii.value); save(); renderList(); };
-        isc.appendChild(ii); isc.appendChild(document.createTextNode('分')); extra.push(isc);
-        /* v108 手機：▲▼ 移動（電腦版隱藏）＋觸控拖曳 ≡ */
-        var up = btn('▲', '往上移', function () { moveItem(it, -1); }); up.classList.add('mv');
-        var dn = btn('▼', '往下移', function () { moveItem(it, 1); }); dn.classList.add('mv');
-        [grip, num, ti, info].concat(extra, [up, dn, rg, del]).forEach(function (x) { row.appendChild(x); });
+        isc.appendChild(document.createTextNode('配分')); isc.appendChild(ii); isc.appendChild(document.createTextNode('分')); isc.dataset.row = 'r3'; extra.push(isc);
+        /* v110.2 卡片排版：第 1 行題號與名稱；設定（手機分兩行：每行小節數＋播放速度／音色或作答卷樣式＋配分；電腦合成一行）；最後一行 🔄 🗑。
+           ▲▼ 拿掉（手機用 ≡ 拖曳） */
+        var r1 = document.createElement('div'); r1.className = 'it-r1';
+        [grip, num, ti, info].forEach(function (x) { r1.appendChild(x); });
+        var set = document.createElement('div'); set.className = 'it-set';
+        var r2 = document.createElement('div'), r3 = document.createElement('div'); r2.className = 'it-r2'; r3.className = 'it-r3';
+        extra.forEach(function (x) { (x.dataset.row === 'r2' ? r2 : r3).appendChild(x); });
+        if (r2.children.length) set.appendChild(r2);
+        set.appendChild(r3);
+        var acts = document.createElement('div'); acts.className = 'it-acts'; acts.appendChild(rg); acts.appendChild(del);
+        [r1, set, acts].forEach(function (x) { row.appendChild(x); });
         grip.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse') return; e.preventDefault(); touchDrag(e, row, it, grip); });
         grip.onmousedown = function () { row.draggable = true; };
         row.ondragstart = function (e) { dragId = it.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
