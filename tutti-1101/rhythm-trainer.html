@@ -276,6 +276,7 @@
           <button class="mode-btn active" data-meter="2/4" data-type="simple">2/4</button>
           <button class="mode-btn" data-meter="3/4" data-type="simple">3/4</button>
           <button class="mode-btn" data-meter="4/4" data-type="simple">4/4</button>
+          <button class="mode-btn" data-meter="5/4" data-type="simple">5/4</button>
           <button class="mode-btn" data-meter="3/8" data-type="compound">3/8</button>
           <button class="mode-btn" data-meter="6/8" data-type="compound">6/8</button>
           <button class="mode-btn" data-meter="12/8" data-type="compound">12/8</button>
@@ -659,6 +660,7 @@ function showPage(pageId) {
     const p = i % beatsPerBar;
     if (p + 1 >= beatsPerBar) return false;
     if (beatsPerBar === 4 && p % 2 === 1) return false;
+    if (beatsPerBar === 5 && p > 2) return false;   // 5/4（v110）：只從第 1、2、3 拍開始
     return true;
   }
   // 一拍有幾個時值單位（已乘 TIE_UNIT）：單拍子 4×3、複拍子 6×3
@@ -2283,7 +2285,7 @@ function showPage(pageId) {
     <h2>節奏練習 — 玩法說明</h2>
     <p class="help-lead">聽寫節奏型 (拍子與節奏顆粒)。</p>
     <h3>設定</h3>
-    <p>音高演奏可選「<b>單音</b> (都用 A4)」或「<b>雙音</b> (兩音嚴格交替，幫助分辨顆粒)」；拍號含單拍子 2/4、3/4、4/4 與複拍子 3/8、6/8、12/8；可調小節數、速度；下方勾選這次要出現的節奏型 (以一拍為單位，可全選)。測驗模式會自動重播數次 (含倒數)。</p>
+    <p>音高演奏可選「<b>單音</b> (都用 A4)」或「<b>雙音</b> (兩音嚴格交替，幫助分辨顆粒)」；拍號含單拍子 2/4、3/4、4/4、5/4 與複拍子 3/8、6/8、12/8；可調小節數、速度；下方勾選這次要出現的節奏型 (以一拍為單位，可全選)。測驗模式會自動重播數次 (含倒數)。</p>
     <h3>作答</h3>
     <p>按「播放題目」 (先有預備拍節拍器)→ 點五線譜上要填的拍位 → 點下方節奏鍵盤填入 (自動往後)，用「⌫刪除」修改 (設定頁開啟「連結線」後，選中某一拍再按「⌒」即可把它連到下一拍，再按一次取消)→ 提交 → 解答頁會把你的作答用<b>紅色標出錯處</b>並與正解對照，可分別聆聽「你的作答」與「正解」。</p>
     <div class="help-common">

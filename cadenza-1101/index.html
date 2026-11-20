@@ -241,6 +241,28 @@
   /* ---- 卡片 ---- */
   .mask{ position:fixed; inset:0; background:rgba(20,18,14,.45); display:none; align-items:center; justify-content:center; z-index:50; }
   .mask.on{ display:flex; }
+  /* v110：我的考卷 */
+  #confirmMask, #promptMask, #dlMask, #busyMask{ z-index:55; }   /* 從「我的考卷」裡跳出的確認、命名、下載、處理中要蓋在它上面 */
+  .papers-card{ width:min(620px, 94vw); display:flex; flex-direction:column; }
+  .pp-h{ display:flex; align-items:center; gap:10px; }
+  .pp-h h3{ margin:0; }
+  .pp-h .spacer{ flex:1; }
+  .pp-count{ font-size:13px; color:var(--ink-soft); }
+  .pp-list{ margin-top:12px; border:1px solid var(--panel-border); border-radius:12px; background:#fff; overflow:auto; max-height:52vh; }
+  .pp-row{ display:flex; align-items:center; gap:8px; padding:9px 12px; border-top:1px solid var(--hairline); }
+  .pp-row:first-child{ border-top:0; }
+  .pp-row.cur{ background:var(--accent-soft, rgba(51,65,92,.06)); }
+  .pp-info{ flex:1; min-width:0; }
+  .pp-name{ font-size:14.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pp-meta{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .pp-acts{ display:flex; gap:4px; flex:none; }
+  .pp-acts button{ border:1px solid var(--panel-border); background:#fff; border-radius:8px; padding:5px 8px; font-size:13px; }
+  .pp-acts .pp-open{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .pp-empty{ padding:22px 12px; text-align:center; color:var(--ink-soft); font-size:13.5px; }
+  .pp-note{ font-size:12.5px; color:var(--ink-soft); margin:12px 0 0; line-height:1.6; }
+  body.m .pp-list{ max-height:none; flex:1; }
+  body.m .pp-row{ flex-wrap:wrap; }
+  body.m .pp-acts{ width:100%; justify-content:flex-end; }
   .card{ background:var(--panel); border-radius:16px; padding:18px 20px; width:min(860px, 94vw); max-height:92vh; overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.25); }
   .card h3{ margin:0 0 10px; font-size:16px; }
   .card .pv-box{ background:#fff; border:1px solid var(--hairline); border-radius:10px; padding:10px 14px; font-family:var(--paper-font); overflow:auto; }
@@ -307,7 +329,7 @@
   body.m #mPvBar{ display:flex; gap:8px; align-items:center; padding:8px 10px; position:sticky; top:0; left:0; z-index:5; background:var(--paper); }
   body.m #mPvBar .seg button{ padding:8px 14px; font-size:14px; }
   body.m #mPvBar #densityM button{ padding:8px 10px; }
-  @media (max-width:400px){ body.m #mPvBar{ gap:6px; padding:8px 8px; } body.m #mPvBar .seg button{ padding:7px 8px; font-size:13px; } body.m #mPvBar #btnExportM{ padding-left:9px; padding-right:9px; font-size:13px; } }
+  @media (max-width:430px){ body.m #mPvBar{ gap:5px; padding:8px 8px; } body.m #mPvBar .seg button{ padding:7px 9px; font-size:13px; white-space:nowrap; } body.m #mPvBar #densityM button{ padding:7px 7px; } body.m #mPvBar #btnExportM{ padding:7px 8px; font-size:13px; white-space:nowrap; } }
   body.m .pv-hint{ font-size:12px; margin:0 12px 8px; text-align:left; }
   body.m .pages{ align-items:flex-start; padding:0 8px; gap:10px; }
   /* v108.1 手機：小節線的點擊範圍加寬（約一個手指寬）並一直顯示虛線框；已經換行的位置顏色較深 */
@@ -363,6 +385,7 @@
   <span class="brand" id="brandHome" role="button" tabindex="0" title="回到封面"><span class="back-cover">‹ 返回</span><img src="icon-192.png" alt="">音聽出考卷</span>
   <span class="seg d-only" id="viewSeg"><button data-v="edit" class="on">出題</button><button data-v="blank">預覽作答卷</button><button data-v="key">預覽解答</button></span>
   <span class="spacer"></span>
+  <button class="tb-btn d-only" id="btnPapers">📁 我的考卷</button>
   <span class="tpl-wrap"><button class="tb-btn" id="btnTpl">📋 套用模板 ▾</button><div class="tpl-menu" id="tplMenu"></div></span>
   <span class="pv-dens d-only" id="densityD"><span class="pv-dens-l">間距</span><span class="seg density-seg"><button data-d="std">標準</button><button data-d="dense">濃縮</button><button data-d="tight">更緊</button></span></span>
   <span class="tpl-wrap d-only"><button class="tb-btn primary" id="btnExport">📤 匯出 ▾</button>
@@ -374,7 +397,7 @@
       <button id="btnMp3">⬇️ 下載 mp3（壓縮檔）</button>
     </div></span>
   <button class="tb-btn m-only" id="btnMore" aria-label="設定與匯出" title="設定與匯出">⚙️</button>
-  <span class="ver d-only">出題工具 v9</span>
+  <span class="ver d-only">出題工具 v10</span>
 </div>
 
 <!-- 考卷設定卡片：電腦版放在右邊列表最上面，手機版放進「設定與匯出」頁（applyMode 搬動） -->
@@ -392,6 +415,12 @@
   <div class="mset-body">
     <div id="setSlotM"></div>
     <div class="card-box">
+      <div class="cb-h">📁 我的考卷</div>
+      <div class="mset-btns">
+        <button class="tb-btn primary" id="mPapers">📁 開啟我的考卷</button>
+      </div>
+    </div>
+    <div class="card-box">
       <div class="cb-h">📤 匯出</div>
       <div class="mset-btns">
         <button class="tb-btn" id="mPdfBlank">📄 PDF 作答卷</button><button class="tb-btn" id="mPdfKey">📄 PDF 解答</button>
@@ -405,7 +434,7 @@
         <button class="tb-btn" id="btnCoverM">🏠 回到封面</button>
       </div>
     </div>
-    <div class="ver" style="text-align:center;">出題工具 v9</div>
+    <div class="ver" style="text-align:center;">出題工具 v10</div>
   </div>
 </div>
 
@@ -483,6 +512,32 @@
     <h3>把「音聽出考卷」加入主畫面</h3>
     <div id="a2Body"></div>
     <div class="row"><button class="tb-btn primary" id="a2Install" style="display:none;">安裝</button><button class="tb-btn" id="a2No">關閉</button></div>
+  </div>
+</div>
+
+<!-- v110：我的考卷（存在瀏覽器的資料庫 IndexedDB，最多 50 張） -->
+<div class="mask" id="papersMask">
+  <div class="card papers-card">
+    <div class="pp-h"><h3>📁 我的考卷</h3><span class="pp-count" id="ppCount"></span><span class="spacer"></span><button class="tb-btn" id="ppClose">✕ 關閉</button></div>
+    <div class="row pp-top">
+      <button class="tb-btn primary" id="ppSave">💾 儲存目前考卷</button>
+      <button class="tb-btn" id="ppSaveAs" style="display:none;">另存新考卷</button>
+    </div>
+    <div class="pp-list" id="ppList"></div>
+    <div class="row pp-bottom">
+      <button class="tb-btn" id="ppExportAll">📦 全部匯出（備份）</button>
+      <button class="tb-btn" id="ppImport">📥 匯入</button>
+      <input type="file" id="ppFile" accept="application/json,.json" style="display:none;">
+    </div>
+    <p class="pp-note">考卷存在這個瀏覽器裡，清除瀏覽器資料就會不見。建議把「音聽出考卷」加入主畫面使用，並定期按「全部匯出」備份。匯入時會帶回所有考卷、模板與題目資料，mp3 可以照常匯出。</p>
+  </div>
+</div>
+
+<div class="mask" id="promptMask">
+  <div class="card small" style="width:min(420px,92vw);">
+    <h3 id="promptTitle">名稱</h3>
+    <input type="text" id="promptInput" style="width:100%;box-sizing:border-box;border:1px solid var(--panel-border);border-radius:8px;padding:7px 9px;font-size:14px;">
+    <div class="row"><button class="tb-btn primary" id="promptOk">確定</button><button class="tb-btn" id="promptNo">取消</button></div>
   </div>
 </div>
 

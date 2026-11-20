@@ -30,6 +30,16 @@
        與原本音色的平均值相同，這樣兩套音色切換時音量不會跳。 */
     targetRms: 229
   };
+  /* v110：C5 響度平衡。逐個取樣量響度（LUFS，接近耳朵的聽感），補到一樣響（dB，正＝加大）。
+     原因：取樣是用「整段音量」正規化，高音、亮的取樣聽起來特別大聲（C5 大 7 dB、D♯7 大 9 dB…）。
+     四部和聲另有作者調好的低音補償，那一頁呼叫 setC5Balance(false) 不套用。 */
+  var C5_EQ = { 21: 2.9, 24: 2.0, 27: 2.1, 30: 2.7, 33: 0.9, 36: 0.1, 39: 1.7, 42: 1.5, 45: 2.2, 48: 1.9,
+                51: 2.0, 54: -1.6, 57: -2.7, 60: 0.7, 63: 1.3, 66: 1.1, 69: -2.5, 72: -6.8, 75: -1.4, 78: -1.2,
+                81: 0.3, 84: 0.0, 87: -3.4, 90: -1.1, 93: -4.1, 96: -3.6, 99: -8.7, 102: -5.3, 105: -4.2, 108: -4.5 };
+  var c5Balance = true;
+  function setC5Balance(on) { c5Balance = !!on; }
+  /* 音高補償（B 版，作者選定）：G3 以下每低一個半音加 0.25 dB，最多 4 dB——手機小喇叭也聽得到低音 */
+  function c5Lift(midi) { return Math.min(4, Math.max(0, 55 - midi) * 0.25); }
   var MUSYNG = { file: 'acoustic_grand_piano-mp3.js' };
   /* soundfont-player 的預設 release（實測其原始碼：attack .01 / decay .1 / sustain .9 / release .3）。
      兩套音色的音長要一致，這個值就必須相同。 */
@@ -90,6 +100,7 @@
     }
 
     var base = (this.gains[src] || 1) * rel;
+    if (c5Balance && C5_EQ[src] != null) base *= Math.pow(10, C5_EQ[src] / 20);   // v110 響度平衡
     var g = ctx.createGain();
     /* 音頭增益：起音時多給一點再滑回原本的大小，補回真實錄音較圓潤的 attack。
        ⚠ 全部用排程，不讀 gain.value——讀當下值會拿到還沒生效的舊值，
@@ -169,6 +180,145 @@
   }
   function isLocked() { return Date.now() < lock.until; }
   function onLockChange(fn) { if (typeof fn === 'function') lock.fns.push(fn); }
+
+  /* ---------- 長笛／低音管（v110） ----------
+     音源：University of Iowa MIS（無使用限制），只在單旋律、兩聲部、音高辨認選了這個音色才載入。
+     製作時已處理好：音準修到標準音高、去掉長笛低音的氣聲、持續段音量拉平、循環點做好交叉淡化。
+     檔案是單聲道；殘響在播放時才加（所有管樂音共用同一個殘響，兩聲部像在同一個房間）。
+     ⚠ mp3 解碼後開頭會多出一段不固定長度的空白，所以每個音開頭放一個脈衝當定位記號，
+       解碼後找脈衝位置，循環點就能準確對上。 */
+  var WIND = {
+    file:      'winds-mp3.js',
+    tune:      442 / 440,   // 取樣修在 A=440，這裡跟鋼琴一樣校正到 442
+    targetRms: 229 * 1.8,   // 與鋼琴同一套正規化尺度。鋼琴有很強的音頭、之後一直衰減；實測整段旋律管樂要放大約 6.5 dB，
+                            // 整體音量才比鋼琴小約 2 dB（持續音聽起來較大聲，所以略小一點）
+    instDb:    { flute: 2, bassoon: 5.5 },   // 各樂器再加的音量（作者試聽選定：兩聲部低音管比長笛略突出約 1.5 dB）
+    release:   0.15,        // 放掉後的淡出秒數
+    revTime:   1.3,         // 殘響長度（秒）
+    revWet:    0.18,        // 殘響量（相對原音）。0.35 時少數音的音量會隨殘響明顯起伏（實測最多約 4 dB）；作者試聽後選 0.18
+    revLow:    5000         // 殘響高頻衰減的轉折頻率
+  };
+  function WindVoice(ctx, set) {
+    this.ctx = ctx;
+    this.set = set;                  // midi → { buf, gain, start, loopStart, loopEnd }
+    this.keys = Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
+    this.playing = [];
+  }
+  WindVoice.prototype._nearest = SalamanderPiano.prototype._nearest;
+  WindVoice.prototype.stop = SalamanderPiano.prototype.stop;
+  WindVoice.prototype.play = function (midi, when, opts) {
+    opts = opts || {};
+    var ctx = this.ctx;
+    var t = (when == null) ? ctx.currentTime : when;
+    var dur = opts.duration || 3.3;
+    var src = this._nearest(midi), s = this.set[src];
+    if (!s) return null;
+    var node = ctx.createBufferSource();
+    node.buffer = s.buf;
+    node.loop = true; node.loopStart = s.loopStart; node.loopEnd = s.loopEnd;
+    node.playbackRate.value = Math.pow(2, (midi - src) / 12) * WIND.tune;   // 超出音域的音：用最近的錄音移調
+    var base = s.gain * (opts.gain == null ? 3.5 : opts.gain);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(base, t);
+    g.gain.setValueAtTime(base, t + dur);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + WIND.release);
+    var fg = ctx.createGain();
+    node.connect(g); g.connect(fg);
+    fg.connect(outputFor(ctx));
+    fg.connect(reverbOf(ctx));
+    node.__fg = fg; node.__t = t;
+    var end = t + dur + WIND.release;
+    markBusy(ctx, end + WIND.revTime);
+    noteEnd(ctx, end);
+    node.start(t, s.start); node.stop(end + 0.02);
+    var self = this;
+    this.playing.push(node);
+    node.onended = function () {
+      var i = self.playing.indexOf(node);
+      if (i >= 0) self.playing.splice(i, 1);
+    };
+    return node;
+  };
+  /* 殘響：每個 context 一個，脈衝響應用固定種子的雜訊產生（不必另外下載檔案），每次都一樣 */
+  function reverbOf(ctx) {
+    if (ctx.__rev && ctx.__revOut === outputFor(ctx)) return ctx.__rev;
+    var sr = ctx.sampleRate, n = Math.floor(WIND.revTime * sr), pre = Math.floor(0.018 * sr);
+    var ir = ctx.createBuffer(2, n + pre, sr), seed = 12345;
+    var rnd = function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff * 2 - 1; };
+    var a = Math.exp(-2 * Math.PI * WIND.revLow / sr);
+    for (var c = 0; c < 2; c++) {
+      var d = ir.getChannelData(c), lp1 = 0, lp2 = 0, e = 0;
+      for (var i = 0; i < n; i++) {
+        lp1 = lp1 * a + rnd() * (1 - a); lp2 = lp2 * a + lp1 * (1 - a);   // 兩級低通：殘響的高頻比較暗
+        var v = lp2 * Math.exp(-6.9 * i / n);
+        d[pre + i] = v; e += v * v;
+      }
+      var k = 1 / Math.sqrt(e || 1);
+      for (var j = pre; j < n + pre; j++) d[j] *= k;                       // 能量正規化：殘響量只由 revWet 決定
+    }
+    var cv = ctx.createConvolver(); cv.normalize = false; cv.buffer = ir;
+    var wg = ctx.createGain(); wg.gain.value = WIND.revWet;
+    cv.connect(wg); wg.connect(outputFor(ctx));
+    ctx.__rev = cv; ctx.__revOut = outputFor(ctx);
+    return cv;
+  }
+  var windData = null;
+  async function windSource() {
+    if (!windData) {
+      if (!(global.MIDI && global.MIDI.Soundfont && global.MIDI.Soundfont.winds)) await loadScript(WIND.file);
+      windData = (global.MIDI && global.MIDI.Soundfont && global.MIDI.Soundfont.winds) || null;
+      if (!windData) throw new Error('管樂音色資料不完整');
+    }
+    return windData;
+  }
+  /* 解碼一個音：找開頭脈衝定位，算出播放起點與循環點（秒） */
+  async function decodeWind(ctx, inst, name) {
+    var W = await windSource();
+    var buf = await ctx.decodeAudioData(dataUriToBuf(W[inst][name]));
+    var x = buf.getChannelData(0), sr = buf.sampleRate, lim = Math.min(x.length, Math.floor(0.06 * sr)), mk = 0;
+    for (var i = 1; i < lim; i++) if (Math.abs(x[i]) > Math.abs(x[mk])) mk = i;
+    var st = mk / sr + W.gap, lp = W.loop[inst][name];
+    /* 量音量時跳過記號：從音的開頭量 1.5 秒（與鋼琴的正規化同一個尺度） */
+    var a = Math.floor(st * sr), b = Math.min(x.length, a + Math.floor(1.5 * sr)), s = 0;
+    for (var k = a; k < b; k++) s += x[k] * x[k];
+    var rms = Math.sqrt(s / Math.max(1, b - a)) || 0.0001;
+    var db = (WIND.instDb && WIND.instDb[inst]) || 0;
+    return { buf: buf, gain: (WIND.targetRms / 32768) / rms * Math.pow(10, db / 20), start: st, loopStart: st + lp[0], loopEnd: st + lp[1] };
+  }
+  /* midis 有給：只解碼用得到的音（導出用）；沒給：整組解碼（練習頁用） */
+  async function windSet(ctx, inst, midis) {
+    var W = await windSource(), names = Object.keys(W[inst]), byMidi = {};
+    names.forEach(function (n) { var m = midiOfName(n); if (m !== null) byMidi[m] = n; });
+    var avail = Object.keys(byMidi).map(Number), want = avail;
+    if (midis) {
+      var need = {};
+      midis.forEach(function (m) {
+        var best = avail[0];
+        avail.forEach(function (k) { if (Math.abs(k - m) < Math.abs(best - m)) best = k; });
+        need[best] = 1;
+      });
+      want = Object.keys(need).map(Number);
+    }
+    var set = {};
+    for (var i = 0; i < want.length; i++) {
+      try { set[want[i]] = await decodeWind(ctx, inst, byMidi[want[i]]); } catch (e) {}
+    }
+    if (!Object.keys(set).length) throw new Error('管樂音色沒有任何取樣可用');
+    return set;
+  }
+  /* 練習頁用：回傳 { flute, bassoon }，介面與鋼琴相同（play／stop） */
+  async function loadWinds(ctx) {
+    var f = await windSet(ctx, 'flute'), b = await windSet(ctx, 'bassoon');
+    return { flute: new WindVoice(ctx, f), bassoon: new WindVoice(ctx, b) };
+  }
+  /* 練習頁的音色設定（各頁分開記）：'piano' 或 'winds' */
+  var TIMBRE_KEY = 'earTrainer.settings.timbre.';
+  function getTimbre(page) {
+    try { return localStorage.getItem(TIMBRE_KEY + page) === 'winds' ? 'winds' : 'piano'; } catch (e) { return 'piano'; }
+  }
+  function setTimbre(page, v) {
+    try { localStorage.setItem(TIMBRE_KEY + page, v === 'winds' ? 'winds' : 'piano'); } catch (e) {}
+  }
 
   /* ---------- 載入 ---------- */
   var NOTE = { C:0, 'C#':1, Db:1, D:2, 'D#':3, Eb:3, E:4, F:5, 'F#':6, Gb:6,
@@ -469,7 +619,7 @@
      所以 Salamander 已解碼的取樣直接沿用，不必重新解碼，幾乎不用等。
      ⚠ soundfont-player 的音色在內部綁死原本的 context，搬不過去 → 回傳 false，由頁面重新載入。 */
   function rebind(inst, ctx) {
-    if (!inst || !ctx || !(inst instanceof SalamanderPiano)) return false;
+    if (!inst || !ctx || !(inst instanceof SalamanderPiano || inst instanceof WindVoice)) return false;
     try { inst.stop(0); } catch (e) {}    // 舊 context 上凍住的音符一併取消（立刻停止，不淡出）
     inst.ctx = ctx; dbg.ctx = ctx;
     return true;
@@ -580,6 +730,7 @@
     opts = opts || {};
     var kit = opts.kit || currentKit();
     var tail = 1.0;                       // 尾端留一點空間給最後一個音的 release
+    if (events.some(function (e) { return e.inst === 'flute' || e.inst === 'bassoon'; })) tail += WIND.revTime;   // 管樂多留殘響尾巴
     var total = 0;
     events.forEach(function (e) {
       var end = (e.type === 'click')
@@ -607,6 +758,18 @@
     });
 
     events = events.filter(function (e) { return e.type !== 'click'; });
+    /* v110：標了 inst（'flute'／'bassoon'）的音用管樂音色，殘響與練習頁相同 */
+    var windEv = events.filter(function (e) { return e.inst === 'flute' || e.inst === 'bassoon'; });
+    if (windEv.length) {
+      var voices = {};
+      for (var wi = 0; wi < 2; wi++) {
+        var nm = wi ? 'bassoon' : 'flute';
+        var mm = windEv.filter(function (e) { return e.inst === nm; }).map(function (e) { return e.midi; });
+        if (mm.length) voices[nm] = new WindVoice(ctx, await windSet(ctx, nm, mm));
+      }
+      windEv.forEach(function (e) { voices[e.inst].play(e.midi, e.time || 0, { duration: e.duration, gain: e.gain }); });
+      events = events.filter(function (e) { return windEv.indexOf(e) < 0; });
+    }
     var midis = events.map(function (e) { return e.midi; });
 
     if (kit === 'salamander') {
@@ -738,6 +901,12 @@
     claimMedia: claimMedia,
     releaseMedia: releaseMedia,
     renderOffline: renderOffline,
+    loadWinds: loadWinds,
+    setC5Balance: setC5Balance,
+    c5Lift: c5Lift,
+    getTimbre: getTimbre,
+    setTimbre: setTimbre,
+    windParams: WIND,
     currentKit: currentKit,
     setKit: setKit,
     DEFAULT_KIT: DEFAULT_KIT,

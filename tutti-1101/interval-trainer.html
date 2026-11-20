@@ -683,10 +683,20 @@ function updateStaffHeader(pageId){
      （08 音堆練習另有一套自己的常數，因為它是音團辨識、遮蔽最嚴重，這裡不共用。） */
   const GAIN_BASE = 3.5, TILT_DB = 1.0, GAIN_NORM = 0;
   const GAIN_MIN = 2.5, GAIN_MAX = 4.8;
+  /* v110：C5 鋼琴改用 B 版補償（作者選定）——音色程式已把每個取樣補到一樣響，這裡拿掉原本的音區傾斜、改成低音加強（PianoEngine.c5Lift）。
+     標準音色、長笛／低音管維持原本的算法。 */
+  function c5PianoNow(){
+    try{
+      if(typeof useWinds === 'function' && useWinds()) return false;
+      const k = (typeof pianoInst !== 'undefined' && pianoInst && pianoInst.__kit) || PianoEngine.currentKit();
+      return k === 'salamander' && !!PianoEngine.c5Lift;
+    }catch(e){ return false; }
+  }
   function gainFor(midi, count){
-    const tilt = Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
+    const c5 = c5PianoNow();
+    const tilt = c5 ? Math.pow(10, PianoEngine.c5Lift(midi || 60) / 20) : Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
     const norm = Math.min(1, Math.pow(2 / Math.max(1, count || 1), GAIN_NORM));
-    return Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
+    return c5 ? GAIN_BASE * tilt * norm : Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
   }
 
   let audioCtx = null; let pianoInstrument = null; let pendingTimeouts = [];

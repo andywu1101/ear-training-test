@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ear-training-shell-v109'; // v.109：四部和聲正解改數字低音寫法、增六按鈕；出題工具和聲作業模式、間距移到預覽頁；v.108：出題工具「音聽出考卷」手機版、PDF 匯出、主畫面圖示；App 各頁加分頁小圖示；v.107：模擬測驗調整（大學檔和絃含轉位、兩聲部拍號隨機、四部和聲 80；高中檔速度放慢、連結線 0～1 條）；v.106.8：出題工具套用模板、配分、找錯音解答顏色、四部和聲 C 拍號；練習頁加 fromExam 接口（?maker=1）；v.106.7：出題工具的音程、和絃、音堆每格改終止線、播放鈕縮小；v.106.6：出題工具的音堆改成大譜表連續格子；v.106.5：兩聲部、找錯音、音堆頁加入出題模式接口；v.106.3：和絃、單旋律、四部和聲頁加入出題模式接口；v.106.2：音程、節奏頁加入出題模式接口（?maker=1，出題工具 cadenza-1101 專用）；v.106.1：節奏、單旋律、兩聲部（找錯音出題）新增三種兩拍節奏型；v.106：音程／和絃不出音高相同的題目、速度標 ♩／♪、錯題本拉桿、贊助者版 MusicXML 匯出
+const CACHE_NAME = 'ear-training-shell-v110'; // v.110：5/4 拍子；單旋律、兩聲部、音高辨認新增長笛／低音管音色（winds-mp3.js，用到才下載）；出題工具「我的考卷」；v.109：四部和聲正解改數字低音寫法、增六按鈕；出題工具和聲作業模式、間距移到預覽頁；v.108：出題工具「音聽出考卷」手機版、PDF 匯出、主畫面圖示；App 各頁加分頁小圖示；v.107：模擬測驗調整（大學檔和絃含轉位、兩聲部拍號隨機、四部和聲 80；高中檔速度放慢、連結線 0～1 條）；v.106.8：出題工具套用模板、配分、找錯音解答顏色、四部和聲 C 拍號；練習頁加 fromExam 接口（?maker=1）；v.106.7：出題工具的音程、和絃、音堆每格改終止線、播放鈕縮小；v.106.6：出題工具的音堆改成大譜表連續格子；v.106.5：兩聲部、找錯音、音堆頁加入出題模式接口；v.106.3：和絃、單旋律、四部和聲頁加入出題模式接口；v.106.2：音程、節奏頁加入出題模式接口（?maker=1，出題工具 cadenza-1101 專用）；v.106.1：節奏、單旋律、兩聲部（找錯音出題）新增三種兩拍節奏型；v.106：音程／和絃不出音高相同的題目、速度標 ♩／♪、錯題本拉桿、贊助者版 MusicXML 匯出
 
 /* 你自己的頁面與程式：採「網路優先」，一更新使用者下次開啟就是新版 */
 const APP_SHELL = [
@@ -35,12 +35,15 @@ const STATIC_ASSETS = [
   './jkopay-qr.png'
 ];
 
+/* v110：用到才下載的固定資源（長笛／低音管音色約 2.7 MB）：不在安裝時預先下載，第一次用到之後走「快取優先」 */
+const LAZY_ASSETS = ['./winds-mp3.js'];
+
 /* 這些外部來源（本機檔案不存在時的備援）也快取起來，讓沒有本機檔案的情況一樣能離線 */
 const CDN_HOSTS = ['cdn.jsdelivr.net', 'gleitz.github.io', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 function isStaticAsset(url) {
   if (CDN_HOSTS.indexOf(url.hostname) !== -1) return true;
-  return STATIC_ASSETS.some(p => url.pathname.endsWith(p.replace('./', '/')) || url.pathname.endsWith(p.replace('./', '')));
+  return STATIC_ASSETS.concat(LAZY_ASSETS).some(p => url.pathname.endsWith(p.replace('./', '/')) || url.pathname.endsWith(p.replace('./', '')));
 }
 
 self.addEventListener('install', event => {

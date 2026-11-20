@@ -302,6 +302,13 @@
           <button class="mode-btn" data-clef="bass">低音譜號 (Bass)</button>
         </div>
       </div>
+      <div class="switch-group">
+        <div class="switch-group-label">音色</div>
+        <div class="switch-btns" id="pe-timbreSwitch">
+          <button class="mode-btn active" data-timbre="piano">鋼琴</button>
+          <button class="mode-btn" data-timbre="winds">長笛／低音管</button>
+        </div>
+      </div>
     </div>
 
     <div class="switch-row">
@@ -344,6 +351,7 @@
           <button class="mode-btn active" data-meter="2/4" data-type="simple">2/4</button>
           <button class="mode-btn" data-meter="3/4" data-type="simple">3/4</button>
           <button class="mode-btn" data-meter="4/4" data-type="simple">4/4</button>
+          <button class="mode-btn" data-meter="5/4" data-type="simple">5/4</button>
           <button class="mode-btn" data-meter="3/8" data-type="compound">3/8</button>
           <button class="mode-btn" data-meter="6/8" data-type="compound">6/8</button>
           <button class="mode-btn" data-meter="12/8" data-type="compound">12/8</button>
@@ -633,7 +641,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
   const CONT = 'cont';
   ALL_BLOCKS[CONT] = { id: CONT, lengths: [], tieNext: [], isTuplet: false, type: 'simple', beats: 1 };
   const isTwoBeat = id => TWO_BEAT.includes(id);
-  function twoBeatOK(i, bpb){ const p = i % bpb; return p + 1 < bpb && !(bpb === 4 && p % 2 === 1); }
+  function twoBeatOK(i, bpb){ const p = i % bpb; return p + 1 < bpb && !(bpb === 4 && p % 2 === 1) && !(bpb === 5 && p > 2); }   // 5/4（v110）：只從第 1、2、3 拍開始
 
   const VF = Vex.Flow;
 
@@ -1325,7 +1333,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
   /* 每個拍號的「每小節音符數上限」。
      複拍子天生比單拍子密（單拍子每拍平均 2.56 個音、複拍子每附點拍 3.59 個），
      所以各拍號分別設限，再加一道絕對上限，避免長題目難以掃視。 */
-  const NOTE_CAP_PER_BAR = { '3/8':5, '2/4':6, '6/8':8, '3/4':9, '4/4':12, '12/8':17 };
+  const NOTE_CAP_PER_BAR = { '3/8':5, '2/4':6, '6/8':8, '3/4':9, '4/4':12, '5/4':15, '12/8':17 };
   const NOTE_CAP_ABSOLUTE = 40;
 
   function notesOfPattern(id){ return ALL_BLOCKS[id].lengths.length; }
@@ -1505,16 +1513,27 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
      （08 音堆練習另有一套自己的常數，因為它是音團辨識、遮蔽最嚴重，這裡不共用。） */
   const GAIN_BASE = 3.5, TILT_DB = 1.0, GAIN_NORM = 0;
   const GAIN_MIN = 2.5, GAIN_MAX = 4.8;
+  /* v110：C5 鋼琴改用 B 版補償（作者選定）——音色程式已把每個取樣補到一樣響，這裡拿掉原本的音區傾斜、改成低音加強（PianoEngine.c5Lift）。
+     標準音色、長笛／低音管維持原本的算法。 */
+  function c5PianoNow(){
+    try{
+      if(typeof useWinds === 'function' && useWinds()) return false;
+      const k = (typeof pianoInst !== 'undefined' && pianoInst && pianoInst.__kit) || PianoEngine.currentKit();
+      return k === 'salamander' && !!PianoEngine.c5Lift;
+    }catch(e){ return false; }
+  }
   function gainFor(midi, count){
-    const tilt = Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
+    const c5 = c5PianoNow();
+    const tilt = c5 ? Math.pow(10, PianoEngine.c5Lift(midi || 60) / 20) : Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
     const norm = Math.min(1, Math.pow(2 / Math.max(1, count || 1), GAIN_NORM));
-    return Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
+    return c5 ? GAIN_BASE * tilt * norm : Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
   }
 
   let audioCtx = null, pianoInst = null, pendingTimers = [];
   function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
   window.peStopAll = function(){
     if(pianoInst) pianoInst.stop();
+    stopWinds();
     clearTimers();
     if(window.peModule){ peModule.isPlaying = false; peModule.updatePlayBtn(); }
   };
@@ -1674,6 +1693,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
     if(needSpare) audioToast('🔊 正在恢復聲音…');
 
     function rebindTo(c){
+      if(windInst && window.PianoEngine && window.PianoEngine.rebind){ window.PianoEngine.rebind(windInst.flute, c); window.PianoEngine.rebind(windInst.bassoon, c); }
       return !!(window.PianoEngine && window.PianoEngine.rebind && pianoInst && window.PianoEngine.rebind(pianoInst, c));
     }
     (function check(){
@@ -1791,6 +1811,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
   window.loadPiano = function(){
     const ctx = ensureAudio(); if(!ctx) return;
     PianoEngine.load(ctx, PIANO_UI)
+      .then(function(inst){ return loadWinds().then(function(){ return inst; }); })   // v110：選了長笛／低音管就等它也載好
       .then(function(inst){
         pianoInst = inst;
         document.getElementById('loadingBanner').style.display = 'none';
@@ -1801,6 +1822,40 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>';
       });
   };
+
+  /* ===== v110：長笛／低音管音色 =====
+     設定頁選「長笛／低音管」才載入（約 2.7 MB）。高音譜號／上聲部＝長笛，低音譜號／下聲部＝低音管。
+     模擬測驗一律用鋼琴。導出 mp3 的事件標上 inst，PianoEngine.renderOffline 會用同樣的音色與殘響。 */
+  const TIMBRE_PAGE = 'pitcherr';
+  let windInst = null, windLoading = null;
+  function useWinds(){ return !(window.EXAM && window.EXAM.isExamMode && window.EXAM.isExamMode()) && !!(window.PianoEngine && PianoEngine.getTimbre) && PianoEngine.getTimbre(TIMBRE_PAGE) === 'winds'; }
+  function windName(clef){ return clef === 'bass' ? 'bassoon' : 'flute'; }
+  function voiceOf(clef){ return (useWinds() && windInst) ? windInst[windName(clef)] : pianoInst; }
+  function withInst(ev, clef){ if(useWinds() && ev && ev.midi != null) ev.inst = windName(clef); return ev; }
+  function loadWinds(){
+    if(!useWinds() || windInst) return Promise.resolve();
+    if(windLoading) return windLoading;
+    const ctx = ensureAudio(); if(!ctx) return Promise.resolve();
+    const b = document.getElementById('loadingBanner');
+    if(b){ b.style.display = ''; b.textContent = '🎺 正在載入長笛／低音管音色…'; }
+    windLoading = PianoEngine.loadWinds(ctx).then(w => { windInst = w; })
+      .catch(() => { if(b) b.textContent = '⚠️ 長笛／低音管音色載入失敗，先用鋼琴播放'; })
+      .then(() => { windLoading = null; setTimeout(() => { if(b && pianoInst && !windLoading) b.style.display = 'none'; }, windInst ? 0 : 2500); peModule.updatePlayBtn(); });
+    return windLoading;
+  }
+  function stopWinds(){ if(windInst){ try{ windInst.flute.stop(); windInst.bassoon.stop(); }catch(e){} } }
+  function initTimbreSwitch(id){
+    const box = document.getElementById(id); if(!box || !window.PianoEngine || !PianoEngine.getTimbre) return;
+    const cur = PianoEngine.getTimbre(TIMBRE_PAGE);
+    box.querySelectorAll('.mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.timbre === cur);
+      b.onclick = () => {
+        PianoEngine.setTimbre(TIMBRE_PAGE, b.dataset.timbre);
+        box.querySelectorAll('.mode-btn').forEach(x => x.classList.toggle('active', x === b));
+        if(b.dataset.timbre === 'winds') loadWinds();
+      };
+    });
+  }
 
   /* ============================================================
      模組
@@ -1830,6 +1885,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         document.querySelectorAll('#pe-modeSwitch .mode-btn').forEach(x => x.classList.toggle('active', x === b));
         document.getElementById('pe-testReplayWrapper').style.display = self.mode === 'test' ? 'flex' : 'none';
       });
+      initTimbreSwitch('pe-timbreSwitch');   // v110
       document.querySelectorAll('#pe-clefSwitch .mode-btn').forEach(b => b.onclick = () => {
         self.clef = b.dataset.clef;
         document.querySelectorAll('#pe-clefSwitch .mode-btn').forEach(x => x.classList.toggle('active', x === b));
@@ -2570,7 +2626,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           let total = lens[i]; let tied = tn[i]; let next = i + 1;
           while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
           const p = this.correctPitch[noteIdx + i];
-          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
+          if(p) voiceOf(this.clef).play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
           time += total * secPer16th; i = next;
         }
         noteIdx += lens.length;
@@ -2673,7 +2729,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           let total = lens[i]; let tied = tn[i]; let next = i + 1;
           while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
           const p = src[noteIdx + i];
-          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
+          if(p) voiceOf(item.clef || peModule.clef).play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
           time += total * secPer16th; i = next;
         }
         noteIdx += lens.length;
@@ -2725,7 +2781,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           let total = lens[i]; let tied = tn[i]; let next = i + 1;
           while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
           const p = this.correctPitch[noteIdx + i];   // 播放 = 正確版
-          if(p) pianoInst.play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
+          if(p) voiceOf(this.clef).play(midiOf(p), time, { duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
           time += total * secPer16th; i = next;
         }
         noteIdx += lens.length;
@@ -2766,7 +2822,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       const secPerUnit = 60 / d.bpm;
       const numerator = parseInt(d.meter.split('/')[0], 10);
       const secPer16th = d.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
-      const ev = [{ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }];
+      const clef = d.clef || peModule.clef;
+      const ev = [withInst({ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }, clef)];
       let t = TUNING_SEC + GAP_SEC;
       for(let i = 0; i < numerator; i++){
         const strong = (d.meterType === 'simple') ? (i === 0) : (i % 3 === 0);
@@ -2782,7 +2839,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
           let total = lens[i]; let tied = tn[i]; let next = i + 1;
           while(tied && next < lens.length){ total += lens[next]; tied = tn[next]; next++; }
           const p = d.correctPitch[noteIdx + i];   // 正確的演奏
-          if(p) ev.push({ midi: midiOf(p), time: t, duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) });
+          if(p) ev.push(withInst({ midi: midiOf(p), time: t, duration: total * secPer16th * 0.9, gain: gainFor(midiOf(p), 1) }, clef));
           t += total * secPer16th; i = next;
         }
         noteIdx += lens.length;
@@ -2882,7 +2939,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
       if(!audioReady(function(){ __self.playTuning(); })) return;
       const ctx = ensureAudio();
       const tA = ctx.currentTime + 0.05;
-      pianoInst.play(69, tA, { duration: 2.0, gain: 3.5 });
+      voiceOf(this.clef).play(69, tA, { duration: 2.0, gain: 3.5 });
       PianoEngine.holdUntil(ctx, tA + 2.0);
     }
   };

@@ -890,10 +890,20 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
      想調整聽感就改這兩個常數：TILT_DB 調音區傾斜、GAIN_NORM 調音數正規化。 */
   const GAIN_BASE = 3.2, TILT_DB = 1.2, GAIN_NORM = 0.35;
   const GAIN_MIN = 1.7, GAIN_MAX = 4.8;
+  /* v110：C5 鋼琴改用 B 版補償（作者選定）——音色程式已把每個取樣補到一樣響，這裡拿掉原本的音區傾斜、改成低音加強（PianoEngine.c5Lift）。
+     標準音色、長笛／低音管維持原本的算法。 */
+  function c5PianoNow(){
+    try{
+      if(typeof useWinds === 'function' && useWinds()) return false;
+      const k = (typeof pianoInst !== 'undefined' && pianoInst && pianoInst.__kit) || PianoEngine.currentKit();
+      return k === 'salamander' && !!PianoEngine.c5Lift;
+    }catch(e){ return false; }
+  }
   function gainFor(midi, count){
-    const tilt = Math.pow(10, ((midi - 60) / 12) * TILT_DB / 20);
+    const c5 = c5PianoNow();
+    const tilt = c5 ? Math.pow(10, PianoEngine.c5Lift(midi || 60) / 20) : Math.pow(10, ((midi - 60) / 12) * TILT_DB / 20);
     const norm = Math.pow(4 / Math.max(1, count || 1), GAIN_NORM);
-    return Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
+    return c5 ? GAIN_BASE * tilt * norm : Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
   }
   let audioCtx = null, pianoInst = null, pendingTimers = [];
   function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }

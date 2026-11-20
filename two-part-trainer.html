@@ -279,6 +279,13 @@
           <button class="mode-btn" data-mode="test">測驗模式 (限制次數)</button>
         </div>
       </div>
+      <div class="switch-group">
+        <div class="switch-group-label">音色</div>
+        <div class="switch-btns" id="tp-timbreSwitch">
+          <button class="mode-btn active" data-timbre="piano">鋼琴</button>
+          <button class="mode-btn" data-timbre="winds">長笛／低音管</button>
+        </div>
+      </div>
     </div>
 
     <div class="switch-row">
@@ -288,6 +295,7 @@
           <button class="mode-btn active" data-meter="2/4" data-type="simple">2/4</button>
           <button class="mode-btn" data-meter="3/4" data-type="simple">3/4</button>
           <button class="mode-btn" data-meter="4/4" data-type="simple">4/4</button>
+          <button class="mode-btn" data-meter="5/4" data-type="simple">5/4</button>
           <button class="mode-btn" data-meter="3/8" data-type="compound">3/8</button>
           <button class="mode-btn" data-meter="6/8" data-type="compound">6/8</button>
           <button class="mode-btn" data-meter="12/8" data-type="compound">12/8</button>
@@ -719,6 +727,7 @@ function showPage(pageId) {
     const p = i % beatsPerBar;
     if (p + 1 >= beatsPerBar) return false;
     if (beatsPerBar === 4 && p % 2 === 1) return false;
+    if (beatsPerBar === 5 && p > 2) return false;   // 5/4（v110）：只從第 1、2、3 拍開始
     return true;
   }
   // 一拍有幾個時值單位（已乘 TIE_UNIT）：單拍子 4×3、複拍子 6×3
@@ -1322,16 +1331,27 @@ function showPage(pageId) {
      （08 音堆練習另有一套自己的常數，因為它是音團辨識、遮蔽最嚴重，這裡不共用。） */
   const GAIN_BASE = 3.5, TILT_DB = 1.0, GAIN_NORM = 0;
   const GAIN_MIN = 2.5, GAIN_MAX = 4.8;
+  /* v110：C5 鋼琴改用 B 版補償（作者選定）——音色程式已把每個取樣補到一樣響，這裡拿掉原本的音區傾斜、改成低音加強（PianoEngine.c5Lift）。
+     標準音色、長笛／低音管維持原本的算法。 */
+  function c5PianoNow(){
+    try{
+      if(typeof useWinds === 'function' && useWinds()) return false;
+      const k = (typeof pianoInst !== 'undefined' && pianoInst && pianoInst.__kit) || PianoEngine.currentKit();
+      return k === 'salamander' && !!PianoEngine.c5Lift;
+    }catch(e){ return false; }
+  }
   function gainFor(midi, count){
-    const tilt = Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
+    const c5 = c5PianoNow();
+    const tilt = c5 ? Math.pow(10, PianoEngine.c5Lift(midi || 60) / 20) : Math.pow(10, (((midi || 60) - 60) / 12) * TILT_DB / 20);
     const norm = Math.min(1, Math.pow(2 / Math.max(1, count || 1), GAIN_NORM));
-    return Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
+    return c5 ? GAIN_BASE * tilt * norm : Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_BASE * tilt * norm));
   }
 
   let audioCtx = null; let pianoInst = null; let pendingTimers = [];
   function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
   window.tpStopAll = function() {
     if(pianoInst) pianoInst.stop();
+    stopWinds();
     clearTimers(); tpModule.testSession.isRunning = false; tpModule.isPlaying = false; tpModule.updatePlayBtn();
   };
   function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state!=='running') audioCtx.resume(); }catch(e){} return audioCtx; }
@@ -1484,6 +1504,7 @@ function showPage(pageId) {
     if(needSpare) audioToast('🔊 正在恢復聲音…');
 
     function rebindTo(c){
+      if(windInst && window.PianoEngine && window.PianoEngine.rebind){ window.PianoEngine.rebind(windInst.flute, c); window.PianoEngine.rebind(windInst.bassoon, c); }
       return !!(window.PianoEngine && window.PianoEngine.rebind && pianoInst && window.PianoEngine.rebind(pianoInst, c));
     }
     (function check(){
@@ -1600,11 +1621,45 @@ function showPage(pageId) {
 
   window.loadPiano = function(){
     const ctx = ensureAudio(); if(!ctx) return;
-    PianoEngine.load(ctx, PIANO_UI).then(inst => {
+    PianoEngine.load(ctx, PIANO_UI).then(inst => loadWinds().then(() => inst)).then(inst => {   // v110：選了長笛／低音管就等它也載好
       pianoInst = inst; document.getElementById('loadingBanner').style.display = 'none'; tpModule.updatePlayBtn();
       if(window.EXAM && window.EXAM.isExamMode() && tpModule._examReady) tpModule._examReady();
     }).catch(()=>{ document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>'; });
   };
+
+  /* ===== v110：長笛／低音管音色 =====
+     設定頁選「長笛／低音管」才載入（約 2.7 MB）。高音譜號／上聲部＝長笛，低音譜號／下聲部＝低音管。
+     模擬測驗一律用鋼琴。導出 mp3 的事件標上 inst，PianoEngine.renderOffline 會用同樣的音色與殘響。 */
+  const TIMBRE_PAGE = 'twopart';
+  let windInst = null, windLoading = null;
+  function useWinds(){ return !(window.EXAM && window.EXAM.isExamMode && window.EXAM.isExamMode()) && !!(window.PianoEngine && PianoEngine.getTimbre) && PianoEngine.getTimbre(TIMBRE_PAGE) === 'winds'; }
+  function windName(clef){ return clef === 'bass' ? 'bassoon' : 'flute'; }
+  function voiceOf(clef){ return (useWinds() && windInst) ? windInst[windName(clef)] : pianoInst; }
+  function withInst(ev, clef){ if(useWinds() && ev && ev.midi != null) ev.inst = windName(clef); return ev; }
+  function loadWinds(){
+    if(!useWinds() || windInst) return Promise.resolve();
+    if(windLoading) return windLoading;
+    const ctx = ensureAudio(); if(!ctx) return Promise.resolve();
+    const b = document.getElementById('loadingBanner');
+    if(b){ b.style.display = ''; b.textContent = '🎺 正在載入長笛／低音管音色…'; }
+    windLoading = PianoEngine.loadWinds(ctx).then(w => { windInst = w; })
+      .catch(() => { if(b) b.textContent = '⚠️ 長笛／低音管音色載入失敗，先用鋼琴播放'; })
+      .then(() => { windLoading = null; setTimeout(() => { if(b && pianoInst && !windLoading) b.style.display = 'none'; }, windInst ? 0 : 2500); tpModule.updatePlayBtn(); });
+    return windLoading;
+  }
+  function stopWinds(){ if(windInst){ try{ windInst.flute.stop(); windInst.bassoon.stop(); }catch(e){} } }
+  function initTimbreSwitch(id){
+    const box = document.getElementById(id); if(!box || !window.PianoEngine || !PianoEngine.getTimbre) return;
+    const cur = PianoEngine.getTimbre(TIMBRE_PAGE);
+    box.querySelectorAll('.mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.timbre === cur);
+      b.onclick = () => {
+        PianoEngine.setTimbre(TIMBRE_PAGE, b.dataset.timbre);
+        box.querySelectorAll('.mode-btn').forEach(x => x.classList.toggle('active', x === b));
+        if(b.dataset.timbre === 'winds') loadWinds();
+      };
+    });
+  }
 
   // 靜態播放：解答頁 / 錯題本用該題自身的拍號、速度與音高播放雙聲部（不動作答狀態）
   /* 播放事件：把一個聲部攤平成「一次發聲」的清單（連結線的兩端合併成一個長音）。
@@ -1644,7 +1699,7 @@ function showPage(pageId) {
     const numerator = parseInt(item.meter.split('/')[0], 10);
     const secPer16th = item.meterType === 'simple' ? secPerUnit / 4 : secPerUnit / 2;
     const beatUnits = item.meterType === 'simple' ? 4 : 6;
-    const ev = [{ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }];
+    const ev = [withInst({ midi: 69, time: 0, duration: TUNING_SEC, gain: 3.5 }, 'treble')];
     let base = TUNING_SEC + GAP_SEC;
     for(let i = 0; i < numerator; i++){
       const strong = (item.meterType === 'simple') ? (i === 0) : (i % 3 === 0);
@@ -1652,15 +1707,15 @@ function showPage(pageId) {
     }
     base += numerator * secPerUnit;
     const bpb = item.beatsPerBar || (item.meterType === 'compound' ? numerator / 3 : numerator);
-    const track = function(seq, pitchArray, tieArr){
+    const track = function(seq, pitchArray, tieArr, clef){
       let t = base;
       buildVoiceEvents(seq, pitchArray, tieArr || [], beatUnits, bpb).forEach(function(e){
-        if(e.midi !== null) ev.push({ midi: e.midi, time: t, duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, 2) });
+        if(e.midi !== null) ev.push(withInst({ midi: e.midi, time: t, duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, 2) }, clef));
         t += e.len * secPer16th;
       });
     };
-    track(seqT, pitchT, tieT);
-    track(seqB, pitchB, tieB);
+    track(seqT, pitchT, tieT, 'treble');
+    track(seqB, pitchB, tieB, 'bass');
     return ev;
   }
 
@@ -1727,18 +1782,18 @@ function showPage(pageId) {
     }
     time += numerator * secPerUnit;
     const bpb = item.beatsPerBar || (item.meterType === 'compound' ? numerator / 3 : numerator);
-    let scheduleTrack = (seq, pitchArray, tieArr, voices) => {
-        let t = time;
+    let scheduleTrack = (seq, pitchArray, tieArr, voices, clef) => {
+        let t = time; const voice = voiceOf(clef);
         buildVoiceEvents(seq, pitchArray, tieArr || [], beatUnits, bpb).forEach(function(e){
-          if(e.midi !== null) pianoInst.play(e.midi, t, { duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, voices || 1) });
+          if(e.midi !== null) voice.play(e.midi, t, { duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, voices || 1) });
           t += e.len * secPer16th;
         });
         return t;
     };
     let maxT = time;
     const voices = (onlyTop || onlyBottom) ? 1 : 2;
-    if(!onlyBottom){ let t1 = scheduleTrack(seqT, pitchT, tieT, voices); if(t1 > maxT) maxT = t1; }
-    if(!onlyTop){ let t2 = scheduleTrack(seqB, pitchB, tieB, voices); if(t2 > maxT) maxT = t2; }
+    if(!onlyBottom){ let t1 = scheduleTrack(seqT, pitchT, tieT, voices, 'treble'); if(t1 > maxT) maxT = t1; }
+    if(!onlyTop){ let t2 = scheduleTrack(seqB, pitchB, tieB, voices, 'bass'); if(t2 > maxT) maxT = t2; }
     tpModule.isPlaying = true; tpModule.updatePlayBtn();
     const timerId = setTimeout(() => { tpModule.isPlaying = false; tpModule.updatePlayBtn(); }, (maxT-ctx.currentTime)*1000 + 100);
     pendingTimers.push(timerId);
@@ -2216,10 +2271,10 @@ function showPage(pageId) {
 
       const beatUnits = this.meterType === 'simple' ? 4 : 6;
       const self0 = this;
-      let scheduleTrack = (seq, pitchArray, tieArr, voices) => {
-          let t = time;
+      let scheduleTrack = (seq, pitchArray, tieArr, voices, clef) => {
+          let t = time; const voice = voiceOf(clef);
           buildVoiceEvents(seq, pitchArray, tieArr || [], beatUnits, self0.beatsPerBar).forEach(function(e){
-            if(e.midi !== null) pianoInst.play(e.midi, t, { duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, voices || 1) });
+            if(e.midi !== null) voice.play(e.midi, t, { duration: e.len * secPer16th * 0.9, gain: gainFor(e.midi, voices || 1) });
             t += e.len * secPer16th;
           });
           return t;
@@ -2228,8 +2283,8 @@ function showPage(pageId) {
       let maxT = time;
       const tieOf = (seq, part) => (seq === this.questionSeq[part]) ? this.questionTie[part] : this.userTie[part];
       const voices = (mode === 'both') ? 2 : 1;
-      if (mode === 'both' || mode === 'top') { let t = scheduleTrack(qTop, pTop, tieOf(qTop, 'top'), voices); if(t > maxT) maxT = t; }
-      if (mode === 'both' || mode === 'bottom') { let t = scheduleTrack(qBot, pBot, tieOf(qBot, 'bottom'), voices); if(t > maxT) maxT = t; }
+      if (mode === 'both' || mode === 'top') { let t = scheduleTrack(qTop, pTop, tieOf(qTop, 'top'), voices, 'treble'); if(t > maxT) maxT = t; }
+      if (mode === 'both' || mode === 'bottom') { let t = scheduleTrack(qBot, pBot, tieOf(qBot, 'bottom'), voices, 'bass'); if(t > maxT) maxT = t; }
 
       PianoEngine.holdUntil(ctx, maxT);
       const timerId = setTimeout(() => { this.isPlaying = false; this.updatePlayBtn(); if(onEnd) onEnd(); }, (maxT-ctx.currentTime)*1000 + 100);
@@ -2604,6 +2659,7 @@ function showPage(pageId) {
         document.getElementById('tp-testReplayInput').style.display = (e.target.value === 'custom') ? 'inline-block' : 'none';
       };
 
+      initTimbreSwitch('tp-timbreSwitch');   // v110
       document.querySelectorAll('#tp-meterSwitch .mode-btn').forEach(b => b.onclick = () => {
         this.meter = b.dataset.meter; this.meterType = b.dataset.type;
         document.querySelectorAll('#tp-meterSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
@@ -2877,7 +2933,7 @@ function showPage(pageId) {
         if(!audioReady(tuningPlay)) return;
         var ctx = ensureAudio();
         var tA = ctx.currentTime + 0.02;
-        pianoInst.play(69, tA, { duration: 2.0, gain: 3.5 });
+        voiceOf('treble').play(69, tA, { duration: 2.0, gain: 3.5 });
         PianoEngine.holdUntil(ctx, tA + 2.0);
         btn.textContent = '🎵 A 響起…';
         clearTimeout(timer); timer = setTimeout(function(){ btn.textContent = LABEL; }, 2000);

@@ -691,6 +691,8 @@ function showPage(pageId) {
      （C3 約 +3.75、G2 約 +5.5、D2 以下 +7）。作者試聽後選定 H 版本（+1.5／上限 8.8），v.105.2 再微調成現值。
      kit：即時播放傳 pianoInst.__kit；導出傳 PianoEngine.currentKit()（離線算音用的就是它）。 */
   const C5_BASS = { baseDb: 1.3, pivot: 55, perSemi: 0.35, maxDb: 7.0 };   // v.105.2 作者微調（原 1.5／8.8）
+  /* v110：其他頁的 C5 改成「每個取樣補到一樣響」；四部和聲維持作者調好的現狀（作者試聽後決定），所以這一頁不套用 */
+  if(window.PianoEngine && PianoEngine.setC5Balance) PianoEngine.setC5Balance(false);
   /* v.105.1：低音加大後，約 1% 的題目（多在 Lv.4／5）和絃起音瞬間會稍微超過上限（最大 +0.67 dBFS，1,500 題實測）。
      C5 的四部和聲整體（四個聲部＋標準音 A）一起降 1 dB，聲部之間的比例完全不變。標準音色不受影響。 */
   const C5_TRIM = Math.pow(10, -1 / 20);
