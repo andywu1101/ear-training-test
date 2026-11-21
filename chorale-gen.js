@@ -353,9 +353,29 @@
         if (!p.every(function (x) { return c[x]; })) return false;
         return /^(ii|ii°|vi|VI)$/.test(m[1]) ? c[p[1]] === 2 : c[p[1]] === 1;
       };
+      // 聖詠的句尾會出現「三和絃」的副屬（V/V、V/vi）；四部和聲的副屬一律是七和絃，引擎因此固定回傳四個音。
+      // 這裡只在本頁的引擎上補一條：沒有七和絃數字的副屬只取三個音（否則會寫成缺三音的七和絃）
+      var origPcs = HE.getChordPcs;
+      HE.getChordPcs = function (sym, isMinor) {
+        var p = origPcs.call(this, sym, isMinor);
+        if (sym && sym.indexOf('/') >= 0 && !/7|65|43|42/.test(sym)) return p.slice(0, 3);
+        return p;
+      };
       HE.__choraleFI = true;
     }
     var root = function (x) { return x.replace(/[0-9]/g, ''); };
+    /* 女高音的音級（1～7；其他半音回傳 0） */
+    function degOf(m, keyObj) {
+      var d = mod(m - keyObj.off, 12);
+      var T = keyObj.isMin ? { 0: 1, 2: 2, 3: 3, 5: 4, 7: 5, 8: 6, 9: 6, 10: 7, 11: 7 } : { 0: 1, 2: 2, 4: 3, 5: 4, 7: 5, 9: 6, 11: 7 };
+      return T[d] || 0;
+    }
+    /* 延長記號處的女高音：停在 3 音或 5 音最多連續兩次（作者規則） */
+    function fermDegOK(degs) {
+      for (var i = 2; i < degs.length; i++)
+        if ((degs[i] === 3 || degs[i] === 5) && (degs[i - 1] === 3 || degs[i - 1] === 5) && (degs[i - 2] === 3 || degs[i - 2] === 5)) return false;
+      return true;
+    }
     var PRE = /^((IV|iv|ii|ii°)(6|65|7|43|42)?|N6|V7?\/V|V65\/V|V43\/V|V42\/V|V6\/V)$/;
 
     function skeleton(cfg, R, keyObj) {
@@ -401,7 +421,7 @@
         return true;
       }
       for (var attempt = 0; attempt < 60; attempt++) {
-        var phr = partition(cfg.bars), seq = [], durs = [], ferm = [], phraseOf = [], kinds = [], okAll = true, startWith = null;
+        var phr = partition(cfg.bars), seq = [], durs = [], ferm = [], phraseOf = [], kinds = [], okAll = true, startWith = null, fdeg = [];
         for (var p = 0; p < phr.length; p++) {
           var fin = p === phr.length - 1, d = slots(phr[p], p === 0, fin), n = d.length;
           var kind = fin ? 'final' : (function () { var w = R(); if (engLv >= 4 && w < 0.25) return 'sec'; if (w < 0.5) return 'hc'; if (w < 0.8) return 'pac'; return 'dc'; })();
@@ -427,6 +447,12 @@
             var sol = HE.solveVoiceLeading(trial, isMin, keyObj.off);
             if (!sol) continue;
             if (fin && sol[sol.length - 1][0] % 12 !== keyObj.off) continue;   // 最後女高音回到主音
+            if (!fin) {
+              var dg = degOf(sol[sol.length - 1][0], keyObj);
+              if (!fermDegOK(fdeg.concat([dg]))) continue;
+              if (fdeg.length && dg === fdeg[fdeg.length - 1] && k < 250) continue;   // 盡量不要和上一個延長記號停在同一個音
+              fdeg.push(dg);
+            }
             got = s;
           }
           if (!got) { okAll = false; break; }
@@ -438,6 +464,9 @@
         if (!HE.skeletonOK(seq, isMin, engLv)) continue;
         var v = HE.solveVoiceLeading(seq, isMin, keyObj.off);
         if (!v) continue;
+        // 整首重新解聲部後再確認一次：延長記號處女高音的規則、最後回到主音
+        var fd = []; for (var fi = 0; fi < seq.length - 1; fi++) if (ferm[fi]) fd.push(degOf(v[fi][0], keyObj));
+        if (!fermDegOK(fd) || v[v.length - 1][0] % 12 !== keyObj.off) continue;
         var tl = 'CDEFGAB'.indexOf(keyObj.vfk[0].toUpperCase());
         var letters = v.map(function (ch, i) { return ch.map(function (m) { return deps.letterIndexOfTone(m % 12, seq[i], keyObj.off, keyObj.name, tl); }); });
         var starts = [], t0 = 0; durs.forEach(function (x) { starts.push(t0); t0 += x; });

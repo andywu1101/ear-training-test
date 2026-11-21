@@ -296,6 +296,45 @@
   .ch-staff-area .ch-score-box { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; overscroll-behavior-y: contain; padding: 6px 4px 6px; margin-bottom: 0; }
   .ch-keyboard-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
   .ch-play-sticky { position: sticky; top: 0; z-index: 20; background: var(--panel); padding: 6px 0 8px 0; margin-bottom: 4px; flex-wrap: nowrap; gap: 6px; }
+  /* 播放、標準音按鈕：與「編輯低音／級數」分頁按鈕同大小（比照四部和聲） */
+  .ch-play-sticky .play-btn, .ch-play-sticky .action-btn { font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 10px; box-shadow: none; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
+  .ch-play-sticky .play-btn:disabled { box-shadow: none; }
+  /* 播放、標準音、分頁同一排（v111.1） */
+  .ch-toprow { align-items: center; flex-wrap: nowrap; gap: 6px; }
+  .ch-toprow .ch-tabs { flex: 0 0 auto; padding: 3px; }
+  .ch-toprow .tab-btn { padding: 7px 12px; white-space: nowrap; }
+  .lbl-l { display: none; }
+  .ch-linebreak { display: none; }
+  .ch-notes, .ch-octclear { display: flex; flex-direction: column; gap: 8px; }   /* 直放：跟原本一樣的列距 */
+  /* 平板直放：維持原本的樣子（分頁在下一列、完整文字） */
+  @media (min-width: 700px) {
+    .lbl-l { display: inline; } .lbl-s { display: none; }
+    .ch-toprow { flex-wrap: wrap; }
+    .ch-toprow .ch-linebreak { display: block; flex-basis: 100%; height: 0; }
+    .ch-toprow .ch-tabs { margin: 6px 0 4px; }
+    .ch-toprow .tab-btn { padding: 8px 22px; }
+  }
+  /* 橫向（寬≥900、寬大於高）：按鍵改成五列，橫向空間拿來排一整列 */
+  @media (min-width: 900px) and (min-aspect-ratio: 1/1) {
+    .ch-toprow { flex-wrap: nowrap; max-width: 900px; margin-left: auto; margin-right: auto; }
+    .ch-toprow .ch-linebreak { display: none; }
+    .ch-toprow .ch-tabs { margin: 0; }
+    #pageChPractice .ch-keyboard-area .keyboard-panel { max-width: 900px; margin-left: auto; margin-right: auto; padding: 10px 12px; }
+    #pageChPractice .ch-keyboard-area > .unified-action-row:last-child { max-width: 900px; margin-left: auto; margin-right: auto; }
+    .pitch-keypad { max-width: none; gap: 8px; }
+    .pitch-row-acc { grid-template-columns: repeat(4, 1fr); }
+    .ch-notes { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .ch-notes > div { display: contents; }
+    .p-btn.note-btn { height: 46px; }
+    .ch-octclear { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .ch-octclear > div { display: contents; }
+    .ch-octclear .ch-clear-row .action-btn { margin: 0; border-radius: 12px; height: 42px; padding: 0 8px; }
+    .p-btn.acc-btn { height: 40px; }
+    #panel-chord .kb-row { flex-wrap: nowrap; }
+    #panel-chord .kb-row .kb-btn { flex: 1 1 0; min-width: 0; white-space: nowrap; }
+    .ch-invn6 { display: flex; gap: 6px; margin-bottom: 8px; }
+    .ch-invn6 > .kb-row { display: contents; }
+  }
   .ch-score-static { overflow-x: hidden; overflow-y: visible; touch-action: auto; padding: 6px 4px; }
   .ch-score { position: relative; width: 100%; }
   .ch-sys { position: relative; width: 100%; }
@@ -316,8 +355,10 @@
   .ch-keyname { position: absolute; font-size: 15px; font-weight: 700; color: var(--ink); line-height: 1.15; }
   .ch-hit { position: absolute; border-radius: 8px; border: 1.5px dashed rgba(51,65,92,0.28); background: rgba(51,65,92,0.03); cursor: pointer; }
   .ch-hit.active { border: 2px solid var(--accent); background: var(--accent-soft); }
-  .ch-bracket { position: absolute; height: 8px; border: 1.5px solid #a8a8a8; border-top: none; pointer-events: none; }
-  .ch-bracket.openL { border-left: none; } .ch-bracket.openR { border-right: none; }
+  /* 挖空的組：左右方括號（比照考卷） */
+  .ch-brk { position: absolute; width: 6px; border: 2px solid #8d887a; pointer-events: none; }
+  .ch-brk.L { border-right: none; border-radius: 4px 0 0 4px; }
+  .ch-brk.R { border-left: none; border-radius: 0 4px 4px 0; }
   .ch-result { font-size: 14px; line-height: 1.8; margin: 6px 0 4px; }
   .ch-result .ng { color: var(--wrong); font-weight: 700; }
   .ch-result .cfroman, .ch-result .cfs { font-family: 'Times New Roman', serif; }
@@ -331,17 +372,14 @@
     box-shadow:0 0 0 100vmax var(--paper); clip-path:inset(-100vmax -100vmax 0 -100vmax); }
   #pageChPractice > *:not(.ch-staff-area){ width:100%; max-width:820px; margin-left:auto; margin-right:auto; box-sizing:border-box; }
   #pageChPractice .ch-keyboard-area{ padding-top:12px !important; }
-  /* 電腦版（≥1024）：不鎖視窗高度，譜例整首顯示 */
-  @media (min-width: 1024px) {
-    body.practice-locked { height: auto; min-height: 100vh; overflow: visible; padding: 0 16px; }
-    body.practice-locked .wrap { height: auto; }
-    #pageChPractice.ch-practice-layout { height: auto; max-height: none; }
-    .ch-staff-area { max-height: none; }
-    .ch-staff-area .ch-score-box { overflow-y: visible; }
-    .ch-keyboard-area { overflow-y: visible; }
+  /* 平板、電腦（≥700）：一樣上下分層——上面譜例（可捲動、用到整個視窗寬度），下面按鍵固定看得到 */
+  @media (min-width: 700px) {
+    body.practice-locked { height: 100dvh; height: calc(var(--app-vh, 1vh) * 100); overflow: hidden; min-height: 0; padding: 0 8px; }
+    body.practice-locked .wrap { height: 100%; }
+    #pageChPractice.ch-practice-layout.active { height: 100dvh; height: calc(var(--app-vh, 1vh) * 100); max-height: none; padding-bottom: 0; }
+    #pageChPractice .ch-staff-area { max-width: none; flex: 1 1 auto; max-height: none; }
+    #pageChPractice .ch-keyboard-area { flex: 0 0 auto; overflow-y: visible; padding-bottom: 12px; }
     .ch-play-sticky { position: static; }
-    body:has(#pageChPractice.active){ padding-bottom:0; }
-    #pageChPractice.active{ min-height:100vh; padding-bottom:64px; }
   }
   .ch-rv-head { font-size: 13.5px; color: var(--ink); display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
   .ch-rv-time { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-soft); }
@@ -385,10 +423,11 @@
       <div class="switch-group">
         <div class="switch-group-label">小節數 (Bars)</div>
         <select id="ch-barsSelect" class="select-box">
-          <option value="mix" selected>隨機 (5～12 小節)</option>
-          <option value="5">5 小節</option><option value="6">6 小節</option><option value="7">7 小節</option>
-          <option value="8">8 小節</option><option value="9">9 小節</option><option value="10">10 小節</option>
-          <option value="11">11 小節</option><option value="12">12 小節</option>
+          <option value="mix" selected>隨機 (4～12 小節)</option>
+          <option value="4-6">4～6 小節</option>
+          <option value="6-8">6～8 小節</option>
+          <option value="8-10">8～10 小節</option>
+          <option value="10-12">10～12 小節</option>
         </select>
       </div>
       <div class="switch-group">
@@ -446,14 +485,13 @@
     </div>
 
     <div class="ch-keyboard-area" style="padding: 0 4px;">
-      <div class="unified-action-row ch-play-sticky">
-        <button class="play-btn" id="ch-btnPlay" disabled>🔊 播放題目</button>
-        <button class="action-btn" id="tuningABtn" title="播放標準音 A (2 秒)">🎵 標準音 A</button>
-      </div>
-      <div class="editor-tabs-container">
-        <div class="editor-tabs">
-          <button class="tab-btn active" id="tab-bass" onclick="window.chModule.switchTab('bass')">🎹 1. 編輯低音</button>
-          <button class="tab-btn" id="tab-chord" onclick="window.chModule.switchTab('chord')">🔠 2. 編輯級數</button>
+      <div class="unified-action-row ch-play-sticky ch-toprow">
+        <button class="play-btn" id="ch-btnPlay" disabled>🔊 <span class="lbl-l">播放題目</span><span class="lbl-s">播放</span></button>
+        <button class="action-btn" id="tuningABtn" title="播放標準音 A (2 秒)">🎵 <span class="lbl-l">標準音 A</span><span class="lbl-s">標準音</span></button>
+        <span class="ch-linebreak"></span>
+        <div class="editor-tabs ch-tabs">
+          <button class="tab-btn active" id="tab-bass" onclick="window.chModule.switchTab('bass')">🎹 <span class="lbl-l">1. 編輯低音</span><span class="lbl-s">低音</span></button>
+          <button class="tab-btn" id="tab-chord" onclick="window.chModule.switchTab('chord')">🔠 <span class="lbl-l">2. 編輯級數</span><span class="lbl-s">級數</span></button>
         </div>
       </div>
 
@@ -465,6 +503,7 @@
             <button class="p-btn acc-btn" id="acc-n" onclick="window.chModule.handleKbInput('bass_acc', 'n')">♮ 還原</button>
             <button class="p-btn acc-btn active" id="acc-d" onclick="window.chModule.handleKbInput('bass_acc', 'default')">復原<span style="font-size:11px;">回本調</span></button>
           </div>
+          <div class="ch-notes">
           <div class="pitch-row-notes">
             <button class="p-btn note-btn" onclick="window.chModule.inputBassPitch('C')">C<span>Do</span></button>
             <button class="p-btn note-btn" onclick="window.chModule.inputBassPitch('D')">D<span>Re</span></button>
@@ -476,12 +515,15 @@
             <button class="p-btn note-btn" onclick="window.chModule.inputBassPitch('A')">A<span>La</span></button>
             <button class="p-btn note-btn" onclick="window.chModule.inputBassPitch('B')">B<span>Ti</span></button>
           </div>
+          </div>
+          <div class="ch-octclear">
           <div class="pitch-row-oct">
             <button class="p-btn oct-btn" onclick="window.chModule.handleKbInput('bass_oct', -1)">▼ 低八度 <span id="oct-label-low">(Oct 2)</span></button>
             <button class="p-btn oct-btn" onclick="window.chModule.handleKbInput('bass_oct', 1)">▲ 高八度 <span id="oct-label-high">(Oct 4)</span></button>
           </div>
-          <div class="unified-action-row" style="margin-top:8px;">
+          <div class="unified-action-row ch-clear-row" style="margin-top:8px;">
             <button class="action-btn" style="flex:1;" onclick="window.chModule.handleKbInput('clearBass')">🗑️ 清空此格低音</button>
+          </div>
           </div>
         </div>
       </div>
@@ -497,6 +539,7 @@
           <button class="kb-btn deg-btn" data-deg="6">VI</button>
           <button class="kb-btn deg-btn" data-deg="7">VII</button>
         </div>
+        <div class="ch-invn6">
         <div class="kb-row" id="kb-row-inv">
           <button class="kb-btn" id="btn-sev-switch" style="background:#f0eef9; border-color:#ccd;">7和絃 [關]</button>
           <button class="kb-btn inv-btn" data-inv="">原位</button>
@@ -506,6 +549,7 @@
         </div>
         <div class="kb-row" id="kb-row-n6" style="display:none;">
           <button class="kb-btn deg-btn" id="btn-deg-N" style="background:#eef4f0; border-color:#bcd;" data-deg="N6">N6</button>
+        </div>
         </div>
         <div class="kb-row">
           <button class="kb-btn mod-btn" data-mod="°">° (減)</button>
@@ -907,6 +951,7 @@ function showPage(pageId) {
   const octOf = (m, L) => Math.floor((m - alterOf(m, L) - LSEMI[L]) / 12) - 1;
   const ACC_STR = { '-2': 'bb', '-1': 'b', '0': '', '1': '#', '2': '##' };
   const DUR = { 0.25: '16', 0.5: '8', 0.75: '8d', 1: 'q', 1.5: 'qd', 2: 'h', 3: 'hd', 4: 'w' };
+  const STEM_INNER = 27, BLANK_BEAT_W = 54;
   const COL = { blue: '#2f5fd0', green: '#1f8a42', red: '#d22f2f' };
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
@@ -993,7 +1038,9 @@ function showPage(pageId) {
     // 級數的寬度也要放得下（副屬和絃比較長）
     const labW = k => { const f = q.figs[k]; return ((f.roman || '').length + (f.sec || '').length) * 10 + (f.rows && f.rows.length ? 12 : 0) + (f.sus ? 26 : 0) + 14; };
     const labSum = meas.map(([a, b]) => q.starts.reduce((s, st, k) => s + (st >= a - 1e-9 && st < b - 1e-9 ? labW(k) * 1.2 : 0), 0));
-    const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27, labSum[i] + 24));
+    // 作答時，有挖空的小節每拍至少留 BLANK_BEAT_W 的寬度，低音框才不會太窄、好按
+    const hasBlank = meas.map(([a, b]) => mode === 'ask' && q.starts.some((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9));
+    const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27, labSum[i] + 24, hasBlank[i] ? 24 + (m[1] - m[0]) * BLANK_BEAT_W : 0));
     const headW = first => 42 + nSig * 10 + (first ? 26 : 0);
     // 排成一行一行
     const systems = []; let cur = [], used = 0;
@@ -1017,7 +1064,7 @@ function showPage(pageId) {
       const totalBase = ms.reduce((s, i) => s + baseW[i], 0);
       const hw = headW(first);
       const stretch = (si === systems.length - 1 && totalBase + hw < lineW * 0.7) ? 1 : (lineW - 30 - hw) / totalBase;
-      const H = 312, Y0 = 20;
+      const H = 327, Y0 = 20;
       const div = document.createElement('div'); div.className = 'ch-sys';
       div.style.height = (H * SC) + 'px';
       host.appendChild(div); sysEls.push(div);
@@ -1028,7 +1075,7 @@ function showPage(pageId) {
       ms.forEach((mi, k) => {
         const [a, b] = meas[mi];
         const mw = baseW[mi] * stretch + (k === 0 ? hw : 0);
-        const sT = new VF.Stave(x, Y0, mw), sB = new VF.Stave(x, Y0 + 115, mw);
+        const sT = new VF.Stave(x, Y0, mw), sB = new VF.Stave(x, Y0 + 130, mw);
         if (k === 0) {
           sT.addClef('treble'); sB.addClef('bass');
           const vk = q.key.vfk; sT.addKeySignature(vk); sB.addKeySignature(vk);
@@ -1069,7 +1116,12 @@ function showPage(pageId) {
                   if (a0 !== def) note.addAccidental(0, new VF.Accidental(a0 === 0 ? 'n' : ACC_STR[String(a0)]));
                   note.setStyle({ fillStyle: COL.blue, strokeStyle: COL.blue });
                 } else {
-                  note = new VF.GhostNote({ duration: DUR[d] });
+                  // 隱藏的低音：用一般音符但畫成透明，排版寬度和看得見的音符一樣，相鄰的框才不會擠在一起
+                  note = new VF.StaveNote({ clef, keys: ['f/2'], duration: DUR[d], stem_direction: -1 });
+                  if (DUR[d].endsWith('d')) note.addDotToAll();
+                  const clear = { fillStyle: 'rgba(0,0,0,0)', strokeStyle: 'rgba(0,0,0,0)' };
+                  note.setStyle(clear); if (note.setLedgerLineStyle) note.setLedgerLineStyle(clear); if (note.setFlagStyle) note.setFlagStyle(clear);
+                  note._hidden = true;
                 }
               } else {
                 const c = q.bassOn[k0], ok = !!us && us.midi === c.m;
@@ -1085,7 +1137,7 @@ function showPage(pageId) {
                   note.setKeyStyle(i, { fillStyle: p.col, strokeStyle: p.col });
                 });
               }
-              if (q.ferm[k0] && !(note instanceof VF.GhostNote)) note.addArticulation(0, new VF.Articulation('a@u').setPosition(VF.Modifier.Position.BELOW));
+              if (q.ferm[k0]) note.addArticulation(0, new VF.Articulation('a@u').setPosition(VF.Modifier.Position.BELOW));
               tick.push(note); allNotes.push(note);
               notePos.set('B' + k0, note);
               hitInfo.push({ slot: k0, note, stave: sB, sys: si });
@@ -1094,6 +1146,7 @@ function showPage(pageId) {
             }
             const note = new VF.StaveNote({ clef, keys: [keyStrOf(e)], duration: DUR[e.d], stem_direction: up ? 1 : -1 });
             if (DUR[e.d].endsWith('d')) note.addDotToAll();
+            if ((v === 1 || v === 2) && e.d < 4) note.setStemLength(STEM_INNER);   // 女低音、男高音的符桿縮短，兩個內聲部的符桿、符槓才不會撞在一起   // 內聲部符桿縮短，女低音與男高音的符槓不會疊在一起
             const ac = accMap.get(e); if (ac) note.addAccidental(0, new VF.Accidental(ac));
             if (q.ferm[e.slot] && (v === 0 || v === 3) && Math.abs(e.t - q.starts[e.slot]) < 1e-9)   // 延長記號只標在女高音上方、男低音下方
               note.addArticulation(0, new VF.Articulation(up ? 'a@a' : 'a@u').setPosition(up ? VF.Modifier.Position.ABOVE : VF.Modifier.Position.BELOW));
@@ -1145,13 +1198,14 @@ function showPage(pageId) {
     // 級數列與點選區
     const noAsk = {}; (q.noAsk || []).forEach(k => noAsk[k] = 1);
     const xOf = n => (n.getAbsoluteX() + 6) * SC;
+    const slotLab = {};
     const sysOfSlot = {};
     for (let k = 0; k < q.seq.length; k++) {
       const n = notePos.get('B' + k); if (!n) continue;
       const si = systemIndexOf(n);
       sysOfSlot[k] = si;
       const div = sysEls[si];
-      const cx = xOf(n), y = 272 * SC;
+      const cx = xOf(n), y = 287 * SC;
       const lab = document.createElement('div'); lab.className = 'ch-num'; lab.style.fontSize = Math.round(18 * SC) + 'px';
       lab.style.top = y + 'px';
       let html = '', cls = '';
@@ -1179,6 +1233,7 @@ function showPage(pageId) {
       if (blank[k] && !noAsk[k] && mode === 'ask') { lab.style.left = (cx - Math.max(lab.getBoundingClientRect().width, 44) / 2) + 'px'; lab.style.minWidth = '44px'; }
       else lab.style.left = (cx - rw / 2) + 'px';
       if (blank[k] && mode === 'ask') lab.onclick = () => opts.onPick && opts.onPick(k, 'chord');
+      if (blank[k] && !noAsk[k] && mode === 'ask') slotLab[k] = lab;
       // 掛留：解決音下方寫解決後的數字，中間「-」
       const f = q.figs[k];
       if (f.sus) {
@@ -1227,10 +1282,11 @@ function showPage(pageId) {
     if (sysEls[0]) {
       const kl = document.createElement('div'); kl.className = 'ch-keyname';
       kl.textContent = q.key.name.replace(' ', '') + '：';
-      kl.style.top = (272 * SC) + 'px'; kl.style.left = '4px';
+      kl.style.top = (287 * SC) + 'px'; kl.style.left = '4px';
       sysEls[0].appendChild(kl);
     }
     // 低音挖空格的點選區
+    const boxAt = {};
     if (mode === 'ask') hitInfo.forEach(h => {
       const div = sysEls[h.sys], n = h.note, k = h.slot;
       const x0 = n.getAbsoluteX() * SC - 8;
@@ -1238,26 +1294,45 @@ function showPage(pageId) {
       let x1 = null;
       const nx = notePos.get('B' + (k + 1));
       if (nx && systemIndexOf(nx) === h.sys) x1 = nx.getAbsoluteX() * SC - 8;
-      if (x1 == null || x1 <= x0) x1 = (h.stave.getX() + h.stave.getWidth()) * SC;
+      if (x1 == null || x1 <= x0) x1 = (h.stave.getX() + h.stave.getWidth()) * SC - 14;   // 小節尾留空間給右括號，不壓到小節線
       const box = document.createElement('div'); box.className = 'ch-hit' + (opts.active === k ? ' active' : '');
-      box.style.left = x0 + 'px'; box.style.width = Math.max(26, x1 - x0) + 'px';
-      box.style.top = (h.stave.getYForLine(0) - 14) * SC + 'px'; box.style.height = 92 * SC + 'px';
+      const bw = nx && systemIndexOf(nx) === h.sys ? Math.max(4, x1 - x0 - 3) : Math.max(18, x1 - x0 - 3);   // 相鄰兩格之間留空隙，絕不重疊
+      box.style.left = x0 + 'px'; box.style.width = bw + 'px';
+      // 框只蓋低音：上緣在這一拍男高音最低的符頭下方（只看男高音，不看低音正解），下緣到低音譜表下方
+      const bot = h.stave.getYForLine(4) + 38;
+      let tenY = -1e9;
+      q.V[2].forEach(e => {
+        const s0 = q.starts[k], s1 = s0 + q.durs[k];
+        if (e._note && e.t < s1 - 1e-9 && e.t + e.d > s0 + 1e-9) e._note.getYs().forEach(y => { tenY = Math.max(tenY, y); });
+      });
+      let top = tenY > -1e8 ? tenY + 9 : h.stave.getYForLine(0) - 14;
+      top = Math.min(top, bot - 40);   // 最少保留 40 的高度，手指才點得到
+      box.style.top = top * SC + 'px'; box.style.height = (bot - top) * SC + 'px';
       box.onclick = () => opts.onPick && opts.onPick(k, 'bass');
       div.appendChild(box);
+      boxAt[k] = { sys: h.sys, x0, x1: x0 + bw, top: top * SC, bot: bot * SC };
+      // 級數框：左右邊界、寬度與正上方的低音框一致；字太長時自動縮小（最多 75%）
+      const lab = slotLab[k];
+      if (lab) {
+        lab.style.left = x0 + 'px'; lab.style.width = bw + 'px'; lab.style.minWidth = '0'; lab.style.boxSizing = 'border-box';
+        lab.style.paddingLeft = '0'; lab.style.paddingRight = '0';
+        const fs0 = parseFloat(lab.style.fontSize) || 14;
+        for (let f = fs0; f >= fs0 * 0.75 && lab.scrollWidth > lab.clientWidth + 1; f -= 1) lab.style.fontSize = f + 'px';
+      }
     });
-    // 挖空的組：低音下方畫灰色括號
-    (q.groups || []).forEach(g => {
-      const n0 = notePos.get('B' + g.ks[0]), n1 = notePos.get('B' + g.ks[g.ks.length - 1]);
-      if (!n0 || !n1) return;
-      const s0 = systemIndexOf(n0), s1 = systemIndexOf(n1);
-      const y = 258 * SC;
-      const seg = (si, xa, xb, openL, openR) => {
-        const br = document.createElement('div'); br.className = 'ch-bracket' + (openL ? ' openL' : '') + (openR ? ' openR' : '');
-        br.style.left = xa + 'px'; br.style.width = Math.max(10, xb - xa) + 'px'; br.style.top = y + 'px';
-        sysEls[si].appendChild(br);
-      };
-      if (s0 === s1) seg(s0, n0.getAbsoluteX() * SC - 4, (n1.getAbsoluteX() + 14) * SC);
-      else { seg(s0, n0.getAbsoluteX() * SC - 4, W - 6, false, true); seg(s1, 50 * SC, (n1.getAbsoluteX() + 14) * SC, true, false); }
+    // 挖空的組：比照考卷，在低音框的左右兩側畫方括號「[ ]」（作答時才顯示）
+    if (mode === 'ask') (q.groups || []).forEach(g => {
+      const bs = g.ks.map(k => boxAt[k]).filter(Boolean);
+      if (!bs.length) return;
+      const bySys = {};
+      bs.forEach(b => { (bySys[b.sys] = bySys[b.sys] || []).push(b); });
+      const sysList = Object.keys(bySys).map(Number).sort((x, y) => x - y);
+      sysList.forEach((si, i) => {
+        const list = bySys[si], top = Math.min(...list.map(b => b.top)) - 4, bot = Math.max(...list.map(b => b.bot)) + 4;
+        const mk = (cls, x) => { const el = document.createElement('div'); el.className = 'ch-brk ' + cls; el.style.left = x + 'px'; el.style.top = top + 'px'; el.style.height = (bot - top) + 'px'; sysEls[si].appendChild(el); };
+        if (i === 0) mk('L', Math.min(...list.map(b => b.x0)) - 9);
+        if (i === sysList.length - 1) mk('R', Math.max(...list.map(b => b.x1)) + 2);
+      });
     });
     function systemIndexOf(n) { const st = n.getStave(); for (let i = 0; i < sysEls.length; i++) if (sysEls[i]._ctx === st.getContext()) return i; return 0; }
     return { sysOfSlot, sysEls };
@@ -1323,7 +1398,8 @@ function showPage(pageId) {
 
     cfgNow: function () {
       const meter = this.meterPref === 'mix' ? (Math.random() < 0.5 ? '4/4' : '3/4') : this.meterPref;
-      const bars = this.barsPref === 'mix' ? 5 + Math.floor(Math.random() * 8) : parseInt(this.barsPref, 10);
+      const rg = ({ mix: [4, 12], '4-6': [4, 6], '6-8': [6, 8], '8-10': [8, 10], '10-12': [10, 12] })[this.barsPref] || [4, 12];
+      const bars = rg[0] + Math.floor(Math.random() * (rg[1] - rg[0] + 1));
       return { level: this.curLevel.id, keyPref: this.keyPref, meter, bars, pickup: Math.random() < 0.5, amount: this.amount };
     },
     settingsKey: function () { return [this.curLevel.id, this.keyPref, this.meterPref, this.barsPref, this.amount].join('|'); },
@@ -1354,7 +1430,7 @@ function showPage(pageId) {
       this.setAccidental('default', false);
       this.currentOctave = 3; this.updateOctaveLabels();
       const lv = this.curLevel.id;
-      document.getElementById('kb-row-n6').style.display = lv >= 3 ? 'flex' : 'none';
+      document.getElementById('kb-row-n6').style.display = lv >= 3 ? '' : 'none';
       document.getElementById('btn-slash').style.display = lv >= 3 ? 'inline-block' : 'none';
       document.getElementById('btn-sev-switch').style.display = lv >= 2 ? 'inline-block' : 'none';
       const sev = document.getElementById('btn-sev-switch');
@@ -1492,14 +1568,21 @@ function showPage(pageId) {
     updateUI: function () {
       if (!this.q) return;
       const host = document.getElementById('ch-score');
-      const info = renderScore(host, this.q, { mode: 'ask', user: { bass: this.userBass, seq: this.userSeq }, active: this.activeSlot, onPick: (k, part) => this.pickSlot(k, part) });
-      // 選到的那一格所在的那一行捲到中間
       const box = document.getElementById('ch-scoreScroll');
+      const keep = box.scrollTop;
+      host.style.minHeight = host.offsetHeight + 'px';   // 重畫的瞬間不讓高度變 0（否則捲動位置會被歸零）
+      const info = renderScore(host, this.q, { mode: 'ask', user: { bass: this.userBass, seq: this.userSeq }, active: this.activeSlot, onPick: (k, part) => this.pickSlot(k, part) });
+      host.style.minHeight = '';
+      box.scrollTop = keep;
+      // 選到的格子不在畫面內時，才把那一行捲到中間
       const si = info.sysOfSlot[this.activeSlot];
       if (si != null && box.scrollHeight > box.clientHeight + 4) {
         const el = info.sysEls[si];
-        const target = el.offsetTop - (box.clientHeight - el.offsetHeight) / 2;
-        box.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        const top = el.offsetTop - host.offsetTop, bot = top + el.offsetHeight;
+        if (top < box.scrollTop || bot > box.scrollTop + box.clientHeight) {
+          const target = top - (box.clientHeight - el.offsetHeight) / 2;
+          box.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        }
       }
       this.updatePlayBtns();
     },
@@ -1676,7 +1759,7 @@ function showPage(pageId) {
   /* 「🎵 標準音 A」按鈕：隨時可按，播放 A4 2 秒（比照四部和聲） */
   (function(){
     var btn = document.getElementById('tuningABtn'); if(!btn) return;
-    var LABEL = btn.textContent, timer = null;
+    var LABEL = btn.innerHTML, timer = null;   // 按鈕裡有長短兩種文字（span），要整段還原
     btn.onclick = function tuningPlay(){
       try{
         if(!pianoInst || PianoEngine.isLocked()) return;
@@ -1685,8 +1768,8 @@ function showPage(pageId) {
         var tA = ctx.currentTime + 0.02;
         pianoInst.play(69, tA, { duration: 2.0, gain: 3.5 * 0.8 });
         PianoEngine.holdUntil(ctx, tA + 2.0);
-        btn.textContent = '🎵 A 響起…';
-        clearTimeout(timer); timer = setTimeout(function(){ btn.textContent = LABEL; }, 2000);
+        btn.innerHTML = '🎵 A 響起…';
+        clearTimeout(timer); timer = setTimeout(function(){ btn.innerHTML = LABEL; }, 2000);
       }catch(e){}
     };
     PianoEngine.onLockChange(function(){ btn.disabled = PianoEngine.isLocked(); chModule.updatePlayBtns(); });
@@ -1729,7 +1812,7 @@ function showPage(pageId) {
     + '<div class="help-box"><button class="help-close" data-help-close aria-label="關閉">×</button>'
     + '<h2>聖詠和聲 — 玩法說明</h2>'
     + '<p class="help-lead">聆聽巴哈聖詠風格的四部和聲：上方三個聲部都已寫好，請在空格填出低音與級數 (含轉位)。</p>'
-    + '<h3>設定</h3><p>可選調性 (隨機 24 大小調／僅大調／僅小調)、拍號 (4/4、3/4)、小節數 (5～12)、挖空多寡 (少／中／多)、速度、難度 Lv1～Lv3 (Lv1 三和絃含所有轉位；Lv2 加入七和絃；Lv3 加入副屬和絃、拿坡里與畢卡第三度)。</p>'
+    + '<h3>設定</h3><p>可選調性 (隨機 24 大小調／僅大調／僅小調)、拍號 (4/4、3/4)、小節數 (4～12)、挖空多寡 (少／中／多)、速度、難度 Lv1～Lv3 (Lv1 三和絃含所有轉位；Lv2 加入七和絃；Lv3 加入副屬和絃、拿坡里與畢卡第三度)。</p>'
     + '<h3>作答</h3><p>按「播放題目」聆聽 (延長記號的和絃會延長一倍)。挖空以「一組」為單位，下方有灰色括號標示。點譜例上的空格或下方的級數框選取一格：① <b>編輯低音</b>：寫出那一拍拍點上的低音 (時值就是那一格的拍數，拍中的經過音不用寫)；② <b>編輯級數</b>：選羅馬數字級數與轉位，另有減／半減、副屬、拿坡里 N6 等按鍵。有掛留音的拍子直接給答案 (例如 V⁷₄ - 3)，不用作答。</p>'
     + '<p>按提交 → 譜例上答對的變綠色、答錯的用紅色標出你的答案，旁邊綠色是正確答案；右上角是「低音與級數都對」的格數。</p>'
     + '<p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>'
