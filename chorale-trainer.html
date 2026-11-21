@@ -1028,7 +1028,8 @@ function showPage(pageId) {
     host.innerHTML = '';
     const mode = opts.mode, user = opts.user || { bass: {}, seq: {} };
     const W = Math.max(280, host.clientWidth || 340);
-    const SC = W < 520 ? 0.74 : (W < 760 ? 0.86 : 1);
+    let SC = W < 520 ? 0.74 : (W < 760 ? 0.86 : 1);
+    if (opts.maxSysH) SC = Math.max(0.6, Math.min(SC, (opts.maxSysH - 8) / 327));   // 譜例區太矮（小手機）時縮小，讓一整行大譜表放得下
     const lineW = W / SC;
     const KS = {}; q.key.sigs.forEach(s => { KS[LETTER.indexOf(s[0])] = s[1] === '#' ? 1 : -1; });
     const nSig = q.key.sigs.length;
@@ -1461,7 +1462,13 @@ function showPage(pageId) {
       document.getElementById('oct-label-low').textContent = `(Oct ${this.currentOctave - 1})`;
       document.getElementById('oct-label-high').textContent = `(Oct ${this.currentOctave + 1})`;
     },
-    nextSlot: function (k) { const i = this.slots.indexOf(k); return (i >= 0 && i < this.slots.length - 1) ? this.slots[i + 1] : k; },
+    /* 填完自動往下一格：只在同一組裡面前進；一組的最後一格就停住（下一組可能在很後面，不自動跳過去） */
+    nextSlot: function (k) {
+      const g = (this.q.groups || []).find(x => x.ks.indexOf(k) >= 0);
+      if (!g) return k;
+      const i = g.ks.indexOf(k);
+      return i < g.ks.length - 1 ? g.ks[i + 1] : k;
+    },
     pickSlot: function (k, part) {
       if (this.isSubmitted) return;
       this.activeSlot = k;
@@ -1571,17 +1578,15 @@ function showPage(pageId) {
       const box = document.getElementById('ch-scoreScroll');
       const keep = box.scrollTop;
       host.style.minHeight = host.offsetHeight + 'px';   // 重畫的瞬間不讓高度變 0（否則捲動位置會被歸零）
-      const info = renderScore(host, this.q, { mode: 'ask', user: { bass: this.userBass, seq: this.userSeq }, active: this.activeSlot, onPick: (k, part) => this.pickSlot(k, part) });
+      const info = renderScore(host, this.q, { maxSysH: box.clientHeight, mode: 'ask', user: { bass: this.userBass, seq: this.userSeq }, active: this.activeSlot, onPick: (k, part) => this.pickSlot(k, part) });
       host.style.minHeight = '';
       box.scrollTop = keep;
-      // 選到的格子不在畫面內時，才把那一行捲到中間
+      // 選到的格子所在的那一行沒有完整顯示時，把整個大譜表對齊譜例區頂端（四個聲部與級數都看得到）
       const si = info.sysOfSlot[this.activeSlot];
       if (si != null && box.scrollHeight > box.clientHeight + 4) {
-        const el = info.sysEls[si];
-        const top = el.offsetTop - host.offsetTop, bot = top + el.offsetHeight;
-        if (top < box.scrollTop || bot > box.scrollTop + box.clientHeight) {
-          const target = top - (box.clientHeight - el.offsetHeight) / 2;
-          box.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        const sr = info.sysEls[si].getBoundingClientRect(), br = box.getBoundingClientRect();
+        if (sr.top < br.top - 1 || sr.bottom > br.bottom + 1) {
+          box.scrollTo({ top: Math.max(0, box.scrollTop + (sr.top - br.top) - 4), behavior: 'smooth' });
         }
       }
       this.updatePlayBtns();
