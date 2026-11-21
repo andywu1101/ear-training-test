@@ -462,6 +462,7 @@
         return p;
       };
       HE.__choraleFI = true;
+      HE.__cadP = 0.07;   // ii65／ii43 → I64 → V7 → I 終止公式：聖詠每一句都有終止，機率調低避免每句都一樣
     }
     var root = function (x) { return x.replace(/[0-9]/g, ''); };
     /* 女高音的音級（1～7；其他半音回傳 0） */
@@ -488,7 +489,7 @@
     }
     function skeleton(cfg, R, keyObj) {
       var B = cfg.meter === '3/4' ? 3 : 4, isMin = keyObj.isMin, engLv = cfg.level + 1, T = isMin ? 'i' : 'I';
-      var DENS = cfg.level >= 2 ? 0.45 : 1.0, pickup = !!cfg.pickup;
+      var DENS = cfg.level >= 2 ? 1.0 : 1.0, pickup = !!cfg.pickup;   // 七和絃密度（v111.6 提高）
       var bars = cfg.bars + (cfg.bars % 2);   // 樂句工整：只出偶數小節
       /* 句尾的延長記號（巴哈聖詠的統計比例）：[句尾那一小節的時值, 下一句的弱起拍數, 機率]
          4/4：第三拍四分音符（下一句第四拍弱起）、第三拍二分音符、第一拍二分音符（下一句第三拍弱起）、第一拍附點二分音符（第四拍弱起）
@@ -527,7 +528,7 @@
           if (x === 'vii°6' && !((/^(I|i)$/.test(p) && /^(I|i)6$/.test(s[i + 1] || '')) || (/^(I|i)6$/.test(p) && /^(I|i)$/.test(s[i + 1] || '')))) return false;
           if (i > 0) {
             if (pr === 'V' && p.indexOf('/') < 0 && /^(IV|iv|ii|ii°)$/.test(r)) return false;
-            if (/^(ii|ii°)$/.test(pr) && /^(I|i)$/.test(r)) return false;
+            if (/^(ii|ii°)$/.test(pr) && /^(I|i)$/.test(r) && !/64$/.test(x)) return false;   // ii → I 不行；ii → 終止六四可以
             if (/^(I|i)6?$/.test(p) && /^(I|i)64$/.test(x)) return false;
             if (p === 'N6' && !((/^V/.test(x) && x.indexOf('/') < 0) || /^(I|i)64$/.test(x))) return false;
             if (i >= 2 && r === pr && r === root(s[i - 2])) return false;
@@ -650,7 +651,10 @@
             if (kind === 'hc') s[n - 1] = 'V';
             else if (kind === 'sec') { s[n - 1] = isMin ? (R() < 0.4 ? 'V/III' : 'V/V') : (R() < 0.35 ? 'V/vi' : 'V/V'); if (/^V/.test(s[n - 2])) continue; }
             else if (kind === 'dc') { s[n - 2] = R() < 0.5 && engLv >= 3 ? 'V7' : 'V'; s[n - 1] = isMin ? 'VI' : 'vi'; }
-            else if (kind === 'pac') { s[n - 2] = 'V'; s[n - 1] = T; }
+            else if (kind === 'pac') {   // 正格終止：約一半用 V7，也可經終止六四
+              if (n >= 5 && R() < 0.4 && PRE.test(s[n - 4])) s[n - 3] = isMin ? 'i64' : 'I64';
+              s[n - 2] = (engLv >= 3 && R() < 0.6) ? 'V7' : 'V'; s[n - 1] = T;
+            }
             else if (kind === 'sd') { s[n - 2] = T; s[n - 1] = isMin ? 'iv' : 'IV'; }
             else if (kind === 'ton') {   // 暫時轉調的終止：停在其他級數（不和上一句停在同一個和絃）
               var TG = isMin ? [['III', 0.5], ['VI', 0.2], ['iv', 0.15], ['V', 0.15]] : [['vi', 0.4], ['ii', 0.2], ['IV', 0.15], ['V', 0.25]];
@@ -663,7 +667,7 @@
             else {
               if (n >= 5 && R() < 0.65 && PRE.test(s[n - 4])) s[n - 3] = isMin ? 'i64' : 'I64';
               s[n - 2] = (engLv >= 3 && R() < 0.7) ? 'V7' : 'V';
-              s[n - 1] = (isMin && engLv >= 4 && R() < 0.3) ? 'I' : T;   // 畢卡第三度（Lv.3）
+              s[n - 1] = (isMin && engLv >= 4 && R() < 0.42) ? 'I' : T;   // 畢卡第三度（Lv.3，約四、五成）
             }
             if (startWith) s[0] = startWith;
             // 模進：一題最多一段，放在句子中段

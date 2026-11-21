@@ -1591,7 +1591,8 @@ function showPage(pageId) {
         if (!isII65) continue;
         let nb = seq[i + 1].replace(/[0-9]/g, '');
         let nextIsV7 = (nb === 'V') && /7/.test(seq[i + 1]) && !seq[i + 1].includes('/');
-        if (nextIsV7) seq[i] = base + '7'; // ii65 → ii7 原位
+        // v.111：ii65 → V7 已可依共同音保持規則寫出，不再自動改成 ii7
+        if (nextIsV7 && false) seq[i] = base + '7';
       }
       return seq;
     },
@@ -1604,6 +1605,11 @@ function showPage(pageId) {
       const usedIdx = new Set([0, n - 1]); // 頭尾（起始主和絃、終止主和絃）不做額外裝飾
 
       if (levelId === 1) return seq; // Lv.1：全部維持原位，不做任何裝飾
+      // v.111：七和絃轉位的比例參考巴哈聖詠（六五最多）；ii 類以 ii65 為主
+      const pickW = arr => { let r = Math.random() * arr.reduce((a, x) => a + x[1], 0); for (const x of arr) { r -= x[1]; if (r < 0) return x[0]; } return arr[0][0]; };
+      const SEV_W = [['65', 0.35], ['7', 0.3], ['42', 0.2], ['43', 0.15]];
+      const SEV_II = [['65', 0.4], ['43', 0.2], ['42', 0.2], ['7', 0.2]];
+      const SEC_W = [['65', 0.3], ['7', 0.25], ['42', 0.25], ['43', 0.2]];
 
       // ---------- Lv.2：三和絃所有轉位 + 四組固定套組 ----------
       const BUNDLES = isMinor ? [
@@ -1662,13 +1668,32 @@ function showPage(pageId) {
         let r = Math.random();
         if (r < sevProb) {
           // 升級成七和絃（含各種轉位）
-          let variant = ['7', '65', '43', '42'][Math.floor(Math.random() * 4)];
+          let variant = pickW((base === 'ii' || base === 'ii°') ? SEV_II : SEV_W);
           seq[i] = base + variant;
           hasLv3Feature = true;
         } else if (r < invProb) {
           // 保留三和絃但加轉位（Lv.4 幾乎一定加轉位，減少原位三和絃）。
           // 以第一轉位 6 為主，大幅降低第二轉位 64（64 是「經過六四」等假套組特徵的主因）。
           if (!hadInv) seq[i] = base + '6'; // v.100：不再隨機改成六四
+        }
+      }
+      // v.111：終止公式 ii65（或 ii43）→ I64 → V7 → I，以及中段 ii42 → V6／V65（大調）
+      {
+        const iiB = isMinor ? 'ii°' : 'ii', T64 = isMinor ? 'i64' : 'I64';
+        if (n >= 6 && !usedIdx.has(n - 4) && !usedIdx.has(n - 3) && Math.random() < (levelId >= 4 ? 0.4 : 0.35)) {
+          if (Math.random() < 0.5) {   // ii65（或 ii43）→ I64 → V7 → I
+            seq[n - 4] = iiB + (Math.random() < 0.65 ? '65' : '43'); seq[n - 3] = T64; seq[n - 2] = 'V7';
+            usedIdx.add(n - 4); usedIdx.add(n - 3); usedIdx.add(n - 2);
+          } else {                     // ii65（或 ii43、ii7）→ V7 → I
+            let r = Math.random(); seq[n - 3] = iiB + (r < 0.6 ? '65' : r < 0.8 ? '43' : '7'); seq[n - 2] = 'V7';
+            usedIdx.add(n - 3); usedIdx.add(n - 2);
+          }
+          hasLv3Feature = true;
+        }
+        if (!isMinor && Math.random() < 0.3) {
+          let spots = [];
+          for (let i = 1; i < n - 3; i++) if (!usedIdx.has(i) && !usedIdx.has(i + 1) && seq[i + 1].replace(/[0-9]/g, '') === 'V' && !seq[i + 1].includes('/')) spots.push(i);
+          if (spots.length) { let i = spots[Math.floor(Math.random() * spots.length)]; seq[i] = 'ii42'; seq[i + 1] = Math.random() < 0.5 ? 'V6' : 'V65'; usedIdx.add(i); usedIdx.add(i + 1); hasLv3Feature = true; }
         }
       }
       if (!hasLv3Feature) {
@@ -1695,7 +1720,9 @@ function showPage(pageId) {
         if (usedIdx.has(idx - 1) || usedIdx.has(idx + 1)) continue;
         if (Math.random() < 0.38) {
           let target = seq[idx + 1].replace(/[0-9]/g, '');
-          let inv = ['7', '65', '43', '42'][Math.floor(Math.random() * 4)];
+          let inv = pickW(SEC_W);
+          // 副屬四二和絃的低音（七音）要下行解決：目標和絃改成第一轉位（vi6／VI6 不用，改別的轉位）
+          if (inv === '42') { if (/^(vi|VI)$/.test(target) || usedIdx.has(idx + 1) || idx + 1 >= n - 1) inv = '65'; else seq[idx + 1] = target + '6'; }
           seq[idx] = 'V' + inv + '/' + target;
           usedIdx.add(idx);
           hasLv4Feature = true;
@@ -1804,7 +1831,9 @@ function showPage(pageId) {
         if (spots.length > 0) {
           let idx = spots[Math.floor(Math.random() * spots.length)];
           let target = seq[idx + 1].replace(/[0-9]/g, '');
-          let inv = ['7', '65', '43', '42'][Math.floor(Math.random() * 4)];
+          let inv = pickW(SEC_W);
+          // 副屬四二和絃的低音（七音）要下行解決：目標和絃改成第一轉位（vi6／VI6 不用，改別的轉位）
+          if (inv === '42') { if (/^(vi|VI)$/.test(target) || usedIdx.has(idx + 1) || idx + 1 >= n - 1) inv = '65'; else seq[idx + 1] = target + '6'; }
           seq[idx] = 'V' + inv + '/' + target;
           usedIdx.add(idx);
         } else {
@@ -1814,7 +1843,7 @@ function showPage(pageId) {
           if (freePairs.length > 0) {
             let target = TARGETS[Math.floor(Math.random() * TARGETS.length)];
             let pos = freePairs[Math.floor(Math.random() * freePairs.length)];
-            let inv = ['7', '65', '43', '42'][Math.floor(Math.random() * 4)];
+            let inv = pickW(SEC_W); if (inv === '42') inv = '65';
             seq[pos] = 'V' + inv + '/' + target;
             seq[pos + 1] = target;
             usedIdx.add(pos); usedIdx.add(pos + 1);
@@ -2063,6 +2092,8 @@ function showPage(pageId) {
       let p = this.getChordPcs(sym, isMinor).map(x => (x + keyOffset) % 12);
       let cnt = {}; v.forEach(x => { let q = x % 12; cnt[q] = (cnt[q] || 0) + 1; });
       let afterV = /^V/.test(prevSym || '') && !(prevSym || '').includes('/'); // V 類（任何轉位）接 vi／VI 都重複三音
+      // v.111：四音完整的 V7 接 I，I 可以省五音（三個根音＋一個三音）；只接在完整的 V7 後面（聲部進行時再確認）
+      if (/^V7(\/|$)/.test(prevSym || '') && this.isAuthenticV7(prevSym, sym) && cnt[p[0]] === 3 && cnt[p[1]] === 1 && !cnt[p[2]]) return true;
       if (!p.every(x => cnt[x])) return false;
       let want = (afterV && (sym === 'vi' || sym === 'VI')) ? p[1] : p[0];
       return cnt[want] === 2;
@@ -2079,7 +2110,8 @@ function showPage(pageId) {
       if (!/^V7(\/|$)/.test(sym || '')) return true;
       let p = this.getChordPcs(sym, isMinor).map(x => (x + keyOffset) % 12);
       let cnt = {}; v.forEach(x => { let q = x % 12; cnt[q] = (cnt[q] || 0) + 1; });
-      if (this.isAuthenticV7(sym, nextSym)) return cnt[p[0]] === 2 && !cnt[p[2]] && cnt[p[1]] === 1 && cnt[p[3]] === 1;
+      // v.111：正格終止的 V7 可以省五重根，也可以四音完整（完整時接的 I 省五音）
+      if (this.isAuthenticV7(sym, nextSym)) return (cnt[p[0]] === 2 && !cnt[p[2]] && cnt[p[1]] === 1 && cnt[p[3]] === 1) || p.every(x => cnt[x] === 1);
       return p.every(x => cnt[x] === 1);
     },
 
@@ -2362,8 +2394,19 @@ function showPage(pageId) {
               if (omitsFifth && doublesRoot) dist -= 4; // 優惠，優先選省五重根的 V7 配置
             }
 
+            // v.111：省五音的 I 只能接在四音完整的 V7 後面（省五的 V7 一定接完整的 I）
+            if (/^V7(\/|$)/.test(prevSym) && this.isAuthenticV7(prevSym, currSym)) {
+              let cp = this.getChordPcs(currSym, isMinor).map(x => (x + keyOffset) % 12), pp = this.getChordPcs(prevSym, isMinor).map(x => (x + keyOffset) % 12);
+              if (!tv.some(x => x % 12 === cp[2]) && !pv.some(x => x % 12 === pp[2])) continue;
+            }
             // 原則 1（硬性）：ii 類 → V 類，上三聲部必須與低音反向，違反直接淘汰
-            if (iiToV && !rootToRoot) { // v.100：原位 ii→V 改由規則 1／5 處理（大調保持共同音）
+            if (iiToV_is7) {   // v.111：ii 類七和絃接 V 類七和絃：共同音（2 級、4 級）保持；共同音若成為 V 的低音，上方聲部不必保持。其他聲部照一般規則
+              let cpcs = this.getChordPcs(currSym, isMinor).map(x => (x + keyOffset) % 12);
+              let ppcs = this.getChordPcs(prevSym, isMinor).map(x => (x + keyOffset) % 12);
+              let common = ppcs.filter(x => cpcs.includes(x)), bad = false;
+              for (let vv = 0; vv < 3; vv++) if (common.includes(pv[vv] % 12) && pv[vv] % 12 !== tv[3] % 12 && tv[vv] !== pv[vv]) { bad = true; break; }
+              if (bad) continue;
+            } else if (iiToV && !rootToRoot) { // v.100：原位 ii→V 改由規則 1／5 處理（大調保持共同音）
               let bassDir = Math.sign(tv[3] - pv[3]); // 低音方向
               if (bassDir !== 0) {
                 let viol = false;
