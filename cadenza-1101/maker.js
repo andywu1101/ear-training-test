@@ -14,7 +14,8 @@
     { id: 'twopart', label: '兩聲部', page: 'two-part-trainer.html', on: true },
     { id: 'pitcherr', label: '找錯音', page: 'pitch-error-trainer.html', on: true },
     { id: 'pitchstack', label: '音堆', page: 'pitch-stack-trainer.html', on: true },
-    { id: 'fourpart', label: '四部和聲', page: 'four-part-trainer.html', on: true }
+    { id: 'fourpart', label: '四部和聲', page: 'four-part-trainer.html', on: true },
+    { id: 'chorale', label: '聖詠和聲', page: 'chorale-trainer.html', on: false }   // v111：先預留，之後開放
   ];
   /* 大題：順序固定（v106.8 起比照大學檔模擬考的順序與名稱） */
   var SECTIONS = [
@@ -23,7 +24,8 @@
     { id: 'rhythm', name: '節奏' }, { id: 'memRhythm', name: '記憶節奏' },
     { id: 'melody', name: '單旋律' }, { id: 'memMelody', name: '記憶旋律' },
     { id: 'twopart', name: '兩聲部' }, { id: 'memTwopart', name: '記憶兩聲部' },
-    { id: 'pitchstack', name: '音堆辨認' }, { id: 'fourpart', name: '四部和聲' }
+    { id: 'pitchstack', name: '音堆辨認' }, { id: 'fourpart', name: '四部和聲' },
+    { id: 'chorale', name: '聖詠和聲' }
   ];
   var CN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
