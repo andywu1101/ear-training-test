@@ -1041,7 +1041,9 @@ function showPage(pageId) {
     const labSum = meas.map(([a, b]) => q.starts.reduce((s, st, k) => s + (st >= a - 1e-9 && st < b - 1e-9 ? labW(k) * 1.2 : 0), 0));
     // 作答時，有挖空的小節每拍至少留 BLANK_BEAT_W 的寬度，低音框才不會太窄、好按
     const hasBlank = meas.map(([a, b]) => mode === 'ask' && q.starts.some((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9));
-    const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27, labSum[i] + 24, hasBlank[i] ? 24 + (m[1] - m[0]) * BLANK_BEAT_W : 0));
+    // 挖空的拍子裡有經過音時，框只框正拍那個音，所以這一拍再多留一點寬度
+    const passBlank = meas.map(([a, b]) => mode !== 'ask' ? 0 : q.starts.filter((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9 && q.V[3].filter(e => e.slot === k).length > 1).length);
+    const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27, labSum[i] + 24, hasBlank[i] ? 24 + (m[1] - m[0]) * BLANK_BEAT_W + passBlank[i] * 40 : 0));
     const headW = first => 42 + nSig * 10 + (first ? 26 : 0);
     // 排成一行一行
     const systems = []; let cur = [], used = 0;
@@ -1096,7 +1098,7 @@ function showPage(pageId) {
         const inM = e => e.t >= a - 1e-9 && e.t < b - 1e-9;
         const voices = [], beams = [], allNotes = [];
         const accT = accidentalsFor(q.V[0].filter(inM).concat(q.V[1].filter(inM)), KS);
-        const accB = accidentalsFor(q.V[2].filter(inM).concat(q.V[3].filter(inM).filter(e => !blank[e.slot] || mode === 'check')), KS);
+        const accB = accidentalsFor(q.V[2].filter(inM).concat(q.V[3].filter(inM).filter(e => !(blank[e.slot] && mode === 'ask' && Math.abs(e.t - q.starts[e.slot]) < 1e-9))), KS);
         for (let v = 0; v < 4; v++) {
           const clef = v < 2 ? 'treble' : 'bass', up = v % 2 === 0, accMap = v < 2 ? accT : accB;
           const tick = [];
@@ -1104,24 +1106,26 @@ function showPage(pageId) {
           let ei = 0;
           while (ei < evs.length) {
             const e = evs[ei];
-            // 低音挖空格：作答時整拍藏起來（拍中的經過音也一起），只顯示學生填的音
-            if (v === 3 && blank[e.slot]) {
-              const k0 = e.slot, d = q.durs[k0];
+            // 低音挖空格：只挖掉正拍上的那個音，同一拍的經過音照常顯示
+            if (v === 3 && blank[e.slot] && Math.abs(e.t - q.starts[e.slot]) < 1e-9) {
+              const k0 = e.slot, D = DUR[e.d];
               const us = user.bass[k0];
               let note;
               if (mode === 'ask') {
                 if (us) {
-                  note = new VF.StaveNote({ clef, keys: [LETTER[us.stepIdx].toLowerCase() + (ACC_STR[String(accToSemi(us.acc))] || '') + '/' + us.oct], duration: DUR[d], stem_direction: -1 });
-                  if (DUR[d].endsWith('d')) note.addDotToAll();
+                  note = new VF.StaveNote({ clef, keys: [LETTER[us.stepIdx].toLowerCase() + (ACC_STR[String(accToSemi(us.acc))] || '') + '/' + us.oct], duration: D, stem_direction: -1 });
+                  if (D.endsWith('d')) note.addDotToAll();
                   const a0 = accToSemi(us.acc), def = KS[us.stepIdx] || 0;
                   if (a0 !== def) note.addAccidental(0, new VF.Accidental(a0 === 0 ? 'n' : ACC_STR[String(a0)]));
                   note.setStyle({ fillStyle: COL.blue, strokeStyle: COL.blue });
                 } else {
-                  // 隱藏的低音：用一般音符但畫成透明，排版寬度和看得見的音符一樣，相鄰的框才不會擠在一起
-                  note = new VF.StaveNote({ clef, keys: ['f/2'], duration: DUR[d], stem_direction: -1 });
-                  if (DUR[d].endsWith('d')) note.addDotToAll();
+                  // 隱藏的低音：符頭透明（放在第三線 D3 佔位置）。跟後面的經過音有符槓相連時，符桿照畫；單獨的音整個透明
+                  const nx = evs[ei + 1];
+                  const beamed = e.d < 1 && nx && nx.slot === k0 && nx.d < 1 && Math.floor(nx.t + 1e-9) === Math.floor(e.t + 1e-9);
+                  note = new VF.StaveNote({ clef, keys: ['d/3'], duration: D, stem_direction: -1 });
                   const clear = { fillStyle: 'rgba(0,0,0,0)', strokeStyle: 'rgba(0,0,0,0)' };
-                  note.setStyle(clear); if (note.setLedgerLineStyle) note.setLedgerLineStyle(clear); if (note.setFlagStyle) note.setFlagStyle(clear);
+                  if (beamed) note.setKeyStyle(0, clear);
+                  else { note.setStyle(clear); if (note.setFlagStyle) note.setFlagStyle(clear); }
                   note._hidden = true;
                 }
               } else {
@@ -1129,8 +1133,8 @@ function showPage(pageId) {
                 const list = [{ m: c.m, L: c.L, col: COL.green }];
                 if (us && !ok) list.push({ m: us.midi, L: us.stepIdx, col: COL.red });
                 list.sort((p, r) => p.m - r.m);
-                note = new VF.StaveNote({ clef, keys: list.map(p => keyStrOf(p)), duration: DUR[d], stem_direction: -1 });
-                if (DUR[d].endsWith('d')) note.addDotToAll();
+                note = new VF.StaveNote({ clef, keys: list.map(p => keyStrOf(p)), duration: D, stem_direction: -1 });
+                if (D.endsWith('d')) note.addDotToAll();
                 note.setStyle({ fillStyle: ok ? COL.green : COL.red, strokeStyle: ok ? COL.green : COL.red });
                 list.forEach((p, i) => {
                   const aa = alterOf(p.m, p.L);
@@ -1140,9 +1144,9 @@ function showPage(pageId) {
               }
               if (q.ferm[k0]) note.addArticulation(0, new VF.Articulation('a@u').setPosition(VF.Modifier.Position.BELOW));
               tick.push(note); allNotes.push(note);
-              notePos.set('B' + k0, note);
-              hitInfo.push({ slot: k0, note, stave: sB, sys: si });
-              while (ei < evs.length && evs[ei].slot === k0) ei++;
+              notePos.set('B' + k0, note); e._note = note; e._sys = si;
+              hitInfo.push({ slot: k0, note, stave: sB, sys: si, nextIn: evs[ei + 1] && evs[ei + 1].slot === k0 ? evs[ei + 1] : null });
+              ei++;
               continue;
             }
             const note = new VF.StaveNote({ clef, keys: [keyStrOf(e)], duration: DUR[e.d], stem_direction: up ? 1 : -1 });
@@ -1298,7 +1302,10 @@ function showPage(pageId) {
       if (x1 == null || x1 <= x0) x1 = (h.stave.getX() + h.stave.getWidth()) * SC - 14;   // 小節尾留空間給右括號，不壓到小節線
       const box = document.createElement('div'); box.className = 'ch-hit' + (opts.active === k ? ' active' : '');
       const bw = nx && systemIndexOf(nx) === h.sys ? Math.max(4, x1 - x0 - 3) : Math.max(18, x1 - x0 - 3);   // 相鄰兩格之間留空隙，絕不重疊
-      box.style.left = x0 + 'px'; box.style.width = bw + 'px';
+      // 低音框只框挖掉的那個音：同一拍後面有經過音時，框到經過音前面為止
+      const pn = h.nextIn && h.nextIn._note;
+      const hb = pn ? Math.max(4, Math.min(bw, pn.getAbsoluteX() * SC - 4 - x0)) : bw;
+      box.style.left = x0 + 'px'; box.style.width = hb + 'px';
       // 框只蓋低音：上緣在這一拍男高音最低的符頭下方（只看男高音，不看低音正解），下緣到低音譜表下方
       const bot = h.stave.getYForLine(4) + 38;
       let tenY = -1e9;
@@ -1311,11 +1318,11 @@ function showPage(pageId) {
       box.style.top = top * SC + 'px'; box.style.height = (bot - top) * SC + 'px';
       box.onclick = () => opts.onPick && opts.onPick(k, 'bass');
       div.appendChild(box);
-      boxAt[k] = { sys: h.sys, x0, x1: x0 + bw, top: top * SC, bot: bot * SC };
+      boxAt[k] = { sys: h.sys, x0, x1: x0 + bw, top: top * SC, bot: bot * SC };   // 方括號依整拍範圍
       // 級數框：左右邊界、寬度與正上方的低音框一致；字太長時自動縮小（最多 75%）
       const lab = slotLab[k];
       if (lab) {
-        lab.style.left = x0 + 'px'; lab.style.width = bw + 'px'; lab.style.minWidth = '0'; lab.style.boxSizing = 'border-box';
+        lab.style.left = x0 + 'px'; lab.style.width = hb + 'px'; lab.style.minWidth = '0';   // 與低音框同寬 lab.style.boxSizing = 'border-box';
         lab.style.paddingLeft = '0'; lab.style.paddingRight = '0';
         const fs0 = parseFloat(lab.style.fontSize) || 14;
         for (let f = fs0; f >= fs0 * 0.75 && lab.scrollWidth > lab.clientWidth + 1; f -= 1) lab.style.fontSize = f + 'px';

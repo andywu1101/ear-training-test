@@ -305,7 +305,8 @@
     var ratio = { few: 0.25, mid: 0.5, many: 0.75 }[amount] || 0.5;
     var seq = q.seq, n = seq.length, bok = bassTieFree(V, q.starts, q.durs), na = {};
     q.noAsk.forEach(function (k) { na[k] = 1; });
-    var elig = seq.map(function (_, i) { return bok[i] && !na[i] && i > 0 && i < n - 1; });
+    var oct = {}; V[3].forEach(function (e) { if (e.k === 'oct') oct[e.slot] = 1; });   // 低音拍中八度跳的拍子不挖空
+    var elig = seq.map(function (_, i) { return bok[i] && !na[i] && !oct[i] && i > 0 && i < n - 1; });
     var units = makeUnits(seq), maxL = ratio >= 0.75 ? 4 : 3, wins = [];
     for (var a = 0; a < units.length; a++) {
       var ks = [], w = 0, kinds = [];
