@@ -101,6 +101,15 @@
       if (e.k !== 'res' && e.k !== 'oct') return;
       for (var u = 0; u < 4; u++) if (u !== v && at(V, u, e.t).m === e.m) errs.push(['解決／八度跳同度', e.t, v, u]);
     });
+    // 掛留延留的那一拍，和其他聲部不可形成增二度或減七度（例如小調 V 上延留降六級對導音）
+    for (v = 0; v < 4; v++) V[v].forEach(function (e) {
+      if (e.k !== 'sus') return;
+      for (var u = 0; u < 4; u++) {
+        if (u === v) continue;
+        var o = at(V, u, e.t), dd = mod(o.m - e.m, 12), ll = mod(o.L - e.L, 7);
+        if ((dd === 3 && ll === 1) || (dd === 9 && ll === 6) || (dd === 9 && ll === 1) || (dd === 3 && ll === 6)) errs.push(['掛留增二度', e.t, v, u]);
+      }
+    });
     for (v = 0; v < 4; v++) {
       var ns = V[v];
       for (i = 0; i + 1 < ns.length; i++) {
