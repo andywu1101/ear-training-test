@@ -1407,8 +1407,9 @@ function showPage(pageId) {
     cfgNow: function () {
       const meter = this.meterPref === 'mix' ? (Math.random() < 0.5 ? '4/4' : '3/4') : this.meterPref;
       const rg = ({ mix: [4, 12], '4-6': [4, 6], '6-8': [6, 8], '8-10': [8, 10], '10-12': [10, 12] })[this.barsPref] || [4, 12];
-      const bars = rg[0] + Math.floor(Math.random() * (rg[1] - rg[0] + 1));
-      return { level: this.curLevel.id, keyPref: this.keyPref, meter, bars, pickup: Math.random() < 0.5, amount: this.amount };
+      const bars = rg[0] + 2 * Math.floor(Math.random() * ((rg[1] - rg[0]) / 2 + 1));   // 樂句工整：只出偶數小節
+      // 弱起拍的比例依巴哈聖詠：4/4 約七成、3/4 約三成五
+      return { level: this.curLevel.id, keyPref: this.keyPref, meter, bars, pickup: Math.random() < (meter === '4/4' ? 0.7 : 0.35), amount: this.amount };
     },
     settingsKey: function () { return [this.curLevel.id, this.keyPref, this.meterPref, this.barsPref, this.amount].join('|'); },
     startPrefetch: function () {

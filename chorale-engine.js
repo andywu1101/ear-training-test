@@ -452,6 +452,8 @@
         // 副屬和絃可以接非目標和絃（由聲部規則判斷寫不寫得出來），唯獨 V/ii → N6 不行：
         // 臨時導音（升一級）在 N6 裡只能異名同音保留成降二級，沒有真正解決
         if (seq[i].includes('/') && seq[i].split('/')[1] === 'ii' && seq[i + 1] === 'N6') return false;
+        // v.111：N6 前面只接 I／i、I6／i6、vi／VI、IV／iv、IV6／iv6、V/IV 類（不接 ii° 類：♮2 接 ♭2 聽起來像更正）
+        if (i > 0 && seq[i] === 'N6' && !/^((I|i)6?|vi|VI|(IV|iv)6?|V(7|6|65|43|42)?\/(IV|iv))$/.test(seq[i - 1])) return false;
         // v.100：V 類接 vi64／VI64 不出（第二轉位不在經過、輔助、終止六四的用法裡）
         if (i > 0 && /^V/.test(seq[i - 1]) && !seq[i - 1].includes('/') && (seq[i] === 'vi64' || seq[i] === 'VI64')) return false;
       }
@@ -1097,11 +1099,12 @@
       let allVoicings = degSeq.map(sym => this.generateLegalVoicings(sym, isMinor, keyOffset));
       allVoicings = allVoicings.map((vs, i) => vs.filter(v => this.rootTriadDoublingOK(v, degSeq[i], degSeq[i - 1], isMinor, keyOffset)
                                                         && this.dominantSeventhOK(v, degSeq[i], degSeq[i + 1], isMinor, keyOffset)));
+      if (this.__filterVoicings) allVoicings = this.__filterVoicings(allVoicings, degSeq);   // 聖詠和聲專用掛鉤（四部和聲頁面不用）
       if (allVoicings.some(v => v.length === 0)) return null; // 有和絃完全找不到可用聲位
       // v.100：音域偏好（軟性）——高音聲部低於 A4（69）時，每低一個半音加成本，避免整題貼著 C4 寫
       const REG_W = 2.0;
       const regPen = v => REG_W * Math.max(0, 69 - v[0]);
-      let dp = allVoicings[0].map(v => ({ cost: regPen(v), path: [v], last: v }));
+      let dp = allVoicings[0].map(v => ({ cost: regPen(v) + (this.__startCost ? this.__startCost(v) : 0), path: [v], last: v }));
       // 供增二度偵測用：此調的名稱與主音字母索引
       let _keyObj = (typeof ALL_KEYS !== 'undefined') ? ALL_KEYS.find(k => k.off === keyOffset && k.isMin === isMinor) : null;
       let _keyName = _keyObj ? _keyObj.name : 'C 大調';
@@ -1186,14 +1189,17 @@
             for (let v = 0; v < 3; v++) {
                 let move = tv[v] - pv[v];
                 let leap = Math.abs(move);
-                if (leap > 5) { leapViolation = true; break; } // v.100：超過完全四度（含三全音、五度）一律不行
+                // 聖詠和聲掛鉤（__sopLeap）：女高音可以跳到完全五度（不含三全音），跳完一定要反向
+                let lim = (v === 0 && this.__sopLeap) ? 7 : 5;
+                if (leap > lim || leap === 6) { leapViolation = true; break; } // v.100：超過完全四度（含三全音、五度）一律不行
                 // 四度或五度跳進後反向：檢查「前一步」是否為四/五度跳進，若是，這一步必須反向
                 if (prevPrev !== null) {
                   let prevMove = pv[v] - prevPrev[v];
                   let pl = Math.abs(prevMove);
                   if (pl === 5 || pl === 7) {
                     if (move !== 0 && Math.sign(move) === Math.sign(prevMove)) { leapViolation = true; break; }
-                    if (leap === 5) { leapViolation = true; break; } // v.100：四度跳進後不可馬上再跳四度
+                    if (v === 0 && this.__sopLeap && move === 0) { leapViolation = true; break; }   // 聖詠：女高音跳四、五度後不可停在原音
+                    if (leap === 5 || leap === 7) { leapViolation = true; break; } // v.100：四度跳進後不可馬上再跳四度
                   }
                 }
             }
@@ -1332,27 +1338,28 @@
             {
               let bd = Math.sign(tv[3] - pv[3]);
               let rv = false;
+              const v0 = this.__sopFree ? 1 : 0;   // 聖詠和聲試用：女高音不受「共同音保持」「無共同音反向」限制（導音仍要上行）
               if (deceptiveRoot) {
                 // 假終止：導音上行到主音，其餘聲部與低音反向
                 for (let v = 0; v < 3; v++) {
                   if (pv[v] % 12 === keyLeadingTone) { if (tv[v] - pv[v] !== 1) { rv = true; break; } }
-                  else if (Math.sign(tv[v] - pv[v]) !== -bd) { rv = true; break; }
+                  else if (v >= v0 && Math.sign(tv[v] - pv[v]) !== -bd) { rv = true; break; }
                 }
               } else if (minorIIV) {
                 // 小調 ii°→V：低音只能上行，上方三聲部無條件反向（下行）
                 if (bd <= 0) rv = true;
-                else for (let v = 0; v < 3; v++) if (tv[v] >= pv[v]) { rv = true; break; }
+                else for (let v = v0; v < 3; v++) if (tv[v] >= pv[v]) { rv = true; break; }
               } else if (rootToRoot && rtCommon.length > 0) {
                 // 有共同音：共同音保持在原聲部。同一共同音若在兩個聲部（假終止後 vi 重三音、V7 後 I 三倍根音），
                 // 保持其中一個即可，另一個可以離開，否則下一個和絃會被迫重複錯的音（例如 V→vi→IV 的 IV 重五音）
                 for (let c of rtCommon) {
                   let had = 0, kept = 0;
-                  for (let v = 0; v < 3; v++) if (pv[v] % 12 === c) { had++; if (tv[v] === pv[v]) kept++; }
+                  for (let v = v0; v < 3; v++) if (pv[v] % 12 === c) { had++; if (tv[v] === pv[v]) kept++; }
                   if (had > 0 && kept === 0) { rv = true; break; }
                 }
               } else if (rootToRoot) {
                 // 沒有共同音：上方三聲部全部與低音反向
-                for (let v = 0; v < 3; v++) if (Math.sign(tv[v] - pv[v]) !== -bd) { rv = true; break; }
+                for (let v = v0; v < 3; v++) if (Math.sign(tv[v] - pv[v]) !== -bd) { rv = true; break; }
               }
               if (rv) continue;
             }
@@ -1393,7 +1400,7 @@
             let sig = '';
             for (let v = 0; v < 4; v++) { let m = tv[v] - pv[v], am = Math.abs(m); sig += (am === 5 || am === 7) ? m + ',' : '0,'; }
             if (k64Curr === 'pass') sig += 'b' + Math.sign(tv[3] - pv[3]); // 經過六四：下一步要同方向，方向不同的路徑分開留
-            let cand = prevNode.cost + dist;
+            let cand = prevNode.cost + dist + (this.__extraCost ? this.__extraCost(pv, tv, i, prevPrev) : 0);
             if (!bestBySig[sig] || cand < bestBySig[sig].cost) bestBySig[sig] = { cost: cand, path: prevNode.path.concat([tv]) };
           }
           for (let sig in bestBySig) nextDp.push({ cost: bestBySig[sig].cost, path: bestBySig[sig].path, last: tv });

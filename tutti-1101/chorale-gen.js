@@ -45,7 +45,7 @@
   }
 
   /* ---------- 獨立檢查（十六分音符為單位；不呼叫出題引擎的判斷） ---------- */
-  function check(V, total) {
+  function check(V, total, ferm) {   // ferm：延長記號（跨過延長記號、下一句重新開始時，不檢查旋律跳進）
     var errs = [], N = Math.round(total * 4), prev = null, prevn = null, i, j;
     for (var g = 0; g < N; g++) {
       var t = g * 0.25, cur = [], ms = [];
@@ -96,14 +96,26 @@
         if (k1 === k2 && (k1 === 0 || k1 === 7) && (m2[i] - m1[i]) * (m2[j] - m1[j]) > 0) errs.push(['拍點平行', b, i, j]);
       }
     }
+    // 掛留解決、低音八度跳的那一刻，其他聲部不可唱同一個音高
+    for (v = 0; v < 4; v++) V[v].forEach(function (e) {
+      if (e.k !== 'res' && e.k !== 'oct') return;
+      for (var u = 0; u < 4; u++) if (u !== v && at(V, u, e.t).m === e.m) errs.push(['解決／八度跳同度', e.t, v, u]);
+    });
     for (v = 0; v < 4; v++) {
       var ns = V[v];
       for (i = 0; i + 1 < ns.length; i++) {
         var A = ns[i], B = ns[i + 1], d = Math.abs(B.m - A.m), ld = Math.min(mod(B.L - A.L, 7), mod(A.L - B.L, 7));
+        if (ferm && ferm[A.slot] && B.slot !== A.slot) continue;
         if (d === 3 && ld === 1) errs.push(['增二度', A.t, v]);
         if (v < 3 && d === 6) errs.push(['三全音跳進', A.t, v]);
         if (v < 3 && d > 7) errs.push(['大跳', A.t, v]);
         if (v === 3 && d === 6) errs.push(['低音三全音', A.t]);
+        // 女高音跳四、五度之後一定要反向（作者規則；延留到下一拍的掛留除外）
+        var C = ns[i + 2];
+        if (v === 0 && (d === 5 || d === 7) && C && !B.tie && !(ferm && ferm[B.slot] && C.slot !== B.slot)) {
+          var m1 = B.m - A.m, m2 = C.m - B.m;
+          if (m2 === 0 || Math.sign(m2) === Math.sign(m1)) errs.push(['跳進後未反向', B.t, v]);
+        }
       }
     }
     return errs;
@@ -117,27 +129,53 @@
   }
 
   /* ---------- 和聲外音 ---------- */
+  var MEL = { rep: 3.5, leap: 1.2, tpl: 1.5, back: 0.8, join: 2, run: 1.0 };
+  var NEIGH_P = 0.25, ANT_P = 0.2, SUS_P = 0.42, SUS_MID = 0.5;
   function decorate(q, rate, seed) {
     var R = rng(seed), bt = build(q), V = bt.V, total = bt.total;
-    if (check(V, total).length) return null;
+    if (check(V, total, q.ferm).length) return null;
     var off = q.key.off, isMin = q.key.isMin, scale = scaleOf(off, isMin);
     var n = q.seq.length, durs = q.durs, ferm = q.ferm, ph = q.phraseOf, seq = q.seq, starts = q.starts;
     var avoid = {}; if (isMin) [8, 9, 10, 11].forEach(function (x) { avoid[(off + x) % 12] = 1; });
     var added = 0, perSlot = [], touched = {}, noask = {};
     for (var z = 0; z < n; z++) perSlot.push(0);
+    // 拿坡里到終止要乾淨：N6、後面接的 I64、V 都不加和聲外音、掛留、八度跳（作者規則）
+    var clean = {};
+    for (z = 0; z < n; z++) if (seq[z] === 'N6') {
+      clean[z] = 1;
+      for (var w = z + 1; w < n && (/^(I|i)64$/.test(seq[w]) || (/^V/.test(seq[w]) && seq[w].indexOf('/') < 0)); w++) clean[w] = 1;
+    }
+    // 終止處（句尾延長記號前一個和絃、I64→V 的 I64）：低音八度跳只能往下
+    function cadAt(i) { return (i + 1 < n && ferm[i + 1] && ph[i + 1] === ph[i]) || (/^(I|i)64$/.test(seq[i]) && /^V/.test(seq[i + 1] || '') && seq[i + 1].indexOf('/') < 0); }
+    // 調內每個音的音名（例如 d♯ 小調的 F 音 = E♯）
+    var TL = 'CDEFGAB'.indexOf(q.key.vfk[0].toUpperCase()), ST = isMin ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11], keyL = {};
+    for (z = 0; z < 7; z++) keyL[(off + ST[z]) % 12] = (TL + z) % 7;
+    // 和聲外音不可抵消同拍和絃的變化音（例如和絃有 E♮，同一拍不可出現 E♯／F♮）
+    function chromOK() {
+      for (var v = 0; v < 4; v++) for (var i = 0; i < V[v].length; i++) {
+        var e = V[v][i]; if (!/^(pass|neigh|esc)$/.test(e.k)) continue;
+        var kl = keyL[mod(e.m, 12)];
+        for (var u = 0; u < 4; u++) for (var r = 0; r < V[u].length; r++) {
+          var c = V[u][r]; if (c.slot !== e.slot || !/^(ct|res|oct)$/.test(c.k)) continue;
+          var di = mod(e.m - c.m, 12);
+          if ((di === 1 || di === 11) && (e.L === c.L || kl === c.L)) return false;
+        }
+      }
+      return true;
+    }
     function T(v, i) { return touched[v + ':' + i]; }
     function attempt(fn, slot, v) {
       var snap = clone(V);
-      if (fn() && !check(V, total).length) { added++; perSlot[slot]++; touched[v + ':' + slot] = 1; return true; }
+      if (fn() && chromOK() && !check(V, total, ferm).length) { added++; perSlot[slot]++; touched[v + ':' + slot] = 1; return true; }
       V = snap; return false;
     }
     function free(v, i) { return !T(v, i) && !T(v, i - 1) && !T(v, i + 1); }
     // 掛留（4-3、7-6、9-8；只在上方聲部）：上一拍預備，同音延留到這一拍前半，下行級進解決
     for (var j = 1; j < n; j++) {
-      if (ph[j] !== ph[j - 1] || durs[j] < 1 || R() > 0.35) continue;
-      if (/^(N|It|Fr|Ger)/.test(seq[j])) continue;   // 拿坡里上不放掛留（數字寫法另議）
+      if (ph[j] !== ph[j - 1] || durs[j] < 1 || R() > SUS_P) continue;
+      if (/^(N|It|Fr|Ger)/.test(seq[j]) || clean[j] || (q.seqAt >= 0 && j >= q.seqAt && j <= q.seqAt + 3)) continue;   // 拿坡里上、N6 之後到終止、模進裡都不放掛留
       var cadential = ferm[j] || (j + 1 < n && ferm[j + 1] && ph[j + 1] === ph[j]);
-      if (!cadential && R() > 0.4) continue;
+      if (!cadential && R() > SUS_MID) continue;
       var vs = shuffle([0, 1, 2], R);
       for (var vi = 0; vi < vs.length; vi++) {
         var v = vs[vi], ka = idx(V, v, starts[j - 1]), kb = idx(V, v, starts[j]);
@@ -155,58 +193,110 @@
         if (ok) { noask[j] = 1; break; }
       }
     }
-    // 女高音先現音（句尾 V→I）
-    for (j = 0; j < n - 1; j++) {
-      if (!(ferm[j + 1] && ph[j + 1] === ph[j] && /^V7?$/.test(seq[j]) && durs[j] === 1) || R() > 0.45) continue;
+    // 女高音先現音（句尾 V→I；機率低、一題最多一個）
+    var antDone = false;
+    for (j = 0; j < n - 1 && !antDone; j++) {
+      if (!(ferm[j + 1] && ph[j + 1] === ph[j] && /^V7?$/.test(seq[j]) && durs[j] === 1) || clean[j] || (q.seqAt >= 0 && j >= q.seqAt && j <= q.seqAt + 3) || R() > ANT_P) continue;
       var k1 = idx(V, 0, starts[j]), k2 = idx(V, 0, starts[j + 1]);
       if (k1 < 0 || k2 < 0 || !free(0, j)) continue;
       var A1 = V[0][k1], B1 = V[0][k2], dd = Math.abs(A1.m - B1.m);
       if (dd >= 1 && dd <= 2 && A1.d === 1)
-        attempt((function (k1, A1, B1) { return function () { split(V, 0, k1, [[0.5, A1.m, A1.L, 'ct'], [0.5, B1.m, B1.L, 'ant']]); return true; }; })(k1, A1, B1), j, 0);
+        antDone = attempt((function (k1, A1, B1) { return function () { split(V, 0, k1, [[0.5, A1.m, A1.L, 'ct'], [0.5, B1.m, B1.L, 'ant']]); return true; }; })(k1, A1, B1), j, 0);
     }
     // 一般和聲外音：逐拍（不出強拍經過音、倚音）
     var OPS = { 0: ['pass', 'neigh', 'pass16', 'escape'], 1: ['pass', 'neigh', 'pass16'], 2: ['pass', 'neigh', 'pass16'], 3: ['pass', 'pass', 'oct', 'pass16', 'neigh'] };
+    // 模進：四個和絃分成前後兩組。後一組照前一組加一樣節奏、一樣方向的和聲外音（四個聲部都比照）
+    var sq = q.seqAt >= 0 ? q.seqAt : -99;
+    function inSeq(i) { return i >= sq && i <= sq + 3; }
+    function mk(op, v, i, fdir) {   // 依這一拍到下一拍的走向，做出一個和聲外音（fdir：指定方向，模進照抄用）
+      var k = idx(V, v, starts[i]), kk = idx(V, v, starts[i + 1]);
+      if (k < 0 || kk < 0 || V[v][k].d !== 1 || V[v][k].k !== 'ct' || V[v][kk].k !== 'ct') return null;
+      var a = V[v][k], b = V[v][kk], d = b.m - a.m, dirn = d > 0 ? 1 : -1, lo = Math.min(a.m, b.m), hi = Math.max(a.m, b.m), p, p1, p2;
+      if (fdir !== undefined && op !== 'neigh' && op !== 'oct' && op !== 'escape' && dirn !== fdir) return null;
+      if (op === 'pass' && (Math.abs(d) === 3 || Math.abs(d) === 4)) {
+        p = step(a.m, a.L, dirn, scale);
+        if (p && lo < p[0] && p[0] < hi && !avoid[mod(p[0], 12)]) return { k: k, dir: dirn, parts: [[0.5, a.m, a.L, 'ct'], [0.5, p[0], p[1], 'pass']] };
+      } else if (op === 'pass16' && Math.abs(d) === 5) {
+        p1 = step(a.m, a.L, dirn, scale); p2 = p1 && step(p1[0], p1[1], dirn, scale);
+        if (p2 && lo < p1[0] && p1[0] < hi && lo < p2[0] && p2[0] < hi && !avoid[mod(p1[0], 12)] && !avoid[mod(p2[0], 12)])
+          return { k: k, dir: dirn, parts: [[0.5, a.m, a.L, 'ct'], [0.25, p1[0], p1[1], 'pass'], [0.25, p2[0], p2[1], 'pass']] };
+      } else if (op === 'neigh' && d === 0) {   // 鄰音一律一顆八分音符（不用十六分音符）
+        // 巴哈多用下鄰音（女高音約 95%、其他聲部約 82%），而且是小二度；上鄰音偶爾用
+        var nd = fdir !== undefined ? fdir : (R() < (v === 0 ? 0.95 : 0.82) ? -1 : 1);
+        if (nd === -1) {   // 下鄰音一律用調內音（小調主音的下鄰音用導音），不加調外臨時記號
+          if (isMin && mod(a.m - off, 12) === 0) return { k: k, dir: -1, parts: [[0.5, a.m, a.L, 'ct'], [0.5, a.m - 1, mod(a.L - 1, 7), 'neigh']] };
+          p = step(a.m, a.L, -1, scale);
+          if (p && !avoid[mod(p[0], 12)]) return { k: k, dir: -1, parts: [[0.5, a.m, a.L, 'ct'], [0.5, p[0], p[1], 'neigh']] };
+          return null;
+        }
+        p = step(a.m, a.L, 1, scale);
+        if (p && !avoid[mod(p[0], 12)]) return { k: k, dir: 1, parts: [[0.5, a.m, a.L, 'ct'], [0.5, p[0], p[1], 'neigh']] };
+      } else if (op === 'escape' && -d >= 1 && -d <= 2) {
+        p = step(a.m, a.L, 1, scale);
+        if (p && !avoid[mod(p[0], 12)]) return { k: k, dir: 1, parts: [[0.5, a.m, a.L, 'ct'], [0.5, p[0], p[1], 'esc']] };
+      } else if (op === 'oct' && v === 3) {
+        var os = fdir !== undefined ? [fdir * 12] : (cadAt(i) ? [-12] : [-12, 12]);
+        for (var o = 0; o < os.length; o++) { var m2 = a.m + os[o]; if (m2 >= 41 && m2 <= 60 && Math.abs(b.m - m2) <= 7 && !(cadAt(i) && os[o] > 0)) return { k: k, dir: Math.sign(os[o]), parts: [[0.5, a.m, a.L, 'ct'], [0.5, m2, a.L, 'oct']] }; }
+      }
+      return null;
+    }
     var order = shuffle(Array.from({ length: n - 1 }, function (_, i) { return i; }), R);
     order.forEach(function (i) {
-      if (ferm[i] || ph[i] !== ph[i + 1] || durs[i] !== 1) return;
+      if (ferm[i] || ph[i] !== ph[i + 1] || durs[i] !== 1 || clean[i]) return;
+      if (inSeq(i) && i !== sq) return;   // 模進裡只在第一個和絃決定，後一組照抄；兩組之間、模進結尾不加
       if (perSlot[i] >= 2 || R() > rate) return;
+      var i2 = sq + 2, pairOK = i === sq && !ferm[i2] && ph[i2] === ph[i2 + 1] && durs[i2] === 1 && !clean[i2];
+      if (i === sq && !pairOK) return;
       var vlist = shuffle([3, 0, 1, 2, 3, 0], R);
       for (var q2 = 0; q2 < vlist.length; q2++) {
         var v = vlist[q2];
         if (T(v, i) || T(v, i - 1) || T(v, i + 1)) continue;
-        var k = idx(V, v, starts[i]), kk = idx(V, v, starts[i + 1]);
-        if (k < 0 || kk < 0 || V[v][k].d !== 1 || V[v][k].k !== 'ct' || V[v][kk].k !== 'ct') continue;
-        var a = V[v][k], b = V[v][kk], d = b.m - a.m, dirn = d > 0 ? 1 : -1, lo = Math.min(a.m, b.m), hi = Math.max(a.m, b.m);
-        var ops = shuffle(OPS[v], R), done = false;
+        var ops = shuffle(OPS[v], R).sort(function (x, y) { return (/^pass/.test(y) ? 1 : 0) - (/^pass/.test(x) ? 1 : 0); }), done = false;   // 先試經過音
         for (var oi = 0; oi < ops.length && !done; oi++) {
-          var op = ops[oi], parts = null, p, p1, p2;
-          if (op === 'pass' && (Math.abs(d) === 3 || Math.abs(d) === 4)) {
-            p = step(a.m, a.L, dirn, scale);
-            if (p && lo < p[0] && p[0] < hi && !avoid[mod(p[0], 12)]) parts = [[0.5, a.m, a.L, 'ct'], [0.5, p[0], p[1], 'pass']];
-          } else if (op === 'pass16' && Math.abs(d) === 5) {
-            p1 = step(a.m, a.L, dirn, scale); p2 = p1 && step(p1[0], p1[1], dirn, scale);
-            if (p2 && lo < p1[0] && p1[0] < hi && lo < p2[0] && p2[0] < hi && !avoid[mod(p1[0], 12)] && !avoid[mod(p2[0], 12)])
-              parts = [[0.5, a.m, a.L, 'ct'], [0.25, p1[0], p1[1], 'pass'], [0.25, p2[0], p2[1], 'pass']];
-          } else if (op === 'neigh' && d === 0) {
-            p = step(a.m, a.L, R() < 0.5 ? 1 : -1, scale);
-            if (p && !avoid[mod(p[0], 12)]) {
-              if (v !== 3 && R() < 0.3) parts = [[0.5, a.m, a.L, 'ct'], [0.25, p[0], p[1], 'neigh'], [0.25, a.m, a.L, 'ct']];
-              else parts = [[0.5, a.m, a.L, 'ct'], [0.5, p[0], p[1], 'neigh']];
-            }
-          } else if (op === 'escape' && -d >= 1 && -d <= 2) {
-            p = step(a.m, a.L, 1, scale);
-            if (p && !avoid[mod(p[0], 12)]) parts = [[0.5, a.m, a.L, 'ct'], [0.5, p[0], p[1], 'esc']];
-          } else if (op === 'oct' && v === 3) {
-            var os = [-12, 12];
-            for (var o = 0; o < 2; o++) { var m2 = a.m + os[o]; if (m2 >= 41 && m2 <= 60 && Math.abs(b.m - m2) <= 7) { parts = [[0.5, a.m, a.L, 'ct'], [0.5, m2, a.L, 'oct']]; break; } }
+          var op = ops[oi];
+          if (op === 'neigh' && R() >= NEIGH_P) continue;   // 鄰音減少
+          var r1 = mk(op, v, i);
+          if (!r1) continue;
+          if (i !== sq) {
+            if (attempt((function (v, k, parts) { return function () { split(V, v, k, parts); return true; }; })(v, r1.k, r1.parts), i, v)) done = true;
+            continue;
           }
-          if (!parts) continue;
-          if (attempt((function (v, k, parts) { return function () { split(V, v, k, parts); return true; }; })(v, k, parts), i, v)) done = true;
+          // 模進：前後兩組一起加，任何一組不合規則就都不加
+          if (attempt((function (v, op, r1) { return function () {
+            split(V, v, r1.k, r1.parts);
+            var r2 = mk(op, v, i2, r1.dir);
+            if (!r2) return false;
+            split(V, v, r2.k, r2.parts); return true; }; })(v, op, r1), i, v)) { done = true; perSlot[i2]++; touched[v + ':' + i2] = 1; }
         }
         if (done && perSlot[i] >= 2) break;
         if (done && R() < 0.6) break;
       }
     });
+    // 同一小節、同一聲部出現兩個一模一樣的下鄰音：保留後面那個（靠近延長記號），前一個改成上鄰音；改了不合規則就拿掉
+    var PK = q.pickup ? 1 : 0, BT = q.beats;
+    function barOf(t) { return Math.floor((t - PK + EPS) / BT); }
+    function nIdx(v, t) { return V[v].findIndex(function (x) { return Math.abs(x.t - t) < EPS && x.k === 'neigh'; }); }
+    function unNeigh(v, t) { var k = nIdx(v, t); if (k < 1) return false; V[v][k - 1].d += V[v][k].d; V[v].splice(k, 1); added--; return true; }
+    function okNow() { return chromOK() && !check(V, total, ferm).length; }
+    for (var vv = 0; vv < 4; vv++) {
+      var groups = {};
+      V[vv].forEach(function (e, k) { if (e.k === 'neigh' && k > 0 && e.m < V[vv][k - 1].m) { var key = barOf(e.t) + ':' + V[vv][k - 1].m + ':' + e.m; (groups[key] = groups[key] || []).push({ t: e.t, slot: e.slot }); } });
+      Object.keys(groups).forEach(function (key) {
+        var g = groups[key]; if (g.length < 2) return;
+        g.sort(function (x, y) { return x.t - y.t; });
+        var last = g[g.length - 1];
+        for (var gi = 0; gi < g.length - 1; gi++) {
+          var snap = clone(V), x = g[gi];
+          if (inSeq(x.slot)) {   // 前一個在模進裡：為了保持模進一致，改拿掉後面那個
+            if (!(unNeigh(vv, last.t) && okNow())) V = snap;
+            return;
+          }
+          var k = nIdx(vv, x.t), a0 = V[vv][k - 1], up = step(a0.m, a0.L, 1, scale), ok = false;
+          if (up && !avoid[mod(up[0], 12)]) { V[vv][k] = Object.assign({}, V[vv][k], { m: up[0], L: up[1] }); ok = okNow(); }
+          if (!ok) { V = snap; if (!(unNeigh(vv, x.t) && okNow())) V = snap; }
+        }
+      });
+    }
     return { V: V, added: added, noAsk: Object.keys(noask).map(Number).sort(function (x, y) { return x - y; }) };
   }
 
@@ -379,27 +469,45 @@
     }
     var PRE = /^((IV|iv|ii|ii°)(6|65|7|43|42)?|N6|V7?\/V|V65\/V|V43\/V|V42\/V|V6\/V)$/;
 
+    /* 同樣兩個和絃（不論轉位）不可 A–B–A–B 來回；A–B–A（輔助、經過）可以 */
+    function noSwing(s) {
+      for (var i = 3; i < s.length; i++) {
+        var a = root(s[i]), b = root(s[i - 1]);
+        if (a !== b && a === root(s[i - 2]) && b === root(s[i - 3])) return false;
+      }
+      return true;
+    }
     function skeleton(cfg, R, keyObj) {
       var B = cfg.meter === '3/4' ? 3 : 4, isMin = keyObj.isMin, engLv = cfg.level + 1, T = isMin ? 'i' : 'I';
-      var DENS = cfg.level >= 2 ? 0.45 : 1.0, pickup = cfg.pickup;
-      function partition(n) {
-        for (var t = 0; t < 200; t++) {
-          var out = [], r = n;
-          while (r > 0) { var w = R(), L = w < 0.5 ? 2 : (w < 0.8 ? 3 : 4); if (L > r) L = r; out.push(L); r -= L; }
-          if (out.every(function (x) { return x >= 2; })) return out;
+      var DENS = cfg.level >= 2 ? 0.45 : 1.0, pickup = !!cfg.pickup;
+      var bars = cfg.bars + (cfg.bars % 2);   // 樂句工整：只出偶數小節
+      /* 句尾的延長記號（巴哈聖詠的統計比例）：[句尾那一小節的時值, 下一句的弱起拍數, 機率]
+         4/4：第三拍四分音符（下一句第四拍弱起）、第三拍二分音符、第一拍二分音符（下一句第三拍弱起）、第一拍附點二分音符（第四拍弱起）
+         3/4：第一拍附點二分音符、第一拍二分音符（第三拍弱起）、第三拍四分音符 */
+      var ENDS = B === 4 ? [[[1, 1, 1], 1, 0.5], [[1, 1, 2], 0, 0.2], [[2], 2, 0.15], [[3], 1, 0.15]]
+                         : [[[3], 0, 0.45], [[2], 1, 0.45], [[1, 1, 1], 0, 0.1]];
+      function pickEnd() { var w = R(), acc = 0; for (var i = 0; i < ENDS.length; i++) { acc += ENDS[i][2]; if (w < acc) return ENDS[i]; } return ENDS[0]; }
+      /* 前後句規劃：前樂句多停在 V（半終止），後樂句回到 I；中段可停在其他級數（副屬＝暫時轉調） */
+      function planKinds(m) {
+        var ks = [];
+        for (var i = 0; i < m; i++) {
+          var w = R(), k;
+          if (i === m - 1) k = 'final';
+          else if (i === 0) k = engLv >= 4 && w < 0.15 ? 'sec' : (w < 0.25 ? 'sd' : 'hc');
+          else if (i % 2 === 0) k = engLv >= 4 && w < 0.2 ? 'sec' : (w < 0.35 ? 'sd' : (w < 0.55 ? 'dc' : 'hc'));
+          else k = engLv >= 4 && w < 0.3 ? 'ton' : (w < 0.55 ? 'dc' : 'pac');
+          if (i > 0 && k !== 'final' && k === ks[i - 1]) k = i % 2 ? 'pac' : 'hc';   // 相鄰兩句不用同一種終止
+          ks.push(k);
         }
-        return [n];
+        return ks;
       }
-      function slots(L, first, fin) {
-        var out = [];
-        if (first && pickup) out.push(1);
-        for (var b = 0; b < L; b++) {
-          var last = b === L - 1;
-          if (last && fin) out.push(pickup ? B - 1 : B);
-          else if (last) { for (var k = 0; k < B - 2; k++) out.push(1); out.push(2); }
-          else for (k = 0; k < B; k++) out.push(1);
-        }
-        return out;
+      /* 模進（Lv.2 起；Lv.3 可用副屬串）：四個和絃根音五度下行，女高音同一個動機往下移一級 */
+      function seqPatterns() {
+        // 和聲引擎要保持共同音，能寫出「女高音同一個動機往下移一級」的組合都先驗證過：[和絃, 女高音音位（0 根音、1 三音、2 五音）可用的組合]
+        var P = isMin ? [[['VI', 'ii°6', 'V', 'i'], [[1, 0], [2, 1]]], [['VI', 'ii°6', 'V', 'i6'], [[1, 0], [2, 1]]]]
+                      : [[['vi', 'ii6', 'V', 'I'], [[1, 0], [2, 1]]], [['vi', 'ii6', 'V7', 'I'], [[1, 0]]], [['vi', 'ii6', 'V', 'I6'], [[1, 0], [2, 1]]]];
+        if (engLv >= 4) P = P.concat(isMin ? [[['V7/iv', 'iv', 'V7/III', 'III'], [[1, 0]]]] : [[['V7/vi', 'vi', 'V7/V', 'V'], [[1, 0]]], [['V/vi', 'vi', 'V/V', 'V'], [[1, 0]]]]);
+        return P;
       }
       function phraseOK(s, kind) {
         var n = s.length;
@@ -417,61 +525,172 @@
           }
         }
         if (s.filter(function (x) { return /^(iii|III)$/.test(root(x)); }).length > 1) return false;
+        if (!noSwing(s)) return false;
+        // N6 只用在終止前（作者規則）：N6 → V → 句尾 I／vi（假終止）、N6 → I64 → V → 句尾 I、N6 → I64 → V（延宕半終止）
+        var isV = function (x) { return /^V7?$/.test(x || ''); }, is64 = function (x) { return /^(I|i)64$/.test(x || ''); };
+        for (i = 0; i < n; i++) {
+          if (s[i] !== 'N6') continue;
+          var okN = (isV(s[i + 1]) && i + 2 === n - 1 && (kind === 'pac' || kind === 'final' || kind === 'dc'))
+                 || (is64(s[i + 1]) && isV(s[i + 2]) && i + 3 === n - 1 && (kind === 'pac' || kind === 'final'))
+                 || (is64(s[i + 1]) && isV(s[i + 2]) && i + 2 === n - 1 && kind === 'hc');
+          if (!okN) return false;
+        }
         if (kind === 'pac' || kind === 'final') { if (!(PRE.test(s[n - 3]) || /^(I|i)64$/.test(s[n - 3]))) return false; }
-        if (kind === 'hc') { if (/^V/.test(s[n - 2]) && s[n - 2].indexOf('/') < 0) return false; }
+        if (kind === 'hc') { if (/^V/.test(s[n - 2]) && s[n - 2].indexOf('/') < 0) return false; if (s[n - 2] === 'N6') return false; }   // 半終止停在 V：前面不接 N6（N6 → i64 → V 可以）
         return true;
       }
+      var memberPc = function (sym, idx) { var pc = HE.getChordPcs(sym, isMin); return (pc[idx] + keyObj.off) % 12; };
+      /* 女高音旋律的成本：同音反覆扣分、跳進扣分、做出弧線（前段往上、後段往下） */
+      /* 女高音旋律輪廓（每一句挑一種，相鄰兩句不同；後樂句偶爾模仿前樂句）
+         d／u：往下／往上級進　D／U：往下／往上跳（三～五度）　h：保持　*：不限
+         A 下行音階→往上跳→下行音階（E D C ↗ F E D）　B 上行到高點再下行　C 先往上跳再級進下行填補
+         D 鄰音形態接下行（E F E D C）　E 先平穩、終止前級進下行 */
+      function contour(id, n) {
+        var t = [], m = n - 1, i;
+        if (id === 'A') { for (i = 0; i < m; i++) t.push((i % 3 === 2 && i < m - 2) ? 'U' : 'd'); }
+        else if (id === 'B') { var pk = Math.max(1, Math.round(m * 0.55)); for (i = 0; i < m; i++) t.push(i < pk ? 'u' : 'd'); }
+        else if (id === 'C') { for (i = 0; i < m; i++) t.push(i === 0 || (m > 8 && i === 5) ? 'U' : 'd'); }
+        else if (id === 'D') { for (i = 0; i < m; i++) t.push(i === 0 ? 'u' : 'd'); if (m > 6) { t[3] = 'u'; } }
+        else { for (i = 0; i < m; i++) t.push(i === 0 ? 'h' : i === 1 ? 'u' : 'd'); }
+        t[m - 1] = '*';   // 終止前最後一步交給終止規則
+        return t;
+      }
+      function tplCost(w, mv) {
+        var am = Math.abs(mv), sg = Math.sign(mv);
+        if (w === '*') return 0;
+        if (w === 'h') return am === 0 ? 0 : (am <= 2 ? 0.8 : 2);
+        var dir = (w === 'u' || w === 'U') ? 1 : -1, leapW = (w === 'U' || w === 'D');
+        if (am === 0) return 1.5;
+        if (sg !== dir) return 2.5;
+        if (leapW) return am >= 5 ? 0 : (am >= 3 ? 0.8 : 1.5);
+        return am <= 2 ? 0 : (am <= 4 ? 0.5 : 2);   // 三度之後可用經過音填成級進
+      }
+      /* 女高音旋律的成本：照輪廓走；跳進扣分（輪廓要跳的地方除外）；同音反覆扣分；不在句尾最後一步跳四、五度 */
+      function melodyCost(n, tpl) {
+        return function (pv, tv, i, pp) {
+          var mv = tv[0] - pv[0], am = Math.abs(mv), w = tpl ? tpl[i - 1] : '*', c = 0;
+          // 抵銷引擎對女高音「少動、保持」的偏好（引擎的距離成本與保持優惠），旋律改由下面的規則決定
+          c -= am; if (am === 0 && tv[1] !== pv[1]) c += 2;
+          if (am === 0 && w !== 'h') c += MEL.rep;
+          if (am >= 3 && w !== 'U' && w !== 'D') c += MEL.leap * (am >= 5 ? 2 : 1);
+          if (am >= 5 && i === n - 1) c += 50;   // 跳進後要反向，句尾不能跳
+          c += MEL.tpl * tplCost(w, mv);
+          if (pp && am > 0 && pp[0] === tv[0]) c += MEL.back;   // 來回同兩個音（A–B–A）
+          if (pp) { var pm = pv[0] - pp[0]; if (am >= 1 && am <= 2 && Math.abs(pm) >= 1 && Math.abs(pm) <= 2 && Math.sign(pm) === Math.sign(mv)) c -= MEL.run; }   // 同方向級進：音階線條
+          return c;
+        };
+      }
+      /* 兩句之間的銜接：上一句最後一個和絃 → 下一句第一個和絃 */
+      function joinOK(pv, tv) {
+        if (Math.abs(tv[0] - pv[0]) > 7 || Math.abs(tv[1] - pv[1]) > 7 || Math.abs(tv[2] - pv[2]) > 7 || Math.abs(tv[3] - pv[3]) > 12) return false;
+        for (var i = 0; i < 4; i++) for (var j = i + 1; j < 4; j++) {
+          if (pv[i] === tv[i] || pv[j] === tv[j]) continue;
+          var a = mod(pv[i] - pv[j], 12), b = mod(tv[i] - tv[j], 12);
+          if (a === b && (a === 0 || a === 7)) return false;
+        }
+        var s1 = tv[0] - pv[0], b1 = tv[3] - pv[3], o = mod(tv[0] - tv[3], 12);
+        if (s1 * b1 > 0 && (o === 0 || o === 7) && Math.abs(s1) > 2) return false;
+        if (tv[0] < pv[1] || tv[1] < pv[2] || tv[2] < pv[3] || tv[1] > pv[0] || tv[2] > pv[1] || tv[3] > pv[2]) return false;   // 聲部超越
+        return true;
+      }
+      function joinCost(pv) {
+        return function (tv) {
+          var s1 = tv[0] - pv[0], b1 = Math.abs(tv[3] - pv[3]), c = 0;
+          if (s1 === 0) c += 0; else if (Math.abs(s1) <= 2) c += 0.5; else if (s1 === 5 || s1 === 7) c += 0.5; else if (s1 === 3 || s1 === 4) c += 1; else c += 2.5;
+          if (!(b1 === 0 || b1 === 12)) c += (b1 === 5 || b1 === 7) ? 1 : 2.5;
+          return c * MEL.join;
+        };
+      }
+      /* 解一句的聲部進行（掛鉤只在這裡設定，解完就拿掉） */
+      function solvePhrase(trialSeq, s, prevLast, seqMark, lastFilter, tpl) {
+        var n = s.length;
+        HE.__extraCost = melodyCost(n, tpl); HE.__sopLeap = true; HE.__sopFree = true;
+        HE.__startCost = prevLast ? joinCost(prevLast) : null;
+        HE.__filterVoicings = function (all) {
+          return all.map(function (vs, i) {
+            var o = vs;
+            if (i === 0 && prevLast) o = o.filter(function (v) { return joinOK(prevLast, v); });
+            if (seqMark && seqMark[i] !== undefined) o = o.filter(function (v) { return v[0] % 12 === memberPc(s[i], seqMark[i]); });
+            if (i === n - 1 && lastFilter) o = o.filter(lastFilter);
+            return o;
+          });
+        };
+        try { return HE.solveVoiceLeading(s, isMin, keyObj.off); }
+        finally { HE.__extraCost = null; HE.__startCost = null; HE.__filterVoicings = null; HE.__sopLeap = false; HE.__sopFree = false; }
+      }
       for (var attempt = 0; attempt < 60; attempt++) {
-        var phr = partition(cfg.bars), seq = [], durs = [], ferm = [], phraseOf = [], kinds = [], okAll = true, startWith = null, fdeg = [];
-        for (var p = 0; p < phr.length; p++) {
-          var fin = p === phr.length - 1, d = slots(phr[p], p === 0, fin), n = d.length;
-          var kind = fin ? 'final' : (function () { var w = R(); if (engLv >= 4 && w < 0.25) return 'sec'; if (w < 0.5) return 'hc'; if (w < 0.8) return 'pac'; return 'dc'; })();
-          var got = null;
-          for (var k = 0; k < 400 && !got; k++) {
+        var P = (B === 3 && bars % 4 === 0 && bars >= 8 && R() < 0.8) ? 4 : 2, m = bars / P;   // 4/4 一律兩小節一句；3/4 多半四小節
+        var plan = planKinds(m), ends = [], ups = [pickup ? 1 : 0];
+        for (var e = 0; e < m - 1; e++) { ends.push(pickEnd()); ups.push(ends[e][1]); }
+        var seq = [], durs = [], ferm = [], phraseOf = [], kinds = [], okAll = true, startWith = null, fdeg = [], voic = [], seqDone = false, seqAt = -1, tpls = [], prevTpl = null;
+        for (var p = 0; p < m; p++) {
+          var fin = p === m - 1, d = [];
+          for (var k = 0; k < ups[p]; k++) d.push(1);
+          for (var bb = 0; bb < P - 1; bb++) for (k = 0; k < B; k++) d.push(1);
+          if (fin) d.push(B - (pickup ? 1 : 0)); else d = d.concat(ends[p][0]);
+          var n = d.length, kind = plan[p], got = null, gotV = null;
+          // 旋律輪廓：後樂句有一半機會模仿前樂句（動機發展），其他時候和上一句不同
+          var TPLS = ['A', 'B', 'C', 'D', 'E'], tplId;
+          if (p % 2 === 1 && prevTpl && R() < 0.5) tplId = prevTpl;
+          else { var cand = TPLS.filter(function (x) { return x !== prevTpl; }); tplId = cand[Math.floor(R() * cand.length)]; }
+          for (k = 0; k < 400 && !got; k++) {
             var s;
             if (kind === 'hc' || kind === 'sec') s = HE.generateSkeleton(n + 1, isMin, engLv, DENS).slice(0, n);
             else s = HE.generateSkeleton(n, isMin, engLv, DENS);
             s = s.map(function (x) { return ({ 'iii6': 'iii', 'vi6': 'vi', 'III6': 'III', 'VI6': 'VI' })[x] || x; });
             if (kind === 'hc') s[n - 1] = 'V';
-            else if (kind === 'sec') { s[n - 1] = (!isMin && R() < 0.3) ? 'V/vi' : 'V/V'; if (/^V/.test(s[n - 2])) continue; }
+            else if (kind === 'sec') { s[n - 1] = isMin ? (R() < 0.4 ? 'V/III' : 'V/V') : (R() < 0.35 ? 'V/vi' : 'V/V'); if (/^V/.test(s[n - 2])) continue; }
             else if (kind === 'dc') { s[n - 2] = R() < 0.5 && engLv >= 3 ? 'V7' : 'V'; s[n - 1] = isMin ? 'VI' : 'vi'; }
             else if (kind === 'pac') { s[n - 2] = 'V'; s[n - 1] = T; }
+            else if (kind === 'sd') { s[n - 2] = T; s[n - 1] = isMin ? 'iv' : 'IV'; }
+            else if (kind === 'ton') {   // 暫時轉調的終止：停在其他級數（不和上一句停在同一個和絃）
+              var TG = isMin ? [['III', 0.5], ['VI', 0.2], ['iv', 0.15], ['V', 0.15]] : [['vi', 0.4], ['ii', 0.2], ['IV', 0.15], ['V', 0.25]];
+              var prevEnd = seq.length ? seq[seq.length - 1] : '';
+              TG = TG.filter(function (t) { return t[0] !== prevEnd; });
+              var tw = R() * TG.reduce(function (a, t) { return a + t[1]; }, 0), x = TG[0][0];
+              for (var ti = 0; ti < TG.length; ti++) { tw -= TG[ti][1]; if (tw < 0) { x = TG[ti][0]; break; } }
+              s[n - 2] = (R() < 0.5 ? 'V7/' : 'V/') + x; s[n - 1] = x;
+            }
             else {
               if (n >= 5 && R() < 0.65 && PRE.test(s[n - 4])) s[n - 3] = isMin ? 'i64' : 'I64';
               s[n - 2] = (engLv >= 3 && R() < 0.7) ? 'V7' : 'V';
               s[n - 1] = (isMin && engLv >= 4 && R() < 0.3) ? 'I' : T;   // 畢卡第三度（Lv.3）
             }
             if (startWith) s[0] = startWith;
+            // 模進：一題最多一段，放在句子中段
+            var seqMark = null;
+            if (!seqDone && cfg.level >= 2 && n >= 9 && R() < 0.5) {
+              var pats = seqPatterns(), pp = pats[Math.floor(R() * pats.length)], pat = pp[0], j0 = 1 + Math.floor(R() * Math.max(1, n - 4 - 3));
+              if (j0 + 4 <= n - 3 && s[j0 - 1] !== pat[0] && s[j0 + 4] !== pat[3]) {   // 模進前後不和同一個和絃相連
+                for (var q2 = 0; q2 < 4; q2++) s[j0 + q2] = pat[q2];
+                var mem = pp[1][Math.floor(R() * pp[1].length)];   // 女高音的音位，兩個和絃一組往下移一級
+                seqMark = {}; for (q2 = 0; q2 < 4; q2++) seqMark[j0 + q2] = mem[q2 % 2];
+              }
+            }
             if (!phraseOK(s, kind)) continue;
             var trial = seq.concat(s);
+            if (trial.filter(function (x) { return x === 'N6'; }).length > 1) continue;   // 一題最多一個 N6
+            if (!noSwing(trial)) continue;
             if (!HE.skeletonOK(trial, isMin, Math.min(engLv, 3))) continue;
-            var sol = HE.solveVoiceLeading(trial, isMin, keyObj.off);
+            var lastF = fin ? function (v) { return v[0] % 12 === keyObj.off; }
+              : (function (fd, soft) { return function (v) { var dg = degOf(v[0], keyObj); return fermDegOK(fd.concat([dg])) && !(soft && fd.length && dg === fd[fd.length - 1]); }; })(fdeg, k < 250);
+            var sol = solvePhrase(trial, s, voic.length ? voic[voic.length - 1] : null, seqMark, lastF, contour(tplId, n));
             if (!sol) continue;
-            if (fin && sol[sol.length - 1][0] % 12 !== keyObj.off) continue;   // 最後女高音回到主音
-            if (!fin) {
-              var dg = degOf(sol[sol.length - 1][0], keyObj);
-              if (!fermDegOK(fdeg.concat([dg]))) continue;
-              if (fdeg.length && dg === fdeg[fdeg.length - 1] && k < 250) continue;   // 盡量不要和上一個延長記號停在同一個音
-              fdeg.push(dg);
-            }
-            got = s;
+            got = s; gotV = sol; if (seqMark) { seqDone = true; seqAt = seq.length + Number(Object.keys(seqMark)[0]); }
           }
           if (!got) { okAll = false; break; }
-          for (k = 0; k < n; k++) { seq.push(got[k]); durs.push(d[k]); ferm.push(k === n - 1); phraseOf.push(p); }
-          kinds.push(kind);
-          startWith = (kind === 'sec') ? (got[n - 1] === 'V/vi' ? 'vi' : 'V') : null;
+          if (!fin) fdeg.push(degOf(gotV[n - 1][0], keyObj));
+          for (k = 0; k < n; k++) { seq.push(got[k]); durs.push(d[k]); ferm.push(k === n - 1); phraseOf.push(p); voic.push(gotV[k]); }
+          kinds.push(kind); tpls.push(tplId); prevTpl = tplId;
+          startWith = (kind === 'sec') ? got[n - 1].split('/')[1] : null;
         }
         if (!okAll) continue;
         if (!HE.skeletonOK(seq, isMin, engLv)) continue;
-        var v = HE.solveVoiceLeading(seq, isMin, keyObj.off);
-        if (!v) continue;
-        // 整首重新解聲部後再確認一次：延長記號處女高音的規則、最後回到主音
-        var fd = []; for (var fi = 0; fi < seq.length - 1; fi++) if (ferm[fi]) fd.push(degOf(v[fi][0], keyObj));
-        if (!fermDegOK(fd) || v[v.length - 1][0] % 12 !== keyObj.off) continue;
+        var v = voic;
         var tl = 'CDEFGAB'.indexOf(keyObj.vfk[0].toUpperCase());
-        var letters = v.map(function (ch, i) { return ch.map(function (m) { return deps.letterIndexOfTone(m % 12, seq[i], keyObj.off, keyObj.name, tl); }); });
+        var letters = v.map(function (ch, i) { return ch.map(function (mm) { return deps.letterIndexOfTone(mm % 12, seq[i], keyObj.off, keyObj.name, tl); }); });
         var starts = [], t0 = 0; durs.forEach(function (x) { starts.push(t0); t0 += x; });
-        return { key: keyObj, meter: cfg.meter, beats: B, bars: cfg.bars, level: cfg.level, pickup: pickup, phrases: phr, kinds: kinds,
+        return { key: keyObj, meter: cfg.meter, beats: B, bars: bars, level: cfg.level, pickup: pickup, phraseBars: P, kinds: kinds, seqAt: seqAt, contours: tpls,
                  seq: seq, durs: durs, starts: starts, total: t0, ferm: ferm, phraseOf: phraseOf, voicings: v, letters: letters,
                  display: seq.map(function (x) { return deps.displayChord ? deps.displayChord(x, isMin) : x; }) };
       }
@@ -487,13 +706,13 @@
         var q = skeleton(cfg, R, keyObj);
         if (!q) continue;
         var bt = build(q);
-        if (check(bt.V, bt.total).length) continue;   // 例如反向八度：出題引擎允許、聖詠不允許 → 重出
+        if (check(bt.V, bt.total, q.ferm).length) continue;   // 例如反向八度：出題引擎允許、聖詠不允許 → 重出
         var best = null;
         for (var s = 0; s < 12; s++) {
-          var dec = decorate(q, 0.75, Math.floor(R() * 4294967296));
+          var dec = decorate(q, 0.9, Math.floor(R() * 4294967296));
           if (!dec) break;
           if (!best || dec.added > best.added) best = dec;
-          if (dec.added >= q.bars * 1.6) break;
+          if (dec.added >= q.bars * 2) break;
         }
         if (!best) continue;
         q.V = best.V; q.noAsk = best.noAsk; q.nct = best.added;
@@ -503,7 +722,7 @@
         q.groups = chooseBlanks(q, q.V, cfg.amount, R);
         q.blank = {}; q.groups.forEach(function (g) { g.ks.forEach(function (k) { q.blank[k] = 1; }); });
         q.bassOn = q.starts.map(function (s) { return at(q.V, 3, s); });   // 每格拍點上的低音（正解）
-        q.errors = check(q.V, q.total);
+        q.errors = check(q.V, q.total, q.ferm);
         return q;
       }
       return null;

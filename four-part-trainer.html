@@ -1440,6 +1440,8 @@ function showPage(pageId) {
         // 副屬和絃可以接非目標和絃（由聲部規則判斷寫不寫得出來），唯獨 V/ii → N6 不行：
         // 臨時導音（升一級）在 N6 裡只能異名同音保留成降二級，沒有真正解決
         if (seq[i].includes('/') && seq[i].split('/')[1] === 'ii' && seq[i + 1] === 'N6') return false;
+        // v.111：N6 前面只接 I／i、I6／i6、vi／VI、IV／iv、IV6／iv6、V/IV 類（不接 ii° 類：♮2 接 ♭2 聽起來像更正）
+        if (i > 0 && seq[i] === 'N6' && !/^((I|i)6?|vi|VI|(IV|iv)6?|V(7|6|65|43|42)?\/(IV|iv))$/.test(seq[i - 1])) return false;
         // v.100：V 類接 vi64／VI64 不出（第二轉位不在經過、輔助、終止六四的用法裡）
         if (i > 0 && /^V/.test(seq[i - 1]) && !seq[i - 1].includes('/') && (seq[i] === 'vi64' || seq[i] === 'VI64')) return false;
       }
