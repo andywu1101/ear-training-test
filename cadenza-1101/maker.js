@@ -385,13 +385,17 @@
           hs.dataset.row = 'r3'; extra.push(hs);
         }
         /* v110.1：單旋律、兩聲部、找錯音的音色（每一題自己記；沒有記的舊題目＝鋼琴）。只影響播放與 mp3，譜例不變；存模板時一起記住 */
-        if (it.type === 'melody' || it.type === 'twopart' || it.type === 'pitcherr') {
+        /* v111：四部和聲、聖詠和聲的音色（鋼琴／管風琴），做法相同 */
+        var TIMBRES = (it.type === 'melody' || it.type === 'twopart' || it.type === 'pitcherr') ? [['piano', '鋼琴'], ['winds', '長笛／低音管']]
+                    : (it.type === 'fourpart' || it.type === 'chorale') ? [['piano', '鋼琴'], ['organ', '管風琴']] : null;
+        if (TIMBRES) {
+          var curT = function () { return TIMBRES.some(function (o3) { return o3[0] === it.data.timbre; }) ? it.data.timbre : 'piano'; };
           var ts = document.createElement('span'); ts.className = 'seg it-seg'; ts.title = '音色（只影響播放與 mp3）';
-          [['piano', '鋼琴'], ['winds', '長笛／低音管']].forEach(function (o2) {
+          TIMBRES.forEach(function (o2) {
             var tb = document.createElement('button'); tb.type = 'button'; tb.textContent = o2[1];
-            if ((it.data.timbre === 'winds' ? 'winds' : 'piano') === o2[0]) tb.classList.add('on');
+            if (curT() === o2[0]) tb.classList.add('on');
             tb.onclick = function () {
-              if ((it.data.timbre === 'winds' ? 'winds' : 'piano') === o2[0]) return;
+              if (curT() === o2[0]) return;
               stopPlayer();
               it.data.timbre = o2[0]; it.snapshot = Object.assign({}, it.snapshot || {}, { timbre: o2[0] });
               save();   // v110.2：只換這兩顆按鈕的樣子，不重畫列表（不會跳回頂端）

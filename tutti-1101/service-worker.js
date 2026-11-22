@@ -41,7 +41,7 @@ const STATIC_ASSETS = [
 ];
 
 /* v110：用到才下載的固定資源（長笛／低音管音色約 2.7 MB）：不在安裝時預先下載，第一次用到之後走「快取優先」 */
-const LAZY_ASSETS = ['./winds-mp3.js'];
+const LAZY_ASSETS = ['./winds-mp3.js', './organ-mp3.js'];   // v111：管風琴（四部和聲、聖詠和聲選了才下載）
 
 /* 這些外部來源（本機檔案不存在時的備援）也快取起來，讓沒有本機檔案的情況一樣能離線 */
 const CDN_HOSTS = ['cdn.jsdelivr.net', 'gleitz.github.io', 'fonts.googleapis.com', 'fonts.gstatic.com'];

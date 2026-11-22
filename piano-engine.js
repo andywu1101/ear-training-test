@@ -198,8 +198,19 @@
     revWet:    0.18,        // 殘響量（相對原音）。0.35 時少數音的音量會隨殘響明顯起伏（實測最多約 4 dB）；作者試聽後選 0.18
     revLow:    5000         // 殘響高頻衰減的轉折頻率
   };
-  function WindVoice(ctx, set) {
+  /* ---------- 管風琴（v111）----------
+     音源：VCSL「Renaissance Organ」8'（CC0），只在四部和聲、聖詠和聲選了管風琴才載入（約 1.5 MB）。
+     製作時已把每個音的響度（K 加權）調成一樣，所以用檔案裡的固定 ref 換算音量，不再逐音正規化。
+     錄音本身有房間殘響，不再另外加殘響。 */
+  var ORGAN = {
+    file:    'organ-mp3.js',
+    db:      -1,       // 整體音量：實測聖詠和聲整題比鋼琴大約 2.8 dB，與長笛／低音管在單旋律的差距相同（作者已試聽認可的比例）
+    release: 0.25,     // 放掉後的淡出秒數
+    reverb:  false
+  };
+  function WindVoice(ctx, set, opt) {
     this.ctx = ctx;
+    this.opt = opt || { release: WIND.release, reverb: true };
     this.set = set;                  // midi → { buf, gain, start, loopStart, loopEnd }
     this.keys = Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
     this.playing = [];
@@ -221,14 +232,15 @@
     var g = ctx.createGain();
     g.gain.setValueAtTime(base, t);
     g.gain.setValueAtTime(base, t + dur);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + WIND.release);
+    var rel = this.opt.release;
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + rel);
     var fg = ctx.createGain();
     node.connect(g); g.connect(fg);
     fg.connect(outputFor(ctx));
-    fg.connect(reverbOf(ctx));
+    if (this.opt.reverb) fg.connect(reverbOf(ctx));
     node.__fg = fg; node.__t = t;
-    var end = t + dur + WIND.release;
-    markBusy(ctx, end + WIND.revTime);
+    var end = t + dur + rel;
+    markBusy(ctx, end + (this.opt.reverb ? WIND.revTime : 0));
     noteEnd(ctx, end);
     node.start(t, s.start); node.stop(end + 0.02);
     var self = this;
@@ -262,8 +274,16 @@
     ctx.__rev = cv; ctx.__revOut = outputFor(ctx);
     return cv;
   }
-  var windData = null;
-  async function windSource() {
+  var windData = null, organData = null;
+  async function windSource(inst) {
+    if (inst === 'organ') {   // v111：管風琴另一個檔案，格式相同
+      if (!organData) {
+        if (!(global.MIDI && global.MIDI.Soundfont && global.MIDI.Soundfont.organ)) await loadScript(ORGAN.file);
+        organData = (global.MIDI && global.MIDI.Soundfont && global.MIDI.Soundfont.organ) || null;
+        if (!organData) throw new Error('管風琴音色資料不完整');
+      }
+      return organData;
+    }
     if (!windData) {
       if (!(global.MIDI && global.MIDI.Soundfont && global.MIDI.Soundfont.winds)) await loadScript(WIND.file);
       windData = (global.MIDI && global.MIDI.Soundfont && global.MIDI.Soundfont.winds) || null;
@@ -273,7 +293,7 @@
   }
   /* 解碼一個音：找開頭脈衝定位，算出播放起點與循環點（秒） */
   async function decodeWind(ctx, inst, name) {
-    var W = await windSource();
+    var W = await windSource(inst);
     var buf = await ctx.decodeAudioData(dataUriToBuf(W[inst][name]));
     var x = buf.getChannelData(0), sr = buf.sampleRate, lim = Math.min(x.length, Math.floor(0.06 * sr)), mk = 0;
     for (var i = 1; i < lim; i++) if (Math.abs(x[i]) > Math.abs(x[mk])) mk = i;
@@ -282,12 +302,13 @@
     var a = Math.floor(st * sr), b = Math.min(x.length, a + Math.floor(1.5 * sr)), s = 0;
     for (var k = a; k < b; k++) s += x[k] * x[k];
     var rms = Math.sqrt(s / Math.max(1, b - a)) || 0.0001;
-    var db = (WIND.instDb && WIND.instDb[inst]) || 0;
+    if (inst === 'organ' && W.ref) rms = W.ref;   // 管風琴：製作時已調好各音響度，用固定基準
+    var db = inst === 'organ' ? ORGAN.db : ((WIND.instDb && WIND.instDb[inst]) || 0);
     return { buf: buf, gain: (WIND.targetRms / 32768) / rms * Math.pow(10, db / 20), start: st, loopStart: st + lp[0], loopEnd: st + lp[1] };
   }
   /* midis 有給：只解碼用得到的音（導出用）；沒給：整組解碼（練習頁用） */
   async function windSet(ctx, inst, midis) {
-    var W = await windSource(), names = Object.keys(W[inst]), byMidi = {};
+    var W = await windSource(inst), names = Object.keys(W[inst]), byMidi = {};
     names.forEach(function (n) { var m = midiOfName(n); if (m !== null) byMidi[m] = n; });
     var avail = Object.keys(byMidi).map(Number), want = avail;
     if (midis) {
@@ -311,13 +332,20 @@
     var f = await windSet(ctx, 'flute'), b = await windSet(ctx, 'bassoon');
     return { flute: new WindVoice(ctx, f), bassoon: new WindVoice(ctx, b) };
   }
-  /* 練習頁的音色設定（各頁分開記）：'piano' 或 'winds' */
+  /* v111：四部和聲、聖詠和聲用：回傳一個管風琴音色（介面與鋼琴相同：play／stop；__kit＝'organ'） */
+  async function loadOrgan(ctx) {
+    var v = new WindVoice(ctx, await windSet(ctx, 'organ'), { release: ORGAN.release, reverb: ORGAN.reverb });
+    v.__kit = 'organ';
+    return v;
+  }
+  /* 練習頁的音色設定（各頁分開記）：'piano'、'winds'（單旋律等）或 'organ'（四部和聲、聖詠和聲） */
   var TIMBRE_KEY = 'earTrainer.settings.timbre.';
+  function okTimbre(v) { return (v === 'winds' || v === 'organ') ? v : 'piano'; }
   function getTimbre(page) {
-    try { return localStorage.getItem(TIMBRE_KEY + page) === 'winds' ? 'winds' : 'piano'; } catch (e) { return 'piano'; }
+    try { return okTimbre(localStorage.getItem(TIMBRE_KEY + page)); } catch (e) { return 'piano'; }
   }
   function setTimbre(page, v) {
-    try { localStorage.setItem(TIMBRE_KEY + page, v === 'winds' ? 'winds' : 'piano'); } catch (e) {}
+    try { localStorage.setItem(TIMBRE_KEY + page, okTimbre(v)); } catch (e) {}
   }
 
   /* ---------- 載入 ---------- */
@@ -758,6 +786,13 @@
     });
 
     events = events.filter(function (e) { return e.type !== 'click'; });
+    /* v111：標了 inst＝'organ' 的音用管風琴 */
+    var orgEv = events.filter(function (e) { return e.inst === 'organ'; });
+    if (orgEv.length) {
+      var ov = new WindVoice(ctx, await windSet(ctx, 'organ', orgEv.map(function (e) { return e.midi; })), { release: ORGAN.release, reverb: ORGAN.reverb });
+      orgEv.forEach(function (e) { ov.play(e.midi, e.time || 0, { duration: e.duration, gain: e.gain }); });
+      events = events.filter(function (e) { return e.inst !== 'organ'; });
+    }
     /* v110：標了 inst（'flute'／'bassoon'）的音用管樂音色，殘響與練習頁相同 */
     var windEv = events.filter(function (e) { return e.inst === 'flute' || e.inst === 'bassoon'; });
     if (windEv.length) {
@@ -902,6 +937,8 @@
     releaseMedia: releaseMedia,
     renderOffline: renderOffline,
     loadWinds: loadWinds,
+    loadOrgan: loadOrgan,
+    organParams: ORGAN,
     setC5Balance: setC5Balance,
     c5Lift: c5Lift,
     getTimbre: getTimbre,

@@ -186,6 +186,8 @@
   .fb-sec .fb-a { position: static; }
   .fb-sec .fb-lone, .fb-sec .fb-one { top: 0; }
   .fb-plus { font-size: 0.6em; }
+  /* v111：音色切換旁的紅色 New! */
+  .timbre-new { color: #e53935; font-weight: 800; font-size: 0.72em; margin-left: 4px; vertical-align: super; letter-spacing: 0.02em; }
   
   /* 全直行感應區 (上五線譜、下作答格) */
   .hitbox-top { position: absolute; top: 0; height: 230px; cursor: pointer; z-index: 10; pointer-events: auto; }
@@ -313,6 +315,13 @@
           <button class="mode-btn active" data-key="mix">隨機 (24 大小調)</button>
           <button class="mode-btn" data-key="major">僅大調</button>
           <button class="mode-btn" data-key="minor">僅小調</button>
+        </div>
+      </div>
+      <div class="switch-group">
+        <div class="switch-group-label">音色</div>
+        <div class="switch-btns" id="fpt-timbreSwitch">
+          <button class="mode-btn active" data-timbre="piano">鋼琴</button>
+          <button class="mode-btn" data-timbre="organ">管風琴<span class="timbre-new">New!</span></button>
         </div>
       </div>
     </div>
@@ -689,7 +698,7 @@ function showPage(pageId) {
      手機、平板的小喇叭幾乎放不出來，聽起來比上方聲部小 4～8 dB（標準音色的低音區天生就大 4～7 dB，不受影響）。
      所以只在 C5 依音高補償低音：G3（55）以上 +1.3 dB，往下每半音多 0.35 dB，最多 +7 dB
      （C3 約 +3.75、G2 約 +5.5、D2 以下 +7）。作者試聽後選定 H 版本（+1.5／上限 8.8），v.105.2 再微調成現值。
-     kit：即時播放傳 pianoInst.__kit；導出傳 PianoEngine.currentKit()（離線算音用的就是它）。 */
+     kit：即時播放傳 curInst().__kit；導出傳 PianoEngine.currentKit()（離線算音用的就是它）。 */
   const C5_BASS = { baseDb: 1.3, pivot: 55, perSemi: 0.35, maxDb: 7.0 };   // v.105.2 作者微調（原 1.5／8.8）
   /* v110：其他頁的 C5 改成「每個取樣補到一樣響」；四部和聲維持作者調好的現狀（作者試聽後決定），所以這一頁不套用 */
   if(window.PianoEngine && PianoEngine.setC5Balance) PianoEngine.setC5Balance(false);
@@ -697,18 +706,51 @@ function showPage(pageId) {
      C5 的四部和聲整體（四個聲部＋標準音 A）一起降 1 dB，聲部之間的比例完全不變。標準音色不受影響。 */
   const C5_TRIM = Math.pow(10, -1 / 20);
   function bassGain(midi, kit) {
+    if (kit === 'organ') return 3.5 * ORG_BASS;   // v111：管風琴的男低音 +4 dB（作者試聽選定）
     if (kit !== 'salamander') return BASS_GAIN;
     const db = Math.min(C5_BASS.maxDb, C5_BASS.baseDb + Math.max(0, C5_BASS.pivot - midi) * C5_BASS.perSemi);
     return 3.5 * Math.pow(10, db / 20) * C5_TRIM;
   }
   /* 上方三聲部與標準音 A */
   function upperGain(kit) { return (kit === 'salamander') ? 3.5 * C5_TRIM : 3.5; }
-  function exportKit() { try { return PianoEngine.currentKit(); } catch (e) { return null; } }
+  function exportKit() { if (useOrgan()) return 'organ'; try { return PianoEngine.currentKit(); } catch (e) { return null; } }
+  /* ===== v111：管風琴音色 =====
+     設定頁選「管風琴」才載入（約 1.5 MB），各頁分開記。練習、解答、錯題本、導出、標準音 A 都跟著；模擬測驗一律鋼琴。
+     導出 mp3 的事件標上 inst＝'organ'，PianoEngine.renderOffline 會用同樣的音色。 */
+  const TIMBRE_PAGE = 'fourpart', ORG_BASS = Math.pow(10, 4 / 20);
+  let organInst = null, organLoading = null, timbreOverride = null;   // timbreOverride：出考卷算某一題的音檔時，用那一題自己記的音色
+  function useOrgan(){ if(timbreOverride) return timbreOverride === 'organ'; return !(window.EXAM && window.EXAM.isExamMode && window.EXAM.isExamMode()) && !!(window.PianoEngine && PianoEngine.getTimbre) && PianoEngine.getTimbre(TIMBRE_PAGE) === 'organ'; }
+  function curInst(){ return (useOrgan() && organInst) ? organInst : pianoInst; }
+  function orgMark(ev){ if(ev && exportKit() === 'organ') ev.forEach(e => { if(e && e.midi != null) e.inst = 'organ'; }); return ev; }
+  function loadOrgan(){
+    if(!useOrgan() || organInst || !PianoEngine.loadOrgan) return Promise.resolve();
+    if(organLoading) return organLoading;
+    const ctx = ensureAudio(); if(!ctx) return Promise.resolve();
+    const b = document.getElementById('loadingBanner');
+    if(b){ b.style.display = ''; b.textContent = '⛪ 正在載入管風琴音色…'; }
+    organLoading = PianoEngine.loadOrgan(ctx).then(o => { organInst = o; })
+      .catch(() => { if(b) b.textContent = '⚠️ 管風琴音色載入失敗，先用鋼琴播放'; })
+      .then(() => { organLoading = null; setTimeout(() => { if(b && pianoInst && !organLoading) b.style.display = 'none'; }, organInst ? 0 : 2500); fptModule.updatePlayBtns(); });
+    return organLoading;
+  }
+  function initTimbreSwitch(id){
+    const box = document.getElementById(id); if(!box || !window.PianoEngine || !PianoEngine.getTimbre) return;
+    const cur = PianoEngine.getTimbre(TIMBRE_PAGE) === 'organ' ? 'organ' : 'piano';
+    box.querySelectorAll('.mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.timbre === cur);
+      b.onclick = () => {
+        PianoEngine.setTimbre(TIMBRE_PAGE, b.dataset.timbre);
+        box.querySelectorAll('.mode-btn').forEach(x => x.classList.toggle('active', x === b));
+        if(b.dataset.timbre === 'organ') loadOrgan();
+      };
+    });
+  }
 
   let audioCtx = null; let pianoInst = null; let pendingTimers = [];
   function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
   window.fptStopAll = function() { 
     if(pianoInst) pianoInst.stop(); 
+    if(organInst){ try{ organInst.stop(); }catch(e){} }   // v111
     clearTimers(); fptModule.isPlaying = false; fptModule.updatePlayBtns(); 
   };
   function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state!=='running') audioCtx.resume(); }catch(e){} return audioCtx; }
@@ -861,6 +903,7 @@ function showPage(pageId) {
     if(needSpare) audioToast('🔊 正在恢復聲音…');
 
     function rebindTo(c){
+      if(organInst && window.PianoEngine && window.PianoEngine.rebind) window.PianoEngine.rebind(organInst, c);   // v111：管風琴也換到新的 context
       return !!(window.PianoEngine && window.PianoEngine.rebind && pianoInst && window.PianoEngine.rebind(pianoInst, c));
     }
     (function check(){
@@ -977,7 +1020,7 @@ function showPage(pageId) {
 
   window.loadPiano = function(){
     const ctx = ensureAudio(); if(!ctx) return;
-    PianoEngine.load(ctx, PIANO_UI).then(inst => {
+    PianoEngine.load(ctx, PIANO_UI).then(inst => loadOrgan().then(() => inst)).then(inst => {   // v111：選了管風琴就等它也載好
       pianoInst = inst; document.getElementById('loadingBanner').style.display = 'none'; fptModule.updatePlayBtns();
     }).catch(()=>{ document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>'; });
   };
@@ -2923,7 +2966,7 @@ function showPage(pageId) {
         if(firstTime){
           self._examTuning = true; refreshPlayBtn();
           const cap = document.getElementById('fpt-playCaption'); if(cap) cap.textContent = '🎵 標準音 A＝440Hz (2 秒)…';
-          pianoInst.play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: upperGain(pianoInst.__kit) });
+          curInst().play(69, ensureAudio().currentTime + 0.05, { duration: 2.0, gain: upperGain(curInst().__kit) });
           const tid = setTimeout(runSeq, 2600); pendingTimers.push(tid);
         } else runSeq();
         refreshPlayBtn();
@@ -3496,7 +3539,7 @@ function showPage(pageId) {
         ev.push({ midi: s0, time: t, duration: measureDur * 0.95, gain: upperGain(exportKit()) });
         t += measureDur;
       });
-      return ev;
+      return orgMark(ev);
     },
 
     /* 譜例導出：另外畫一份乾淨的正解譜。
@@ -3530,7 +3573,7 @@ function showPage(pageId) {
         ev.push({ midi: s0, time: t, duration: measureDur * 0.95, gain: upperGain(exportKit()) });
         t += measureDur;
       });
-      AudioExport.exportEvents(ev, '四部和聲', {
+      AudioExport.exportEvents(orgMark(ev), '四部和聲', {
         onStage: function(st){ btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
         onProgress: function(pr){ btn.textContent = Math.round(pr * 100) + '%'; }
       }).then(function(){ btn.textContent = '✓'; })
@@ -3628,7 +3671,7 @@ function showPage(pageId) {
       var ev = this.buildExportEvents();
       if (!ev || btn.disabled) return;
       btn.disabled = true; var old = btn.textContent;
-      AudioExport.exportEvents(ev, '四部和聲', {
+      AudioExport.exportEvents(orgMark(ev), '四部和聲', {
         onStage: function (st) { btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
         onProgress: function (pr) { btn.textContent = Math.round(pr * 100) + '%'; }
       }).then(function(){ btn.textContent = '✓'; })
@@ -3663,21 +3706,21 @@ function showPage(pageId) {
       this.questionVoicings.forEach((v) => {
         let [s, a, tn, b] = v;
         if (modeStr === 'block') {
-            pianoInst.play(b, t - 0.010, { duration: measureDur * 0.95, gain: bassGain(b, pianoInst.__kit) });
-            pianoInst.play(tn, t, { duration: measureDur * 0.95, gain: upperGain(pianoInst.__kit) });
-            pianoInst.play(a, t, { duration: measureDur * 0.95, gain: upperGain(pianoInst.__kit) });
-            pianoInst.play(s, t, { duration: measureDur * 0.95, gain: upperGain(pianoInst.__kit) });
+            curInst().play(b, t - 0.010, { duration: measureDur * 0.95, gain: bassGain(b, curInst().__kit) });
+            curInst().play(tn, t, { duration: measureDur * 0.95, gain: upperGain(curInst().__kit) });
+            curInst().play(a, t, { duration: measureDur * 0.95, gain: upperGain(curInst().__kit) });
+            curInst().play(s, t, { duration: measureDur * 0.95, gain: upperGain(curInst().__kit) });
         } else if (modeStr === 'arpeggio') {
-            pianoInst.play(b, t, { duration: measureDur, gain: bassGain(b, pianoInst.__kit) });
-            pianoInst.play(tn, t + 0.3, { duration: measureDur - 0.3, gain: upperGain(pianoInst.__kit) });
-            pianoInst.play(a, t + 0.6, { duration: measureDur - 0.6, gain: upperGain(pianoInst.__kit) });
-            pianoInst.play(s, t + 0.9, { duration: measureDur - 0.9, gain: upperGain(pianoInst.__kit) });
+            curInst().play(b, t, { duration: measureDur, gain: bassGain(b, curInst().__kit) });
+            curInst().play(tn, t + 0.3, { duration: measureDur - 0.3, gain: upperGain(curInst().__kit) });
+            curInst().play(a, t + 0.6, { duration: measureDur - 0.6, gain: upperGain(curInst().__kit) });
+            curInst().play(s, t + 0.9, { duration: measureDur - 0.9, gain: upperGain(curInst().__kit) });
             
             let remDur = Math.max(0.5, measureDur - 1.2);
-            pianoInst.play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: bassGain(b, pianoInst.__kit) });
-            pianoInst.play(tn, t + 1.2, { duration: remDur * 0.95, gain: upperGain(pianoInst.__kit) });
-            pianoInst.play(a, t + 1.2, { duration: remDur * 0.95, gain: upperGain(pianoInst.__kit) });
-            pianoInst.play(s, t + 1.2, { duration: remDur * 0.95, gain: upperGain(pianoInst.__kit) });
+            curInst().play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: bassGain(b, curInst().__kit) });
+            curInst().play(tn, t + 1.2, { duration: remDur * 0.95, gain: upperGain(curInst().__kit) });
+            curInst().play(a, t + 1.2, { duration: remDur * 0.95, gain: upperGain(curInst().__kit) });
+            curInst().play(s, t + 1.2, { duration: remDur * 0.95, gain: upperGain(curInst().__kit) });
         }
         t += measureDur;
       });
@@ -3706,21 +3749,21 @@ function showPage(pageId) {
         item.questionVoicings.forEach((v) => {
             let [s, a, tn, b] = v;
             if (modeStr === 'block') {
-                pianoInst.play(b, t - 0.010, { duration: measureDur * 0.95, gain: bassGain(b, pianoInst.__kit) });
-                pianoInst.play(tn, t, { duration: measureDur * 0.95, gain: upperGain(pianoInst.__kit) });
-                pianoInst.play(a, t, { duration: measureDur * 0.95, gain: upperGain(pianoInst.__kit) });
-                pianoInst.play(s, t, { duration: measureDur * 0.95, gain: upperGain(pianoInst.__kit) });
+                curInst().play(b, t - 0.010, { duration: measureDur * 0.95, gain: bassGain(b, curInst().__kit) });
+                curInst().play(tn, t, { duration: measureDur * 0.95, gain: upperGain(curInst().__kit) });
+                curInst().play(a, t, { duration: measureDur * 0.95, gain: upperGain(curInst().__kit) });
+                curInst().play(s, t, { duration: measureDur * 0.95, gain: upperGain(curInst().__kit) });
             } else if (modeStr === 'arpeggio') {
-                pianoInst.play(b, t, { duration: measureDur, gain: bassGain(b, pianoInst.__kit) });
-                pianoInst.play(tn, t + 0.3, { duration: measureDur - 0.3, gain: upperGain(pianoInst.__kit) });
-                pianoInst.play(a, t + 0.6, { duration: measureDur - 0.6, gain: upperGain(pianoInst.__kit) });
-                pianoInst.play(s, t + 0.9, { duration: measureDur - 0.9, gain: upperGain(pianoInst.__kit) });
+                curInst().play(b, t, { duration: measureDur, gain: bassGain(b, curInst().__kit) });
+                curInst().play(tn, t + 0.3, { duration: measureDur - 0.3, gain: upperGain(curInst().__kit) });
+                curInst().play(a, t + 0.6, { duration: measureDur - 0.6, gain: upperGain(curInst().__kit) });
+                curInst().play(s, t + 0.9, { duration: measureDur - 0.9, gain: upperGain(curInst().__kit) });
                 
                 let remDur = Math.max(0.5, measureDur - 1.2);
-                pianoInst.play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: bassGain(b, pianoInst.__kit) });
-                pianoInst.play(tn, t + 1.2, { duration: remDur * 0.95, gain: upperGain(pianoInst.__kit) });
-                pianoInst.play(a, t + 1.2, { duration: remDur * 0.95, gain: upperGain(pianoInst.__kit) });
-                pianoInst.play(s, t + 1.2, { duration: remDur * 0.95, gain: upperGain(pianoInst.__kit) });
+                curInst().play(b, t + 1.2 - 0.010, { duration: remDur * 0.95, gain: bassGain(b, curInst().__kit) });
+                curInst().play(tn, t + 1.2, { duration: remDur * 0.95, gain: upperGain(curInst().__kit) });
+                curInst().play(a, t + 1.2, { duration: remDur * 0.95, gain: upperGain(curInst().__kit) });
+                curInst().play(s, t + 1.2, { duration: remDur * 0.95, gain: upperGain(curInst().__kit) });
             }
             t += measureDur;
         });
@@ -3936,6 +3979,7 @@ function showPage(pageId) {
         this.mode = b.dataset.mode; document.querySelectorAll('#fpt-modeSwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
         document.getElementById('testReplayWrapper').style.display = this.mode === 'test' ? 'flex' : 'none';
       });
+      initTimbreSwitch('fpt-timbreSwitch');   // v111：音色
       document.querySelectorAll('#fpt-keySwitch .mode-btn').forEach(b => b.onclick = () => {
         this.keyPref = b.dataset.key; document.querySelectorAll('#fpt-keySwitch .mode-btn').forEach(x=>x.classList.toggle('active',x===b));
       });
@@ -4046,8 +4090,8 @@ function showPage(pageId) {
   let makerHw = false;
   function makerOffer(){
     const m = fptModule, data = makerData(m);
-    const snap = { keyPref: m.keyPref, bars: m.bars, bpm: m.bpm, levelId: m.curLevel.id, hw: makerHw };
-    data.hw = makerHw;
+    const snap = { keyPref: m.keyPref, bars: m.bars, bpm: m.bpm, levelId: m.curLevel.id, hw: makerHw, timbre: useOrgan() ? 'organ' : 'piano' };
+    data.hw = makerHw; data.timbre = snap.timbre;   // v111：每一題記住出題當下的音色
     if(window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'fourpart', data: data, snapshot: snap, title: makerTitle(data) });
   }
   /* 暫時把某一題放進模組狀態，做完立刻還原 */
@@ -4063,6 +4107,7 @@ function showPage(pageId) {
       const lv = LEVELS.find(l => l.id === snap.levelId) || LEVELS[0];
       const d = makerWith({ keyPref: snap.keyPref, bars: snap.bars, bpm: snap.bpm, curLevel: lv }, function(m){ m.generateQuestion(); return makerData(m); });
       d.hw = !!snap.hw;   // v109：重抽、套用模板沿用作答卷樣式
+      d.timbre = snap.timbre === 'organ' ? 'organ' : 'piano';   // v111：舊題目沒有記＝鋼琴
       return d;
     },
     /* 譜例：用本頁解答的繪譜畫在畫面外（同 exportSheet），交給 MusicXML 記錄器 */
@@ -4084,7 +4129,9 @@ function showPage(pageId) {
       return { key: data.keyObj.name.replace(' ', '') + '：', numerals: data.questionSeq.map(sym => displayChord(sym, data.keyObj.isMin) || '') };
     },
     events: function(data){
-      return makerWith({ questionVoicings: data.questionVoicings, bpm: data.bpm }, function(m){ return m.buildExportEvents(); });
+      timbreOverride = (data && data.timbre === 'organ') ? 'organ' : 'piano';   // v111：用那一題自己記的音色
+      try { return makerWith({ questionVoicings: data.questionVoicings, bpm: data.bpm }, function(m){ return m.buildExportEvents(); }); }
+      finally { timbreOverride = null; }
     }
   };
   if(MAKER_MODE) window.__maker.fromExam = function(cfg){   /* v106.8 套用模板：照本頁模擬考（examBootstrap）的出題設定，換成出題模式的快照 */
@@ -4132,7 +4179,7 @@ function showPage(pageId) {
         if(!audioReady(tuningPlay)) return;
         var ctx = ensureAudio();
         var tA = ctx.currentTime + 0.02;
-        pianoInst.play(69, tA, { duration: 2.0, gain: upperGain(pianoInst.__kit) });
+        curInst().play(69, tA, { duration: 2.0, gain: upperGain(curInst().__kit) });
         PianoEngine.holdUntil(ctx, tA + 2.0);
         btn.textContent = '🎵 A 響起…';
         clearTimeout(timer); timer = setTimeout(function(){ btn.textContent = LABEL; }, 2000);

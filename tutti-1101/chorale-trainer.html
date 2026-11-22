@@ -389,6 +389,9 @@
 
   /* 答案頁、錯題本是整頁捲動：也預留捲軸位置，避免畫完譜才出現捲軸把右邊擠掉 */
   html { scrollbar-gutter: stable; }
+
+  /* v111：音色切換旁的紅色 New! */
+  .timbre-new { color: #e53935; font-weight: 800; font-size: 0.72em; margin-left: 4px; vertical-align: super; letter-spacing: 0.02em; }
 </style>
 </head>
 <body>
@@ -420,6 +423,13 @@
           <button class="mode-btn active" data-meter="mix">隨機</button>
           <button class="mode-btn" data-meter="4/4">4/4 拍</button>
           <button class="mode-btn" data-meter="3/4">3/4 拍</button>
+        </div>
+      </div>
+      <div class="switch-group">
+        <div class="switch-group-label">音色</div>
+        <div class="switch-btns" id="ch-timbreSwitch">
+          <button class="mode-btn active" data-timbre="piano">鋼琴</button>
+          <button class="mode-btn" data-timbre="organ">管風琴<span class="timbre-new">New!</span></button>
         </div>
       </div>
     </div>
@@ -671,7 +681,8 @@ function showPage(pageId) {
   let audioCtx = null; let pianoInst = null; let pendingTimers = [];
   function clearTimers(){ pendingTimers.forEach(id => clearTimeout(id)); pendingTimers = []; }
   window.chStopAll = function() { 
-    if(pianoInst) pianoInst.stop(); 
+    if(pianoInst) pianoInst.stop(); if(window.__organStop) window.__organStop();   // v111：管風琴也停
+    
     clearTimers(); chModule.isPlaying = false; chModule.updatePlayBtns(); 
   };
   function ensureAudio(){ try{ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state!=='running') audioCtx.resume(); }catch(e){} return audioCtx; }
@@ -824,6 +835,7 @@ function showPage(pageId) {
     if(needSpare) audioToast('🔊 正在恢復聲音…');
 
     function rebindTo(c){
+      if(window.__organRebind) window.__organRebind(c);   // v111：管風琴也換到新的 context
       return !!(window.PianoEngine && window.PianoEngine.rebind && pianoInst && window.PianoEngine.rebind(pianoInst, c));
     }
     (function check(){
@@ -940,7 +952,7 @@ function showPage(pageId) {
 
   window.loadPiano = function(){
     const ctx = ensureAudio(); if(!ctx) return;
-    PianoEngine.load(ctx, PIANO_UI).then(inst => {
+    PianoEngine.load(ctx, PIANO_UI).then(inst => (window.__organLoad ? window.__organLoad().then(() => inst) : inst)).then(inst => {   // v111：選了管風琴就等它也載好
       pianoInst = inst; document.getElementById('loadingBanner').style.display = 'none'; chModule.updatePlayBtns();
     }).catch(()=>{ document.getElementById('loadingBanner').innerHTML = '⚠️ 載入失敗，請重試 <button onclick="loadPiano()">🔁</button>'; });
   };
@@ -1459,6 +1471,38 @@ function showPage(pageId) {
   }
 
   /* ---------- 播放 ---------- */
+  /* ---------- v111：管風琴音色（設定頁選了才載入；各頁分開記；男低音 +4 dB，作者試聽選定）---------- */
+  const TIMBRE_PAGE = 'chorale', ORG_BASS = Math.pow(10, 4 / 20);
+  let organInst = null, organLoading = null, timbreOverride = null;   // timbreOverride：出考卷算某一題的音檔時，用那一題自己記的音色
+  function useOrgan() { if (timbreOverride) return timbreOverride === 'organ'; return !!(window.PianoEngine && PianoEngine.getTimbre) && PianoEngine.getTimbre(TIMBRE_PAGE) === 'organ'; }
+  function curInst() { return (useOrgan() && organInst) ? organInst : pianoInst; }
+  function loadOrgan() {
+    if (!useOrgan() || organInst || !PianoEngine.loadOrgan) return Promise.resolve();
+    if (organLoading) return organLoading;
+    const ctx = ensureAudio(); if (!ctx) return Promise.resolve();
+    const b = document.getElementById('loadingBanner');
+    if (b) { b.style.display = ''; b.textContent = '⛪ 正在載入管風琴音色…'; }
+    organLoading = PianoEngine.loadOrgan(ctx).then(o => { organInst = o; })
+      .catch(() => { if (b) b.textContent = '⚠️ 管風琴音色載入失敗，先用鋼琴播放'; })
+      .then(() => { organLoading = null; setTimeout(() => { if (b && pianoInst && !organLoading) b.style.display = 'none'; }, organInst ? 0 : 2500); if (window.chModule) chModule.updatePlayBtns(); });
+    return organLoading;
+  }
+  window.__organLoad = loadOrgan;
+  window.__organStop = () => { if (organInst) { try { organInst.stop(); } catch (e) {} } };
+  window.__organRebind = c => { if (organInst && PianoEngine.rebind) PianoEngine.rebind(organInst, c); };
+  window.__curInst = curInst;
+  function initTimbreSwitch(id) {
+    const box = document.getElementById(id); if (!box || !window.PianoEngine || !PianoEngine.getTimbre) return;
+    const cur = PianoEngine.getTimbre(TIMBRE_PAGE) === 'organ' ? 'organ' : 'piano';
+    box.querySelectorAll('.mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.timbre === cur);
+      b.onclick = () => {
+        PianoEngine.setTimbre(TIMBRE_PAGE, b.dataset.timbre);
+        box.querySelectorAll('.mode-btn').forEach(x => x.classList.toggle('active', x === b));
+        if (b.dataset.timbre === 'organ') loadOrgan();
+      };
+    });
+  }
   function playEvents(q, bpm) {
     // 延長記號一律多停一拍（最後的和絃也一樣）
     const segs = q.durs.map((d, i) => [q.starts[i], q.starts[i] + d, q.ferm[i] ? (d + 1) / d : 1]);
@@ -1467,13 +1511,15 @@ function showPage(pageId) {
     const clicks = []; for (let i = 0; i < nClick; i++) clicks.push({ type: 'click', time: i * spb, freq: i === 0 ? 1000 : 700, gain: 0.2 });
     const T = qn => { let s = 0; for (const [a, b, f] of segs) { if (qn >= b) s += (b - a) * f; else { s += Math.max(0, qn - a) * f; break; } } return lead + s * 60 / bpm; };
     const ev = [];
-    q.V.forEach(notes => {
+    const org = useOrgan();
+    q.V.forEach((notes, vi) => {
       for (let k = 0; k < notes.length; k++) {
         const x = notes[k]; let end = x.t + x.d;
         while (notes[k].tie && k + 1 < notes.length) { k++; end = notes[k].t + notes[k].d; }
         const t0 = T(x.t), t1 = T(end);
         const lift = Math.min(4, Math.max(0, 55 - x.m) * 0.25);   // 低音稍微加大（雛形試聽時的設定）
-        ev.push({ midi: x.m, time: t0, duration: (t1 - t0) * 0.97, gain: 3.5 * Math.pow(10, lift / 20) * 0.8 });
+        if (org) ev.push({ midi: x.m, time: t0, duration: (t1 - t0) * 0.97, gain: 3.5 * 0.8 * (vi === 3 ? ORG_BASS : 1), inst: 'organ' });   // 管風琴：男低音 +4 dB
+        else ev.push({ midi: x.m, time: t0, duration: (t1 - t0) * 0.97, gain: 3.5 * Math.pow(10, lift / 20) * 0.8 });
       }
     });
     return { ev, clicks, lead, end: T(q.total) };
@@ -1490,6 +1536,7 @@ function showPage(pageId) {
   function exportEventsOf(q, bpm) {
     const TUNING = 2.0, GAP = 1.0, pe = playEvents(q, bpm);
     const ev = [{ midi: 69, time: 0, duration: TUNING, gain: 3.5 * 0.8 }];
+    if (useOrgan()) ev[0].inst = 'organ';   // 管風琴：標準音也用管風琴
     pe.clicks.forEach(c => ev.push(Object.assign({}, c, { time: TUNING + GAP + c.time })));
     pe.ev.forEach(e => ev.push(Object.assign({}, e, { time: TUNING + GAP + e.time })));
     return ev;
@@ -1819,7 +1866,8 @@ function showPage(pageId) {
       const ctx = ensureAudio(), t0 = ctx.currentTime + 0.1;
       const pe = playEvents(q, bpm);
       scheduleClicks(ctx, t0, pe.clicks);
-      pe.ev.forEach(e => pianoInst.play(e.midi, t0 + e.time, { duration: e.duration, gain: e.gain }));
+      const ins = curInst();
+      pe.ev.forEach(e => ins.play(e.midi, t0 + e.time, { duration: e.duration, gain: e.gain }));
       PianoEngine.holdUntil(ctx, t0 + pe.end);
       pendingTimers.push(setTimeout(() => { self.isPlaying = false; self.updatePlayBtns(); }, pe.end * 1000 + 200));
     },
@@ -1912,6 +1960,7 @@ function showPage(pageId) {
       sw('#ch-keySwitch', 'key', v => this.keyPref = v);
       sw('#ch-meterSwitch', 'meter', v => this.meterPref = v);
       sw('#ch-amountSwitch', 'amount', v => this.amount = v);
+      initTimbreSwitch('ch-timbreSwitch');   // v111：音色
       document.getElementById('ch-enterBtn').onclick = () => {
         if (this.busy) return;
         if (MAKER_MODE) { makerOffer(); return; }   // 出題模式：把題目交給音聽出考卷，不進作答頁
@@ -1980,8 +2029,8 @@ function showPage(pageId) {
   const PAPER_W = 1133;   // 畫譜寬度（VexFlow 單位）：排到 A4 內容寬（180 mm）時，譜表大小和四部和聲一樣（約 0.6 倍）
   const ULINE = 60;   // 考卷底線的長度（夠寫 V⁶₅/V）
   const ULINE_DY = 23;   // 底線在羅馬數字基線下方多少：三層數字（V⁶₄₃/V）最下層數字的基線約在 +19.3，再留約 3.5 的空隙
-  function makerSnap(m) { return { levelId: m.curLevel.id, keyPref: m.keyPref, meterPref: m.meterPref, barsPref: m.barsPref, amount: m.amount, bpm: m.bpm }; }
-  function makerData(q, snap) { return { q: storable(q), bpm: snap.bpm, levelId: snap.levelId }; }
+  function makerSnap(m) { return { levelId: m.curLevel.id, keyPref: m.keyPref, meterPref: m.meterPref, barsPref: m.barsPref, amount: m.amount, bpm: m.bpm, timbre: useOrgan() ? 'organ' : 'piano' }; }
+  function makerData(q, snap) { return { q: storable(q), bpm: snap.bpm, levelId: snap.levelId, timbre: snap.timbre === 'organ' ? 'organ' : 'piano' }; }
   function makerTitle(d) { const q = d.q; return q.key.name.replace(' ', '') + ' ' + q.meter + '拍 ' + q.bars + '小節'; }
   function makerOffer() {
     const m = chModule, btn = document.getElementById('ch-enterBtn');
@@ -2041,7 +2090,10 @@ function showPage(pageId) {
     musicxml: function () { return ''; },   // 聖詠和聲的考卷用 paper() 畫好的譜，不經過 MusicXML
     paper: function (data) { return { blank: paperSystems(data.q, 'blank'), key: paperSystems(data.q, 'key') }; },
     answers: function (data) { return { key: data.q.key.name.replace(' ', '') + '：' }; },
-    events: function (data) { return exportEventsOf(data.q, data.bpm || 66); },
+    events: function (data) {   // 用那一題自己記的音色（沒有記的舊題目＝鋼琴）
+      timbreOverride = data && data.timbre === 'organ' ? 'organ' : 'piano';
+      try { return exportEventsOf(data.q, data.bpm || 66); } finally { timbreOverride = null; }
+    },
     titleOf: function (d) { return makerTitle(d); }
   };
   if (MAKER_MODE) {
@@ -2065,7 +2117,7 @@ function showPage(pageId) {
         if(!audioReady(tuningPlay)) return;
         var ctx = ensureAudio();
         var tA = ctx.currentTime + 0.02;
-        pianoInst.play(69, tA, { duration: 2.0, gain: 3.5 * 0.8 });
+        (window.__curInst ? window.__curInst() : pianoInst).play(69, tA, { duration: 2.0, gain: 3.5 * 0.8 });   // v111：選了管風琴，標準音也用管風琴
         PianoEngine.holdUntil(ctx, tA + 2.0);
         btn.innerHTML = '🎵 A 響起…';
         clearTimeout(timer); timer = setTimeout(function(){ btn.innerHTML = LABEL; }, 2000);
