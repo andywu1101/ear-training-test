@@ -15,7 +15,7 @@
     { id: 'pitcherr', label: '找錯音', page: 'pitch-error-trainer.html', on: true },
     { id: 'pitchstack', label: '音堆', page: 'pitch-stack-trainer.html', on: true },
     { id: 'fourpart', label: '四部和聲', page: 'four-part-trainer.html', on: true },
-    { id: 'chorale', label: '聖詠和聲', page: 'chorale-trainer.html', on: false }   // v111：先預留，之後開放
+    { id: 'chorale', label: '聖詠和聲', page: 'chorale-trainer.html', on: true }   // v111
   ];
   /* 大題：順序固定（v106.8 起比照大學檔模擬考的順序與名稱） */
   var SECTIONS = [
@@ -46,7 +46,7 @@
     return p;
   }
   function save() {
-    var slim = JSON.parse(JSON.stringify(paper, function (k, v) { return (k === 'measures' || k === 'shownBreaks') ? undefined : v; }));
+    var slim = JSON.parse(JSON.stringify(paper, function (k, v) { return (k === 'measures' || k === 'shownBreaks' || k === 'chSvg') ? undefined : v; }));
     try { localStorage.setItem(STORE, JSON.stringify(slim)); } catch (e) {}
   }
   function secName(id) { return paper.sectionNames[id] || SECTIONS.filter(function (s) { return s.id === id; })[0].name; }
@@ -167,12 +167,30 @@
   function buildCandidate(w, type, data, snapshot, title) {
     var xml = w.__maker.musicxml(data);
     return { id: uid(), type: type, section: sectionOf(type, data), title: title, autoTitle: title, data: data, snapshot: snapshot,
-             xml: xml, answers: w.__maker.answers(data), layout: (type === 'interval' || type === 'chord') ? 'cells' : (type === 'fourpart' ? 'grand' : (type === 'pitchstack' ? 'stack' : 'lines')),
+             xml: xml, answers: w.__maker.answers(data), layout: (type === 'interval' || type === 'chord') ? 'cells' : (type === 'fourpart' ? 'grand' : (type === 'pitchstack' ? 'stack' : (type === 'chorale' ? 'chorale' : 'lines'))),
+             chSvg: w.__maker.paper ? w.__maker.paper(data) : undefined,   // v111 聖詠和聲：練習頁畫好的譜（作答卷／解答卷；不存進 localStorage，見 prepChorale）
              blankNotes: type === 'pitcherr',   // 找錯音：作答卷要印題目譜
              pageBreak: false, breaks: null };
   }
   /* 新題目的自動標題：依題目內容決定標題的題型（四部和聲、找錯音）用頁面給的；其他題型由設定決定，與原本相同 */
   function autoTitleOf(w, data, it) { return (w.__maker.titleOf ? w.__maker.titleOf(data) : null) || it.autoTitle || it.title; }
+  /* v111 聖詠和聲：譜例（SVG）一題約 0.4 MB，不存進 localStorage（整個網域共用 5 MB），只存題目資料；
+     重新開啟、載入「我的考卷」後，用到時再請練習頁重畫一次（記在 it.chSvg，只放記憶體） */
+  var chPending = null;
+  function prepChorale() {
+    var need = paper.items.filter(function (it) { return it.layout === 'chorale' && !it.chSvg; });
+    if (!need.length) return Promise.resolve();
+    if (chPending) return chPending;
+    chPending = waitFrame('chorale').then(function (w) {
+      need.forEach(function (it) { if (!it.chSvg) it.chSvg = w.__maker.paper(it.data); });
+      chPending = null;
+    }, function (e) { chPending = null; throw e; });
+    return chPending;
+  }
+  window.__makerNeedChorale = function () {   // engrave.js 畫到還沒有譜的聖詠和聲時呼叫（先畫同樣高度的空白，畫好再重排）
+    if (chPending) return;
+    prepChorale().then(function () { renderList(); renderPreview(); }, function (e) { flash('聖詠和聲譜例載入失敗：' + e.message); });
+  };
   function addItem(c) { paper.items.push(c); save(); renderList(); }
 
   /* ---------- 預覽卡片 ---------- */
@@ -225,7 +243,7 @@
     var c = card.cand;
     try {
       var w = await waitFrame(c.type);
-      var data = w.__maker.regen(c.snapshot);
+      var data = await w.__maker.regen(c.snapshot);   // 聖詠和聲的 regen 回傳 Promise
       var n = buildCandidate(w, c.type, data, c.snapshot, autoTitleOf(w, data, c));
       card.cand = n; drawCardScore(); resetCardAudio();
     } catch (e) { $('cardMsg').textContent = '重抽失敗：' + e.message; $('cardMsg').className = 'msg err'; }
@@ -329,7 +347,7 @@
         var ti = document.createElement('input'); ti.value = it.title; ti.title = it.title;   // 太長時滑過去看全文
         ti.onchange = function () { it.title = ti.value.trim() || it.title; ti.value = it.title; save(); };
         var info = document.createElement('span'); info.className = 'it-info';
-        info.textContent = it.layout === 'cells' ? (it.data.questions.length + ' 格') : (it.layout === 'grand' ? (it.answers && it.answers.key ? it.answers.key.replace('：', '') : '') : '');
+        info.textContent = it.layout === 'cells' ? (it.data.questions.length + ' 格') : ((it.layout === 'grand' || it.layout === 'chorale') ? (it.answers && it.answers.key ? it.answers.key.replace('：', '') : '') : '');
         var rg = btn('🔄', '重抽', function () { regenItem(it); });
         var del = btn('🗑', '刪除', function () { ask('刪除第 ' + o.num + ' 題「' + it.title + '」？', function () { paper.items.splice(paper.items.indexOf(it), 1); save(); renderList(); }); });
         var extra = [];
@@ -462,7 +480,7 @@
     busy('重抽中…');
     try {
       var w = await waitFrame(it.type);
-      var data = w.__maker.regen(it.snapshot);
+      var data = await w.__maker.regen(it.snapshot);
       var c = buildCandidate(w, it.type, data, it.snapshot, autoTitleOf(w, data, it));
       busy(null); openCard(c, it.id);
     } catch (e) { busy(null); alert('重抽失敗：' + e.message); }
@@ -694,8 +712,9 @@
   document.querySelectorAll('#viewSeg button').forEach(function (b) { b.onclick = function () { setView(b.dataset.v); }; });
 
   /* ---------- 列印成 PDF ---------- */
-  function doPrint(mode) {
+  async function doPrint(mode) {
     if (!paper.items.length) { flash('還沒有題目'); return; }
+    try { await prepChorale(); } catch (e) { flash('聖詠和聲譜例載入失敗：' + e.message); return; }
     var area = $('printArea'); area.innerHTML = '';
     buildPages(mode, false).forEach(function (p) { area.appendChild(p); });
     var old = document.title;
@@ -744,7 +763,7 @@
      內建：大學檔、高中檔，直接讀 App 的 exam-common.js（EXAM.PRESETS），每次套用重新隨機（拍號、譜號…）；
      自訂：存每一題的設定快照、標題、配分、換行、換頁、速度，以及大題名稱與配分；套用時重新出題。 */
   var TPL_STORE = 'earTrainer.maker.templates';
-  var BUILTIN = [{ id: 'standard', name: '大學檔' }, { id: 'highschool', name: '高中檔' }];
+  var BUILTIN = [{ id: 'standard', name: '考大學檔' }, { id: 'highschool', name: '考高中檔' }];
   var EXAM_TYPE = { pitcherr1: 'pitcherr', pitcherr2: 'pitcherr', interval: 'interval', chord: 'chord',
                     rhythm1: 'rhythm', rhythm2: 'rhythm', rhythm3: 'rhythm', melody1: 'melody', melody2: 'melody',
                     twopart: 'twopart', fourpart: 'fourpart' };
@@ -807,9 +826,9 @@
     save(); busy(null); setView('edit'); flash('✓ 已套用「' + name + '」，共 ' + out.length + ' 題');
   }
   /* 找錯音偶爾會出題失敗（頁面本來就會重抽），這裡最多試 8 次 */
-  function regenTry(w, snap) {
+  async function regenTry(w, snap) {
     var err;
-    for (var k = 0; k < 8; k++) { try { return w.__maker.regen(snap); } catch (e) { err = e; } }
+    for (var k = 0; k < 8; k++) { try { return await w.__maker.regen(snap); } catch (e) { err = e; } }
     throw err;
   }
   async function applyBuiltin(id) {
@@ -825,7 +844,7 @@
         if (!type) throw new Error('不認得的段落：' + key);
         var w = await waitFrame(type);
         var fe = w.__maker.fromExam(cfg[key] || {});
-        var data = regenTry(w, fe.snapshot);
+        var data = await regenTry(w, fe.snapshot);
         var title = fe.title || w.__maker.titleOf(data);
         return buildCandidate(w, type, data, fe.snapshot, title);
       };
@@ -837,7 +856,7 @@
     var jobs = t.items.map(function (s) {
       return async function () {
         var w = await waitFrame(s.type);
-        var data = regenTry(w, s.snapshot);
+        var data = await regenTry(w, s.snapshot);
         if (s.bpm && data.bpm) data.bpm = s.bpm;
         var auto = (w.__maker.titleOf ? w.__maker.titleOf(data) : null) || s.autoTitle || '';
         var c = buildCandidate(w, s.type, data, s.snapshot, s.title || auto);
@@ -917,6 +936,7 @@
     if (!paper.items.length) { flash('還沒有題目'); return; }
     stopPlayer();
     busy('匯出 PDF：準備中…');
+    try { await prepChorale(); } catch (e) { busy(null); alert('聖詠和聲譜例載入失敗：' + e.message); return; }
     var area = document.createElement('div');
     area.style.cssText = 'position:fixed; left:-30000px; top:0; pointer-events:none;';
     document.body.appendChild(area);
@@ -1093,7 +1113,7 @@
   function pDel(id) { return pdbTx('readwrite', function (st) { return st.delete(id); }); }
   function newId() { return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function slimPaper(p) {
-    var o = JSON.parse(JSON.stringify(p, function (k, v) { return (k === 'measures' || k === 'shownBreaks') ? undefined : v; }));
+    var o = JSON.parse(JSON.stringify(p, function (k, v) { return (k === 'measures' || k === 'shownBreaks' || k === 'chSvg') ? undefined : v; }));
     delete o.savedId; delete o.savedName;
     return o;
   }

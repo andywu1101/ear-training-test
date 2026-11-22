@@ -653,6 +653,28 @@
     return sys;
   }
 
+  /* ---------- 聖詠和聲（v111）：譜由練習頁畫好（item.paper.blank／key，每行一張 SVG），這裡縮放到 A4 內容寬 ----------
+     作答卷：低音挖空、級數列畫底線；解答卷：同一個版面，補上低音、級數寫在底線上。每行三小節由練習頁排好。 */
+  function renderChorale(item, mode, d) {
+    var cw = contentPx(d);
+    if (!item.chSvg) {   // 譜還沒畫好（剛開啟考卷）：先放同樣高度的空白，maker.js 請練習頁畫好後會重排
+      if (global.__makerNeedChorale) global.__makerNeedChorale();
+      var q = item.data && item.data.q, n = q ? Math.ceil(q.bars / 3) : 1, out = [];
+      for (var i = 0; i < n; i++) { var ph = document.createElement('div'); ph.className = 'sys'; ph.style.height = (327 * cw / 1133) + 'px'; out.push(ph); }
+      return out;
+    }
+    var list = item.chSvg[mode === 'key' ? 'key' : 'blank'] || [];
+    return list.map(function (s) {
+      var sc = cw / s.w, sys = document.createElement('div'); sys.className = 'sys';
+      sys.innerHTML = s.svg;
+      var svg = sys.querySelector('svg');
+      svg.setAttribute('width', cw.toFixed(2)); svg.setAttribute('height', (s.h * sc).toFixed(2));
+      svg.style.width = cw.toFixed(2) + 'px'; svg.style.height = (s.h * sc).toFixed(2) + 'px'; svg.style.display = 'block';
+      sys.style.height = (s.h * sc) + 'px';
+      return sys;
+    });
+  }
+
   /* ---------- 一個小題（標題＋譜） ---------- */
   function renderItem(item, mode, d, numState, opt) {
     var box = document.createElement('div'); box.className = 'item';
@@ -660,8 +682,9 @@
     t.style.fontSize = d.item + 'px';
     t.textContent = numState.item + '. ' + item.title + (global.__makerScoreText ? global.__makerScoreText(item.score) : '');
     box.appendChild(t);
-    if (!item.measures) item.measures = parse(item.xml);
-    var systems = (item.layout === 'stack') ? [renderStackRow([item], [''], mode, d)]   // 出題預覽卡：單題
+    if (!item.measures && item.layout !== 'chorale') item.measures = parse(item.xml);
+    var systems = (item.layout === 'chorale') ? renderChorale(item, mode, d)
+                : (item.layout === 'stack') ? [renderStackRow([item], [''], mode, d)]   // 出題預覽卡：單題
                 : (item.layout === 'cells') ? renderCells(item, mode, d, numState)
                 : (item.layout === 'grand') ? renderGrand(item, mode, d) : renderLines(item, mode, d, opt);
     systems.forEach(function (s) { s.style.marginTop = d.sysGap + 'px'; box.appendChild(s); });

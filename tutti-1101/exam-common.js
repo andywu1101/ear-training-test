@@ -70,8 +70,8 @@
   var PRESETS = {
     standard: {
       mode: 'standard',
-      label: '大學檔 (模擬大學聯合招生難易度)',
-      short: '大學檔',
+      label: '考大學檔 (模擬大學聯合招生難易度)',
+      short: '考大學檔',
       queue: ['pitcherr1', 'pitcherr2', 'interval', 'chord', 'rhythm1', 'rhythm2', 'melody1', 'melody2', 'twopart', 'fourpart'],
       /* 這一檔的大題編號（各檔不同，覆蓋 SECTIONS 的預設值） */
       sectionNo: { pitcherr1: '一', pitcherr2: '一', interval: '二', chord: '三',
@@ -114,8 +114,8 @@
 
     highschool: {
       mode: 'standard-hs',
-      label: '高中檔 (模擬音樂班甄選)',
-      short: '高中檔',
+      label: '考高中檔 (模擬音樂班甄選)',
+      short: '考高中檔',
       queue: ['interval', 'chord', 'rhythm1', 'rhythm2', 'rhythm3', 'melody1', 'twopart', 'fourpart'],
       groups: [
         { no: '一', label: '音程',         max: 10, keys: ['interval'] },

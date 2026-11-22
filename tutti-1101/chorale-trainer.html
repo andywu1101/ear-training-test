@@ -945,6 +945,7 @@ function showPage(pageId) {
 
   /* ===================== 聖詠和聲（v111） ===================== */
   const CE = window.ChoraleEngine;
+  const MAKER_MODE = new URLSearchParams(location.search).get('maker') === '1';   // 音聽出考卷嵌入時才是 true
   const { ALL_KEYS, normalizeChord, getDefaultAccidental, resolveAccidental, accToSemi } = CE;
   const LEVELS = [
     { id: 1, name: 'Lv.1 三和絃（含所有轉位）' },
@@ -958,6 +959,7 @@ function showPage(pageId) {
   const ACC_STR = { '-2': 'bb', '-1': 'b', '0': '', '1': '#', '2': '##' };
   const DUR = { 0.25: '16', 0.5: '8', 0.75: '8d', 1: 'q', 1.5: 'qd', 2: 'h', 3: 'hd', 4: 'w' };
   const STEM_INNER = 27, BLANK_BEAT_W = 54;
+  const SOFTMAX = 10;   // VexFlow 預設 100（幾乎照時值比例，二分音符後面留很大空白）；10：二分音符約是四分音符的 1.7 倍寬
   const COL = { blue: '#2f5fd0', green: '#1f8a42', red: '#d22f2f' };
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
@@ -982,6 +984,12 @@ function showPage(pageId) {
   }
 
   /* ---------- 數字低音的顯示（作者寫法：一個數字在正右方；兩層在右上／右下；三層上中下） ---------- */
+  // 文字節點的實際基線（螢幕座標）：在文字後面插一個高度 0 的 inline-block，它的上緣就是基線
+  function baselineOf(tn) {
+    const m = document.createElement('span'); m.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;';
+    tn.parentNode.insertBefore(m, tn.nextSibling);
+    const y = m.getBoundingClientRect().top; m.remove(); return y;
+  }
   function stackHtml(rows, onlyRow) {
     if (!rows.length) return '';
     const cell = (r, i) => {
@@ -1033,6 +1041,7 @@ function showPage(pageId) {
   function renderScore(host, q, opts) {
     host.innerHTML = '';
     const mode = opts.mode, user = opts.user || { bass: {}, seq: {} };
+    const NUM_FS = opts.numFs || 18;   // 級數字級：練習頁 18；考卷、導出 20（opts.numFs）
     const W = Math.max(280, (host.clientWidth || 340) - 4);   // 右邊留一點安全邊距，最後的小節線不貼邊
     let SC = W < 520 ? 0.74 : (W < 760 ? 0.86 : 1);
     if (opts.maxSysH) SC = Math.max(0.6, Math.min(SC, (opts.maxSysH - 8) / 327));   // 譜例區太矮（小手機）時縮小，讓一整行大譜表放得下
@@ -1046,9 +1055,9 @@ function showPage(pageId) {
     const labW = k => { const f = q.figs[k]; return ((f.roman || '').length + (f.sec || '').length) * 10 + (f.rows && f.rows.length ? 12 : 0) + (f.sus ? 26 : 0) + 14; };
     const labSum = meas.map(([a, b]) => q.starts.reduce((s, st, k) => s + (st >= a - 1e-9 && st < b - 1e-9 ? labW(k) * 1.2 : 0), 0));
     // 作答時，有挖空的小節每拍至少留 BLANK_BEAT_W 的寬度，低音框才不會太窄、好按
-    const hasBlank = meas.map(([a, b]) => mode === 'ask' && q.starts.some((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9));
+    const hasBlank = meas.map(([a, b]) => (mode === 'ask' || mode === 'paper') && q.starts.some((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9));
     // 挖空的拍子裡有經過音時，框只框正拍那個音，所以這一拍再多留一點寬度
-    const passBlank = meas.map(([a, b]) => mode !== 'ask' ? 0 : q.starts.filter((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9 && q.V[3].filter(e => e.slot === k).length > 1).length);
+    const passBlank = meas.map(([a, b]) => (mode !== 'ask' && mode !== 'paper') ? 0 : q.starts.filter((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9 && q.V[3].filter(e => e.slot === k).length > 1).length);
     const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27, labSum[i] + 24, hasBlank[i] ? 24 + (m[1] - m[0]) * BLANK_BEAT_W + passBlank[i] * 40 : 0));
     const headW = first => 42 + nSig * 10 + (first ? 26 : 0);
     // 排成一行一行
@@ -1073,6 +1082,8 @@ function showPage(pageId) {
     // 事件預先標記：跨拍連結線、所在格、是否挖空隱藏
     q.V.forEach(v => v.forEach((e, i) => { e._tiedIn = i > 0 && !!v[i - 1].tie; }));
     const blank = mode === 'clean' ? {} : (q.blank || {});   // clean：導出用的乾淨正解，不挖空、不上色
+    // paper：音聽出考卷（opts.paper＝'blank' 作答卷：低音挖空；'key' 解答卷：低音照常畫）。版面兩者相同
+    const hideBass = mode === 'ask' || (mode === 'paper' && opts.paper === 'blank');
     const hitInfo = [];   // 挖空格的點選區域
     const notePos = new Map();   // 事件 → {sys, x}
     const tiePairs = [];
@@ -1087,7 +1098,7 @@ function showPage(pageId) {
         const nFull = ms.filter(i => (meas[i][1] - meas[i][0]) >= q.beats - 1e-9 || i === meas.length - 1).length;
         stretch = Math.max(0.6, ((lineW - 30) * Math.min(1, nFull / opts.barsPerSys) - hw) / totalBase);
       }
-      const H = 327, Y0 = 20;
+      const H = mode === 'paper' ? 340 : 327, Y0 = 20;   // 考卷：底線在三層數字下方，下面多留一點
       const div = document.createElement('div'); div.className = 'ch-sys';
       div.style.height = (H * SC) + 'px';
       host.appendChild(div); sysEls.push(div);
@@ -1118,7 +1129,7 @@ function showPage(pageId) {
         const inM = e => e.t >= a - 1e-9 && e.t < b - 1e-9;
         const voices = [], beams = [], allNotes = [];
         const accT = accidentalsFor(q.V[0].filter(inM).concat(q.V[1].filter(inM)), KS);
-        const accB = accidentalsFor(q.V[2].filter(inM).concat(q.V[3].filter(inM).filter(e => !(blank[e.slot] && mode === 'ask' && Math.abs(e.t - q.starts[e.slot]) < 1e-9))), KS);
+        const accB = accidentalsFor(q.V[2].filter(inM).concat(q.V[3].filter(inM).filter(e => !(blank[e.slot] && hideBass && Math.abs(e.t - q.starts[e.slot]) < 1e-9))), KS);
         for (let v = 0; v < 4; v++) {
           const clef = v < 2 ? 'treble' : 'bass', up = v % 2 === 0, accMap = v < 2 ? accT : accB;
           const tick = [];
@@ -1127,11 +1138,11 @@ function showPage(pageId) {
           while (ei < evs.length) {
             const e = evs[ei];
             // 低音挖空格：只挖掉正拍上的那個音，同一拍的經過音照常顯示
-            if (v === 3 && blank[e.slot] && Math.abs(e.t - q.starts[e.slot]) < 1e-9) {
+            if (v === 3 && blank[e.slot] && Math.abs(e.t - q.starts[e.slot]) < 1e-9 && !(mode === 'paper' && !hideBass)) {
               const k0 = e.slot, D = DUR[e.d];
               const us = user.bass[k0];
               let note;
-              if (mode === 'ask') {
+              if (hideBass) {
                 if (us) {
                   note = new VF.StaveNote({ clef, keys: [LETTER[us.stepIdx].toLowerCase() + (ACC_STR[String(accToSemi(us.acc))] || '') + '/' + us.oct], duration: D, stem_direction: -1 });
                   if (D.endsWith('d')) note.addDotToAll();
@@ -1162,7 +1173,6 @@ function showPage(pageId) {
                   note.setKeyStyle(i, { fillStyle: p.col, strokeStyle: p.col });
                 });
               }
-              if (q.ferm[k0]) note.addArticulation(0, new VF.Articulation('a@u').setPosition(VF.Modifier.Position.BELOW));
               tick.push(note); allNotes.push(note);
               notePos.set('B' + k0, note); e._note = note; e._sys = si;
               hitInfo.push({ slot: k0, note, stave: sB, sys: si, nextIn: evs[ei + 1] && evs[ei + 1].slot === k0 ? evs[ei + 1] : null });
@@ -1173,11 +1183,13 @@ function showPage(pageId) {
             if (DUR[e.d].endsWith('d')) note.addDotToAll();
             if ((v === 1 || v === 2) && e.d < 4) note.setStemLength(STEM_INNER);   // 女低音、男高音的符桿縮短，兩個內聲部的符桿、符槓才不會撞在一起   // 內聲部符桿縮短，女低音與男高音的符槓不會疊在一起
             const ac = accMap.get(e); if (ac) note.addAccidental(0, new VF.Accidental(ac));
-            if (q.ferm[e.slot] && (v === 0 || v === 3) && Math.abs(e.t - q.starts[e.slot]) < 1e-9)   // 延長記號只標在女高音上方、男低音下方
-              note.addArticulation(0, new VF.Articulation(up ? 'a@a' : 'a@u').setPosition(up ? VF.Modifier.Position.ABOVE : VF.Modifier.Position.BELOW));
+            if (q.ferm[e.slot] && v === 0 && Math.abs(e.t - q.starts[e.slot]) < 1e-9)   // 延長記號只標在女高音上方（作者：下方不用）
+              note.addArticulation(0, new VF.Articulation('a@a').setPosition(VF.Modifier.Position.ABOVE));
             tick.push(note); allNotes.push(note);
             notePos.set(e, note); e._note = note; e._sys = si;
             if (v === 3 && Math.abs(e.t - q.starts[e.slot]) < 1e-9) notePos.set('B' + e.slot, note);
+            if (mode === 'paper' && v === 3 && blank[e.slot] && Math.abs(e.t - q.starts[e.slot]) < 1e-9)   // 解答卷：括號的位置照作答卷
+              hitInfo.push({ slot: e.slot, note, stave: sB, sys: si, nextIn: evs[ei + 1] && evs[ei + 1].slot === e.slot ? evs[ei + 1] : null });
             ei++;
           }
           const voice = new VF.Voice({ num_beats: Math.round((b - a) * 4), beat_value: 16 }).setStrict(false).addTickables(tick);
@@ -1194,9 +1206,20 @@ function showPage(pageId) {
           });
           flush();
         }
-        const fmt = new VF.Formatter();
+        // 間距不完全照時值比例（softmax）：長音後面的空白縮小、讓給短音，但時值長的一定比短的寬（四分 < 二分 < 附點二分）
+        voices.forEach(o => o.voice.setSoftmaxFactor(SOFTMAX));
+        const fmt = new VF.Formatter({ softmaxFactor: SOFTMAX });
         fmt.joinVoices([voices[0].voice, voices[1].voice]); fmt.joinVoices([voices[2].voice, voices[3].voice]);
-        fmt.format(voices.map(o => o.voice), mw - (nsx - x) - 14);
+        const fw = mw - (nsx - x) - 14;
+        fmt.format(voices.map(o => o.voice), fw);
+        // 最後一個音（含附點）離小節線太近（短音在小節尾）時，整小節往左收一點再排一次：至少留一個符頭寬
+        const endX = x + mw, MIN_GAP = 14;
+        const gapNow = () => { let g = 1e9; voices.forEach(o => o.voice.getTickables().forEach(n => {
+          n.setStave(o.stave); let r = n.getAbsoluteX() + 12;
+          try { const m = n.getMetrics(); r = n.getAbsoluteX() + (m.noteWidth || 0) + (m.modRightPx || 0); } catch (e) {}
+          g = Math.min(g, endX - r); })); return g; };
+        const g0 = gapNow();
+        if (g0 < MIN_GAP) fmt.format(voices.map(o => o.voice), fw - (MIN_GAP - g0));
         voices.forEach(o => o.voice.draw(ctx, o.stave));
         beams.forEach(bm => bm.setContext(ctx).draw());
         x += mw;
@@ -1231,11 +1254,12 @@ function showPage(pageId) {
       sysOfSlot[k] = si;
       const div = sysEls[si];
       const cx = xOf(n), y = 287 * SC;
-      const lab = document.createElement('div'); lab.className = 'ch-num'; lab.style.fontSize = Math.round(18 * SC) + 'px';
+      const lab = document.createElement('div'); lab.className = 'ch-num'; lab.style.fontSize = Math.round(NUM_FS * SC) + 'px';
       lab.style.top = y + 'px';
       let html = '', cls = '';
       if (blank[k] && !noAsk[k]) {
-        if (mode === 'ask') {
+        if (mode === 'paper') html = opts.paper === 'key' ? figHtml(q.figs[k]) : '';   // 考卷：作答卷空白、解答卷寫正解（黑色）
+        else if (mode === 'ask') {
           const f = userFig(user.seq[k]);
           html = f ? figHtml(f) : '';
           cls = 'ch-num-slot' + (opts.active === k ? ' active' : '') + (f ? ' filled' : '');
@@ -1252,9 +1276,10 @@ function showPage(pageId) {
       lab.className += ' ' + cls;
       lab.innerHTML = html; labOf[k] = lab;
       div.appendChild(lab);
-      // 級數置中在低音音符上（只看羅馬數字本身）
-      const rEl = lab.querySelector('.cfroman');
-      const rw = rEl ? rEl.getBoundingClientRect().width : lab.getBoundingClientRect().width;
+      // 級數置中在低音音符上
+      // 一般級數：羅馬數字對齊低音；副屬和絃（有「/x」）：整串置中（同四部和聲）。有掛留時「/x」寫在解決數字後面，正拍這段照一般級數
+      const rEl = lab.querySelector('.cfroman'), wholeSec = !!lab.querySelector('.cfsec');
+      const rw = (rEl && !wholeSec) ? rEl.getBoundingClientRect().width : lab.getBoundingClientRect().width;
       if (blank[k] && !noAsk[k] && mode === 'ask') { lab.style.left = (cx - Math.max(lab.getBoundingClientRect().width, 44) / 2) + 'px'; lab.style.minWidth = '44px'; }
       else lab.style.left = (cx - rw / 2) + 'px';
       if (blank[k] && mode === 'ask') lab.onclick = () => opts.onPick && opts.onPick(k, 'chord');
@@ -1266,7 +1291,7 @@ function showPage(pageId) {
         const re = vv && vv.find(e => e.slot === k && e.k === 'res');
         if (re && re._note) {
           const rx = xOf(re._note);
-          const r2 = document.createElement('div'); r2.className = 'ch-num ch-res'; r2.style.fontSize = Math.round(18 * SC) + 'px';
+          const r2 = document.createElement('div'); r2.className = 'ch-num ch-res'; r2.style.fontSize = Math.round(NUM_FS * SC) + 'px';
           r2.style.top = y + 'px';
           const rows = f.rows.map((r, i) => i === f.sus.row ? f.sus.res : r);
           r2.innerHTML = '<span class="cfroman" style="visibility:hidden">' + esc(f.roman) + '</span>' + stackHtml(rows, f.sus.row) + (f.sec ? '<span class="cfsec">' + esc(f.sec) + '</span>' : '');
@@ -1308,13 +1333,18 @@ function showPage(pageId) {
       const kl = document.createElement('div'); kl.className = 'ch-keyname';
       kl.textContent = q.key.name.replace(' ', '') + '：';
       kl.style.top = (287 * SC) + 'px'; kl.style.left = '4px';
+      if (NUM_FS !== 18) kl.style.fontSize = Math.round(15 * NUM_FS / 18 * SC) + 'px';   // 考卷、導出：調名跟著級數放大
       sysEls[0].appendChild(kl);
+      // 調名的基線對齊同一行級數的羅馬數字（字型、字級不同，只對 top 會高低不一）
+      const ro = sysEls[0].querySelector('.ch-num:not(.ch-res):not(.ch-num-slot) .cfroman');
+      if (ro && ro.firstChild && kl.firstChild) kl.style.top = (parseFloat(kl.style.top) + baselineOf(ro.firstChild) - baselineOf(kl.firstChild)) + 'px';
     }
     // 低音挖空格的點選區
     const boxAt = {};
-    if (mode === 'ask') hitInfo.forEach(h => {
+    if (mode === 'ask' || mode === 'paper') hitInfo.forEach(h => {
       const div = sysEls[h.sys], n = h.note, k = h.slot;
-      const x0 = n.getAbsoluteX() * SC - 8;
+      let x0 = n.getAbsoluteX() * SC - 8;
+      if (mode === 'paper') { try { x0 -= (n.getMetrics().modLeftPx || 0) * SC; } catch (e) {} }   // 考卷解答：括號不要壓到臨時記號
       // 寬度：到下一個拍點的音（同一行）或小節尾
       let x1 = null;
       const nx = notePos.get('B' + (k + 1));
@@ -1337,8 +1367,8 @@ function showPage(pageId) {
       top = Math.min(top, bot - 40);   // 最少保留 40 的高度，手指才點得到
       box.style.top = top * SC + 'px'; box.style.height = (bot - top) * SC + 'px';
       box.onclick = () => opts.onPick && opts.onPick(k, 'bass');
-      div.appendChild(box);
-      boxAt[k] = { sys: h.sys, x0, x1: x0 + bw, top: top * SC, bot: bot * SC };   // 方括號依整拍範圍
+      if (mode === 'ask') div.appendChild(box);   // 考卷：只要外面的括號，不畫作答框
+      boxAt[k] = { sys: h.sys, x0, x1: x0 + bw, top: top * SC, bot: (mode === 'paper' ? 312 : bot) * SC };   // 考卷：括號往下包到級數那一列   // 方括號依整拍範圍
       // 級數框：左右邊界、寬度與正上方的低音框一致；字太長時自動縮小（最多 75%）
       const lab = slotLab[k];
       if (lab) {
@@ -1346,6 +1376,19 @@ function showPage(pageId) {
         lab.style.paddingLeft = '0'; lab.style.paddingRight = '0';
         const fs0 = parseFloat(lab.style.fontSize) || 14;
         for (let f = fs0; f >= fs0 * 0.75 && lab.scrollWidth > lab.clientWidth + 1; f -= 1) lab.style.fontSize = f + 'px';
+      }
+    });
+    // 作答時：級數框已對齊低音框（不能動），旁邊的級數若壓到級數框，就把那個級數往旁邊挪（掛留的解決數字與「-」一起挪）
+    if (mode === 'ask') sysEls.forEach(div => {
+      const labs = Array.from(div.querySelectorAll('.ch-num:not(.ch-res)')).sort((a, b) => a.offsetLeft - b.offsetLeft);
+      const isSlot = el => el.classList.contains('ch-num-slot');
+      const move = (el, dx) => { el.style.left = (el.offsetLeft + dx) + 'px'; (el._followers || []).forEach(f => { f.style.left = (f.offsetLeft + dx) + 'px'; }); };
+      const rightOf = el => Math.max(el.offsetLeft + el.offsetWidth, ...(el._followers || []).map(f => f.offsetLeft + f.offsetWidth));
+      for (let i = 1; i < labs.length; i++) {
+        const a = labs[i - 1], b = labs[i], over = rightOf(a) + 4 - b.offsetLeft;
+        if (over <= 0) continue;
+        if (!isSlot(b)) move(b, over);
+        else if (!isSlot(a)) move(a, -over);
       }
     });
     // 挖空的組：比照考卷，在低音框的左右兩側畫方括號「[ ]」（作答時才顯示）
@@ -1362,6 +1405,20 @@ function showPage(pageId) {
         if (i === sysList.length - 1) mk('R', Math.max(...list.map(b => b.x1)) + 2);
       });
     });
+    // 考卷：要作答的拍子，在低音正下方的級數列畫一條底線（統一長度；兩條之間留空隙）。高度在 paperSystems 依級數的下緣決定
+    if (mode === 'paper') {
+      const cxs = {};
+      for (let k = 0; k < q.seq.length; k++) { const n = notePos.get('B' + k); if (n) cxs[k] = { x: xOf(n), si: systemIndexOf(n) }; }
+      Object.keys(blank).map(Number).filter(k => !noAsk[k] && cxs[k]).forEach(k => {
+        const c = cxs[k];
+        let half = ULINE / 2;
+        Object.keys(cxs).forEach(j => { if (+j !== k && cxs[j].si === c.si) half = Math.min(half, Math.abs(cxs[j].x - c.x) / 2 - 4); });
+        half = Math.max(10, half);
+        const el = document.createElement('div'); el.className = 'ch-uline';
+        el.style.cssText = 'position:absolute; height:0; top:0; left:' + (c.x - half) + 'px; width:' + (2 * half) + 'px;';
+        sysEls[c.si].appendChild(el);
+      });
+    }
     function systemIndexOf(n) { const st = n.getStave(); for (let i = 0; i < sysEls.length; i++) if (sysEls[i]._ctx === st.getContext()) return i; return 0; }
     return { sysOfSlot, sysEls, labOf };
   }
@@ -1394,13 +1451,18 @@ function showPage(pageId) {
     });
   }
   /* ---------- 贊助者版：導出正解（免費版按鈕會被 export-menu.js 隱藏） ---------- */
+  // 導出／考卷 mp3 的音：標準音 A 2 秒 → 停 1 秒 → 預備拍 → 題目
+  function exportEventsOf(q, bpm) {
+    const TUNING = 2.0, GAP = 1.0, pe = playEvents(q, bpm);
+    const ev = [{ midi: 69, time: 0, duration: TUNING, gain: 3.5 * 0.8 }];
+    pe.clicks.forEach(c => ev.push(Object.assign({}, c, { time: TUNING + GAP + c.time })));
+    pe.ev.forEach(e => ev.push(Object.assign({}, e, { time: TUNING + GAP + e.time })));
+    return ev;
+  }
   function exportAudio(q, bpm, btn) {
     if (!q || !btn || btn.disabled || !window.AudioExport) return;
     btn.disabled = true; const old = btn.textContent;
-    const TUNING = 2.0, GAP = 1.0, pe = playEvents(q, bpm);
-    const ev = [{ midi: 69, time: 0, duration: TUNING, gain: 3.5 * 0.8 }];   // 標準音 A 2 秒 → 停 1 秒 → 預備拍 → 題目
-    pe.clicks.forEach(c => ev.push(Object.assign({}, c, { time: TUNING + GAP + c.time })));
-    pe.ev.forEach(e => ev.push(Object.assign({}, e, { time: TUNING + GAP + e.time })));
+    const ev = exportEventsOf(q, bpm);
     AudioExport.exportEvents(ev, '聖詠和聲', {
       onStage: st => { btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
       onProgress: pr => { btn.textContent = Math.round(pr * 100) + '%'; }
@@ -1424,7 +1486,7 @@ function showPage(pageId) {
     document.body.appendChild(holder);
     const done = txt => { btn.textContent = txt; holder.remove(); setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 1600); };
     let r = null;
-    try { r = renderScore(holder, q, { mode: 'clean', barsPerSys: 4 }); } catch (e) { done('✗'); return; }
+    try { r = renderScore(holder, q, { mode: 'clean', barsPerSys: 3, numFs: 20 }); } catch (e) { done('✗'); return; }
     const items = [];
     r.sysEls.forEach((div, si) => {
       const svg = div.querySelector('svg'); if (!svg) return;
@@ -1438,7 +1500,7 @@ function showPage(pageId) {
           if (cs.visibility === 'hidden') continue;
           const rg = document.createRange(); rg.selectNodeContents(tn); const rc = rg.getBoundingClientRect();
           const fs = parseFloat(cs.fontSize) || 16;
-          overlays.push({ x: rc.left - sr.left, y: rc.bottom - sr.top - fs * 0.22, text: txt.trim(), size: Math.round(fs * 10) / 10,
+          overlays.push({ x: rc.left - sr.left, y: baselineOf(tn) - sr.top, text: txt.trim(), size: Math.round(fs * 10) / 10,
                           align: 'left', bold: cs.fontWeight >= 600, font: cs.fontFamily, noXml: !el.classList.contains('ch-keyname') });
         }
       });
@@ -1480,6 +1542,13 @@ function showPage(pageId) {
              durs: q.durs, starts: q.starts, total: q.total, ferm: q.ferm, phraseOf: q.phraseOf, noAsk: q.noAsk, figs: q.figs, blank: q.blank,
              groups: (q.groups || []).map(g => ({ ks: g.ks })), V: q.V.map(v => v.map(ev)), bassOn: q.bassOn.map(ev) };
   }
+  function cfgFrom(sn) {
+    const meter = sn.meterPref === 'mix' ? (Math.random() < 0.5 ? '4/4' : '3/4') : sn.meterPref;
+    const rg = ({ mix: [4, 12], '4-6': [4, 6], '6-8': [6, 8], '8-10': [8, 10], '10-12': [10, 12] })[sn.barsPref] || [4, 12];
+    const bars = rg[0] + 2 * Math.floor(Math.random() * ((rg[1] - rg[0]) / 2 + 1));   // 樂句工整：只出偶數小節
+    // 弱起拍的比例依巴哈聖詠：4/4 約七成、3/4 約三成五
+    return { level: sn.levelId, keyPref: sn.keyPref, meter, bars, pickup: Math.random() < (meter === '4/4' ? 0.7 : 0.35), amount: sn.amount };
+  }
   function copyUser(o) { const r = {}; Object.keys(o || {}).forEach(k => { r[k] = (o[k] && typeof o[k] === 'object') ? Object.assign({}, o[k]) : o[k]; }); return r; }
 
   const chModule = {
@@ -1503,11 +1572,7 @@ function showPage(pageId) {
     },
 
     cfgNow: function () {
-      const meter = this.meterPref === 'mix' ? (Math.random() < 0.5 ? '4/4' : '3/4') : this.meterPref;
-      const rg = ({ mix: [4, 12], '4-6': [4, 6], '6-8': [6, 8], '8-10': [8, 10], '10-12': [10, 12] })[this.barsPref] || [4, 12];
-      const bars = rg[0] + 2 * Math.floor(Math.random() * ((rg[1] - rg[0]) / 2 + 1));   // 樂句工整：只出偶數小節
-      // 弱起拍的比例依巴哈聖詠：4/4 約七成、3/4 約三成五
-      return { level: this.curLevel.id, keyPref: this.keyPref, meter, bars, pickup: Math.random() < (meter === '4/4' ? 0.7 : 0.35), amount: this.amount };
+      return cfgFrom({ levelId: this.curLevel.id, keyPref: this.keyPref, meterPref: this.meterPref, barsPref: this.barsPref, amount: this.amount });
     },
     settingsKey: function () { return [this.curLevel.id, this.keyPref, this.meterPref, this.barsPref, this.amount].join('|'); },
     startPrefetch: function () {
@@ -1808,6 +1873,7 @@ function showPage(pageId) {
       sw('#ch-amountSwitch', 'amount', v => this.amount = v);
       document.getElementById('ch-enterBtn').onclick = () => {
         if (this.busy) return;
+        if (MAKER_MODE) { makerOffer(); return; }   // 出題模式：把題目交給音聽出考卷，不進作答頁
         ensureAudio(); window.chStopAll();
         this.barsPref = document.getElementById('ch-barsSelect').value;
         this.bpm = parseInt(document.getElementById('ch-bpm').value, 10);
@@ -1866,6 +1932,83 @@ function showPage(pageId) {
   };
   window.chModule = chModule;
   window.__chRender = renderScore;   // 測試用
+
+  /* ===== 出題模式（v111，音聽出考卷 cadenza-1101 專用；網址帶 ?maker=1 才會執行）=====
+     出題、畫譜、音檔都用本頁原本的函式；譜例在這裡畫好（作答卷、解答卷各一份 SVG），交給出題工具排上 A4。 */
+  const PAPER_W = 1133;   // 畫譜寬度（VexFlow 單位）：排到 A4 內容寬（180 mm）時，譜表大小和四部和聲一樣（約 0.6 倍）
+  const ULINE = 60;   // 考卷底線的長度（夠寫 V⁶₅/V）
+  const ULINE_DY = 23;   // 底線在羅馬數字基線下方多少：三層數字（V⁶₄₃/V）最下層數字的基線約在 +19.3，再留約 3.5 的空隙
+  function makerSnap(m) { return { levelId: m.curLevel.id, keyPref: m.keyPref, meterPref: m.meterPref, barsPref: m.barsPref, amount: m.amount, bpm: m.bpm }; }
+  function makerData(q, snap) { return { q: storable(q), bpm: snap.bpm, levelId: snap.levelId }; }
+  function makerTitle(d) { const q = d.q; return q.key.name.replace(' ', '') + ' ' + q.meter + '拍 ' + q.bars + '小節'; }
+  function makerOffer() {
+    const m = chModule, btn = document.getElementById('ch-enterBtn');
+    m.barsPref = document.getElementById('ch-barsSelect').value;
+    m.bpm = parseInt(document.getElementById('ch-bpm').value, 10);
+    const snap = makerSnap(m), old = btn.textContent;
+    m.busy = true; btn.textContent = '⏳ 出題中…';
+    genAsync(cfgFrom(snap)).then(q => q || genSync(cfgFrom(snap))).then(q => {
+      m.busy = false; btn.textContent = old;
+      const data = makerData(q, snap);
+      if (window.parent && window.parent.__makerOffer) window.parent.__makerOffer({ type: 'chorale', data, snapshot: snap, title: makerTitle(data) });
+    }, () => { m.busy = false; btn.textContent = old; });
+  }
+  // 一份考卷用的譜：每行一張 SVG（音符、括號、調名、級數都畫在 SVG 裡，列印與 PDF 都不會跑位）
+  function paperSystems(q, which) {
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:' + (PAPER_W + 4) + 'px; background:#fff;';
+    document.body.appendChild(holder);
+    const r1 = v => Math.round(v * 10) / 10;
+    const attr = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    try {
+      const r = renderScore(holder, JSON.parse(JSON.stringify(q)), { mode: 'paper', paper: which, barsPerSys: 3, numFs: 20 });
+      return r.sysEls.map(div => {
+        const svg = div.querySelector('svg'), sr = svg.getBoundingClientRect();
+        const W = r1(sr.width), H = r1(sr.height);
+        let extra = '';
+        div.querySelectorAll('.ch-num, .ch-dash, .ch-keyname').forEach(el => {
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          let tn; while ((tn = walker.nextNode())) {
+            const t = tn.nodeValue; if (!t || !t.trim()) continue;
+            const cs = getComputedStyle(tn.parentElement); if (cs.visibility === 'hidden') continue;
+            const rg = document.createRange(); rg.selectNodeContents(tn); const rc = rg.getBoundingClientRect();
+            const fs = parseFloat(cs.fontSize) || 16;
+            extra += '<text x="' + r1(rc.left - sr.left) + '" y="' + r1(baselineOf(tn) - sr.top) + '" font-size="' + r1(fs) + '" font-family="' + attr(cs.fontFamily) +
+                     '"' + (parseInt(cs.fontWeight, 10) >= 600 ? ' font-weight="bold"' : '') + ' fill="#000">' + attr(t.trim()) + '</text>';
+          }
+        });
+        // 底線：對齊級數的下緣（羅馬數字的基線，再往下一點，解答卷寫在線上的數字才不會被線切到）
+        let base = 287 + 20 * 0.8;
+        const ro = div.querySelector('.ch-num .cfroman');
+        if (ro && ro.firstChild) base = baselineOf(ro.firstChild) - sr.top;
+        const uy = r1(base + ULINE_DY);
+        div.querySelectorAll('.ch-uline').forEach(el => {
+          const b = el.getBoundingClientRect();
+          extra += '<path d="M' + r1(b.left - sr.left) + ' ' + uy + 'H' + r1(b.right - sr.left) + '" stroke="#222" stroke-width="1.3"/>';
+        });
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+        let s = svg.outerHTML.replace('</svg>', extra + '</svg>');
+        s = s.replace(/#999999/gi, '#222222').replace(/(\d\.\d)\d+/g, '$1');   // 列印用深色譜線；座標只留一位小數（存在考卷裡比較小）
+        return { w: W, h: H, svg: s };
+      });
+    } finally { holder.remove(); }
+  }
+  if (MAKER_MODE) window.__maker = {
+    type: 'chorale',
+    regen: function (snap) { return genAsync(cfgFrom(snap)).then(q => makerData(q || genSync(cfgFrom(snap)), snap)); },
+    musicxml: function () { return ''; },   // 聖詠和聲的考卷用 paper() 畫好的譜，不經過 MusicXML
+    paper: function (data) { return { blank: paperSystems(data.q, 'blank'), key: paperSystems(data.q, 'key') }; },
+    answers: function (data) { return { key: data.q.key.name.replace(' ', '') + '：' }; },
+    events: function (data) { return exportEventsOf(data.q, data.bpm || 66); },
+    titleOf: function (d) { return makerTitle(d); }
+  };
+  if (MAKER_MODE) {
+    document.body.classList.add('maker-mode');
+    const st = document.createElement('style');
+    st.textContent = 'body.maker-mode #pageChSettings .nav-header-row, body.maker-mode #ch-reviewEntryBtn { display:none !important; }';
+    document.head.appendChild(st);
+    const enter = document.getElementById('ch-enterBtn'); if (enter) enter.textContent = '➕ 出題';
+  }
 
   chModule.init(); loadPiano();
   if (location.hash === '#review') showPage('ch-review');
