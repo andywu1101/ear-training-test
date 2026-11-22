@@ -763,6 +763,59 @@
     } catch (e) { busy(null); alert('mp3 產生失敗：' + e.message); }
   };
 
+  /* ---------- 譜例影片打包（v111）----------
+     每一題一支 mp4：解答譜例（與 PDF 解答同一套畫法）＋與 mp3 相同的聲音；直式或橫式自動判斷。
+     製作影片的程式在 ../tutti-1101/video-export.js（贊助者版共用），第一次用到才載入。 */
+  function ensureVideoExport() {
+    if (window.VideoExport) return Promise.resolve();
+    window.VIDEO_EXPORT_BASE = '../tutti-1101/';
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = '../tutti-1101/video-export.js';
+      s.onload = function () { res(); }; s.onerror = function () { rej(new Error('影片模組載入失敗')); };
+      document.head.appendChild(s);
+    });
+  }
+  async function itemCanvas(o) {
+    var d = Engrave.DENSITY[paper.density] || Engrave.DENSITY.dense, cw = Engrave.contentPx(d);
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed; left:-30000px; top:0; box-sizing:content-box; width:' + cw + 'px; padding:40px; background:#fff; color:#000; font-family:var(--paper-font); pointer-events:none;';
+    var el = o.it.type === 'pitchstack'
+      ? Engrave.renderStackRow([o.it], [o.num], 'key', d)
+      : Engrave.renderItem(o.it, 'key', d, { item: o.num, cell: 1 }, null);
+    el.style.marginTop = '0px';
+    box.appendChild(el); document.body.appendChild(box);
+    try { await new Promise(function (r) { setTimeout(r, 60); }); return await MakerPdf.elementCanvas(box, 3); }
+    finally { box.remove(); }
+  }
+  $('btnVideo').onclick = async function () {
+    if (!paper.items.length) { flash('還沒有題目'); return; }
+    stopPlayer();
+    var list = []; ordered().forEach(function (g) { g.items.forEach(function (o) { list.push({ it: o.it, num: o.num, sec: secName(g.sec) }); }); });
+    var files = [], zipWin = null;
+    try {
+      busy('譜例影片：準備中…');
+      await ensureVideoExport();
+      if (!(await VideoExport.supported())) { busy(null); alert(VideoExport.NO_SUPPORT); return; }
+      await prepChorale();
+      for (var i = 0; i < list.length; i++) {
+        var o = list[i], label = '第 ' + (i + 1) + '／' + list.length + ' 題';
+        busy(label + '：產生聲音…');
+        var w = await waitFrame(o.it.type); zipWin = w;
+        var buf = await w.PianoEngine.renderOffline(w.__maker.events(o.it.data));
+        busy(label + '：畫譜例…');
+        var cv = await itemCanvas(o);
+        var blob = await VideoExport.make(cv, buf, { orient: 'auto', onProgress: function (p) { busy(label + '：製作影片 ' + Math.round(p * 100) + '%'); } });
+        cv.width = 0; cv.height = 0;
+        files.push({ name: o.num + '_' + safeName(o.sec) + '_' + safeName(o.it.title) + '.mp4', u8: new Uint8Array(await blob.arrayBuffer()) });
+      }
+      busy('打包中…');
+      var zip = zipWin.ExportMenu.makeZip(files, new Date());
+      files = null;
+      busy(null);
+      deliver(zip, '聽寫課堂練習影片_' + (paper.header.date || today()) + '.zip', 'video', list.length + ' 支影片');
+    } catch (e) { busy(null); alert('譜例影片產生失敗：' + (e && e.message || e)); }
+  };
+
   /* ---------- 模板（v106.8）----------
      內建：大學檔、高中檔，直接讀 App 的 exam-common.js（EXAM.PRESETS），每次套用重新隨機（拍號、譜號…）；
      自訂：存每一題的設定快照、標題、配分、換行、換頁、速度，以及大題名稱與配分；套用時重新出題。 */
@@ -916,7 +969,7 @@
   }
   function deliver(blob, name, kind, desc) {
     if (!IS_IOS) { download(blob, name); flash('✓ 已下載 ' + (desc || name)); return; }
-    $('dlTitle').textContent = kind === 'pdf' ? 'PDF 已完成' : (kind === 'json' ? '考卷檔已完成' : 'mp3 壓縮檔已完成');
+    $('dlTitle').textContent = kind === 'pdf' ? 'PDF 已完成' : (kind === 'json' ? '考卷檔已完成' : (kind === 'video' ? '影片壓縮檔已完成' : 'mp3 壓縮檔已完成'));
     $('dlText').textContent = name + '（' + (blob.size / 1048576).toFixed(1) + ' MB）。' +
       (kind === 'pdf' ? '按「開啟」會打開 PDF，從右上角的分享鈕可以存到「檔案」或傳 LINE。' : '按「分享／儲存」後選「儲存到檔案」，或傳給 LINE 等 App。');
     $('dlBtn').textContent = kind === 'pdf' ? '開啟' : '分享／儲存';
@@ -966,6 +1019,7 @@
   $('mxPdfBlank').onclick = function () { exportPdf('blank'); };
   $('mxPdfKey').onclick = function () { exportPdf('key'); };
   $('mxMp3').onclick = function () { $('btnMp3').click(); };
+  $('mxVideo').onclick = function () { $('btnVideo').click(); };
 
   /* ---------- 手機版（v108，寬度小於 900px）---------- */
   var mq = window.matchMedia('(max-width: 899px)'), mtab = 'make', pvMode = 'blank', pvZoom = 1;
@@ -1006,6 +1060,7 @@
   $('mPdfBlank').onclick = function () { exportPdf('blank'); };
   $('mPdfKey').onclick = function () { exportPdf('key'); };
   $('mMp3').onclick = function () { $('btnMp3').click(); };
+  $('mVideo').onclick = function () { $('btnVideo').click(); };
 
   /* ---------- 電腦版：左右分隔（v108）----------
      拖曳調整右邊列表的寬度，記在瀏覽器；雙擊恢復預設。左邊至少 420、右邊至少 480 */

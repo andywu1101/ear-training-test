@@ -53,6 +53,16 @@
          VexFlow 畫大譜表時上方會空 70px 左右、下方 45px，
          不裁掉的話題號與答案會離譜例很遠；而符頭不在 SVG 正中央
          （有臨時記號時還會右移），答案要對齊它才不會看起來歪掉。 */
+      /* v.111：音程、和絃的頁面把整個音符群組用 translate 置中，path 裡的座標沒有算到這段位移，
+         答案文字因此偏左（實測 41.5）。量水平位置時要把祖先元素的 translate 一起加上。 */
+      var txOf = function (el) {
+        var t = 0;
+        for (var e = el.parentNode; e && e.nodeName && e.nodeName.toLowerCase() !== 'svg'; e = e.parentNode) {
+          var m = ((e.getAttribute && e.getAttribute('transform')) || '').match(/translate\(\s*(-?[0-9.]+)/);
+          if (m) t += parseFloat(m[1]);
+        }
+        return t;
+      };
       var box = (function () {
         var minY = Infinity, maxY = -Infinity, hMin = Infinity, hMax = -Infinity;
         try {
@@ -68,7 +78,7 @@
           svgEl.querySelectorAll('.vf-notehead path').forEach(function (pth) {
             var m = (pth.getAttribute('d') || '').match(/M\s*(-?[0-9.]+)/);
             if (!m) return;
-            var x = parseFloat(m[1]);
+            var x = parseFloat(m[1]) + txOf(pth);
             if (x < hMin) hMin = x;
             if (x > hMax) hMax = x;
           });
@@ -115,7 +125,7 @@
           clone.querySelectorAll('.vf-stavenote path').forEach(function (pth) {
             var m = (pth.getAttribute('d') || '').match(/M\s*(-?[0-9.]+)/);
             if (!m) return;
-            var x = parseFloat(m[1]);
+            var x = parseFloat(m[1]) + txOf(pth);
             if (x < bMin) bMin = x;
             if (x > bMax) bMax = x;
           });
@@ -777,8 +787,16 @@
       var fmt = col ? 'both' : ((global.ExportMenu && global.ExportMenu.sheetFormat) ? global.ExportMenu.sheetFormat() : 'png');
       if (ui.onStage) ui.onStage('render');
       var r = null;
+      /* v.111：只做影片時，畫好 PNG 用的圖就交給選單，不產生任何檔案 */
+      if (col && col.videoOnly) {
+        col.raw.canvases.push(await buildCanvas(items, ui));
+        r = { ok: true, collected: true };
+        if (ui.onStage) ui.onStage('done', r);
+        return r;
+      }
       if (fmt === 'png' || fmt === 'both') {
         var canvas = await buildCanvas(items, ui);
+        if (col && col.raw) col.raw.canvases.push(canvas);   // 「全部下載」最後要做影片
         if (ui.onStage) ui.onStage('encode');
         var blob = await canvasToBlob(canvas);
         if (ui.onStage) ui.onStage('deliver');

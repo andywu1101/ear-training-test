@@ -130,6 +130,11 @@
       if (!events || !events.length) throw new Error('沒有可以導出的內容');
       if (ui.onStage) ui.onStage('render');
       var audio = await global.PianoEngine.renderOffline(events);
+      /* v.111：影片導出要用算好的聲音（還沒轉 mp3）；只做影片時到這裡就結束 */
+      if (col && col.raw) {
+        col.raw.audio = audio; col.raw.prefix = prefix;
+        if (col.videoOnly) { var rv = { ok: true, collected: true }; if (ui.onStage) ui.onStage('done', rv); return rv; }
+      }
       if (ui.onStage) ui.onStage('encode');
       var blob = await encodeMp3(audio, ui.onProgress);
       if (ui.onStage) ui.onStage('deliver');

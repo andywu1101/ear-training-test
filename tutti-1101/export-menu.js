@@ -48,9 +48,14 @@
         '<button type="button" class="em-btn ghost" id="em-sheet">🖼️ 下載譜例</button>' +
         /* 第三顆（v.98）：只有傳入 onSheet2 的頁面才顯示，例如找錯音的「正確譜例」 */
         '<button type="button" class="em-btn ghost" id="em-sheet2" style="display:none;"></button>' +
+        /* v.111：譜例影片（譜例＋音檔，mp4） */
+        '<div id="em-video-wrap" style="display:none;">' +
+          '<div class="em-fmt">影片方向 <span class="em-seg"><button type="button" data-vo="P">直式</button><button type="button" data-vo="L">橫式</button></span></div>' +
+          '<button type="button" class="em-btn ghost" id="em-video">🎬 下載影片</button>' +
+        '</div>' +
         /* v.102：一次下載音檔＋譜例（PNG 與 PDF），全部同一個主檔名 */
         '<div id="em-all" style="display:none;">' +
-          '<p class="em-all-title">全部下載（音檔＋譜例 PNG＋PDF＋MusicXML）</p>' +
+          '<p class="em-all-title">全部下載（音檔＋譜例 PNG＋PDF＋MusicXML＋影片）</p>' +
           '<button type="button" class="em-btn all" id="em-all-zip">📦 全部下載（壓縮檔）</button>' +
           '<button type="button" class="em-btn all" id="em-all-files">📂 全部下載（個別檔案）</button>' +
         '</div>' +
@@ -69,9 +74,13 @@
     document.getElementById('em-sheet2').onclick = function () {
       var fn = current && current.onSheet2; close(); if (fn) fn();
     };
-    Array.prototype.forEach.call(wrap.querySelectorAll('.em-seg button'), function (b) {
+    Array.prototype.forEach.call(wrap.querySelectorAll('.em-seg button[data-fmt]'), function (b) {
       b.onclick = function () { setFormat(b.getAttribute('data-fmt')); paintFormat(); };
     });
+    Array.prototype.forEach.call(wrap.querySelectorAll('.em-seg button[data-vo]'), function (b) {
+      b.onclick = function () { setOrient(b.getAttribute('data-vo')); paintFormat(); };
+    });
+    document.getElementById('em-video').onclick = function () { runVideo(); };
     document.getElementById('em-all-zip').onclick = function () { runAll('zip'); };
     document.getElementById('em-all-files').onclick = function () { runAll('files'); };
   }
@@ -86,9 +95,81 @@
   function paintFormat() {
     var f = sheetFormat(), el = document.getElementById(EL_ID);
     if (!el) return;
-    Array.prototype.forEach.call(el.querySelectorAll('.em-seg button'), function (b) {
+    Array.prototype.forEach.call(el.querySelectorAll('.em-seg button[data-fmt]'), function (b) {
       b.classList.toggle('on', b.getAttribute('data-fmt') === f);
     });
+    var o = videoOrient();
+    Array.prototype.forEach.call(el.querySelectorAll('.em-seg button[data-vo]'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-vo') === o);
+    });
+  }
+
+  /* ---- 影片方向（v.111，記住上次的選擇）---- */
+  var VO_KEY = 'earTrainer.export.videoOrient';
+  function videoOrient() { try { if (localStorage.getItem(VO_KEY) === 'L') return 'L'; } catch (e) {} return 'P'; }
+  function setOrient(v) { try { localStorage.setItem(VO_KEY, v === 'L' ? 'L' : 'P'); } catch (e) {} }
+
+  /* ---- 譜例影片（v.111）----
+     跟「全部下載」同一套：照這一頁原本的流程算音檔、畫譜例，但不產生檔案，
+     只把算好的聲音與畫好的圖收起來（__expCollect.raw），再做成 mp4。
+     找錯音用「正確譜例」（onSheet2），其他頁用 onSheet。 */
+  var videoReady = null;
+  function ensureVideo() {
+    if (global.VideoExport) return Promise.resolve();
+    if (!videoReady) videoReady = new Promise(function (res, rej) {
+      var sc = document.createElement('script');
+      sc.src = (global.VIDEO_EXPORT_BASE || '') + 'video-export.js';
+      sc.onload = function () { res(); };
+      sc.onerror = function () { videoReady = null; rej(new Error('影片模組載入失敗')); };
+      document.head.appendChild(sc);
+    });
+    return videoReady;
+  }
+  function videoName(col) {
+    var a = global.AudioExport && global.AudioExport.fileName;
+    var prefix = (col.raw && col.raw.prefix) || '譜例影片';
+    var keep = global.__expCollect; global.__expCollect = col;
+    var n = a ? a(prefix) : (prefix + '.mp3');
+    global.__expCollect = keep;
+    return n.replace(/\.mp3$/, '') + '.mp4';
+  }
+  async function buildVideo(col, onPct) {
+    await ensureVideo();
+    var cvs = col.raw.canvases;
+    return await global.VideoExport.make(cvs[cvs.length - 1], col.raw.audio,
+      { orient: videoOrient(), onProgress: onPct });
+  }
+  async function runVideo() {
+    if (busy || !current) return;
+    var onAudio = current.onAudio, onSheet = current.onSheet2 || current.onSheet;
+    close();
+    busy = true;
+    toast('⏳ 準備中…', 0);
+    var col = { date: new Date(), files: [], failed: 0, videoOnly: true, expectNow: 1, raw: { audio: null, canvases: [] } };
+    try {
+      await ensureVideo();
+      if (!(await global.VideoExport.supported())) { toast('✗ ' + global.VideoExport.NO_SUPPORT, 4000); return; }
+      global.__expCollect = col;
+      onAudio();
+      var t0 = Date.now();
+      while (!col.raw.audio && !col.failed && Date.now() - t0 < 120000) await sleep(120);
+      if (!col.raw.audio) throw new Error('音檔產生失敗');
+      await sleep(1900);   // 各頁的導出按鈕完成後會鎖 1.6～1.8 秒
+      onSheet();
+      t0 = Date.now();
+      while (!col.raw.canvases.length && !col.failed && Date.now() - t0 < 120000) await sleep(120);
+      if (!col.raw.canvases.length) throw new Error('譜例產生失敗');
+      global.__expCollect = null;
+      var blob = await buildVideo(col, function (p) { toast('🎬 製作影片 ' + Math.round(p * 100) + '%', 0); });
+      toast('', 1);
+      var r = await global.VideoExport.deliver(blob, videoName(col));
+      if (r && !r.ok) toast('✗ 下載失敗，請再試一次', 2500);
+    } catch (e) {
+      toast('✗ ' + ((e && e.message) || '影片製作失敗'), 3500);
+    } finally {
+      global.__expCollect = null;
+      busy = false;
+    }
   }
 
   /* ---- 全部下載（v.102）----
@@ -105,7 +186,7 @@
     if (current.onSheet2) steps.push({ fn: current.onSheet2, n: 3 });
     close();
     busy = true;
-    var col = { date: new Date(), files: [], failed: 0 };
+    var col = { date: new Date(), files: [], failed: 0, raw: { audio: null, canvases: [] } };
     global.__expCollect = col;
     toast('⏳ 準備中…', 0);
     try {
@@ -123,11 +204,23 @@
       busy = false;
     }
     if (!col.files.length) { toast('✗ 下載失敗，請再試一次', 2500); return; }
+    /* v.111：最後用已經算好的聲音與譜例做影片（不必重算）；不支援的裝置略過 */
+    var videoNote = '';
+    if (col.raw.audio && col.raw.canvases.length) {
+      try {
+        await ensureVideo();
+        if (await global.VideoExport.supported()) {
+          var vb = await buildVideo(col, function (p) { toast('🎬 製作影片 ' + Math.round(p * 100) + '%', 0); });
+          col.files.push({ blob: vb, name: videoName(col) });
+        } else videoNote = '（這台裝置無法製作影片，已略過）';
+      } catch (e) { videoNote = '（影片製作失敗，已略過）'; }
+    }
     for (var q = 0; q < col.files.length; q++) col.files[q].u8 = new Uint8Array(await col.files[q].blob.arrayBuffer());
     var base = col.files[0].name.replace(/\.[^.]+$/, '').replace(/_[^_]*譜例$/, '');
     var r = (mode === 'zip') ? await deliverZip(col.files, base) : await deliverFiles(col.files, base);
     if (r === 'fallback-zip') r = await deliverZip(col.files, base, '這個瀏覽器不支援一次下載多個檔案，已改用壓縮檔');
     if (col.failed) toast('⚠ 有部分檔案產生失敗，已下載其餘 ' + col.files.length + ' 個', 3500);
+    else if (videoNote) toast('⚠ ' + videoNote.replace(/[（）]/g, ''), 3500);
   }
 
   function isIOS() {
@@ -237,6 +330,7 @@
     paintFormat();
     /* 有音檔也有譜例時才顯示「全部下載」 */
     document.getElementById('em-all').style.display = (current.onAudio && current.onSheet) ? '' : 'none';
+    document.getElementById('em-video-wrap').style.display = (current.onAudio && current.onSheet) ? '' : 'none';
     document.getElementById(EL_ID).classList.add('open');
     lock(true);
   }

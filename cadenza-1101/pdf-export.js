@@ -172,5 +172,45 @@
     return new Blob(chunks, { type: 'application/pdf' });
   }
 
-  global.MakerPdf = { exportPages: exportPages };
+  /* v111：把一個區塊（一題的解答譜例）畫成一張畫布，給譜例影片用。畫法與 exportPages 相同 */
+  async function elementCanvas(el, sc) {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    var info = collect(el), W = info.w, H = info.h;
+    /* 譜可能比外框寬（聖詠和聲），以實際內容為準 */
+    info.ops.forEach(function (o) { if (o.kind === 'svg' || o.kind === 'rect') { W = Math.max(W, o.x + o.w); H = Math.max(H, o.y + o.h); } });
+    var cv = document.createElement('canvas');
+    cv.width = Math.round(W * sc); cv.height = Math.round(H * sc);
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.setTransform(sc, 0, 0, sc, 0, 0);
+    for (var i = 0; i < info.ops.length; i++) {
+      var o = info.ops[i];
+      if (o.kind === 'svg') { var img = await svgImage(o.el, sc); ctx.drawImage(img, o.x, o.y, o.w, o.h); img.src = ''; }
+      else if (o.kind === 'rect') { ctx.fillStyle = o.color; ctx.fillRect(o.x, o.y, o.w, o.h); }
+      else {
+        ctx.font = o.font; ctx.fillStyle = o.color; ctx.textBaseline = 'alphabetic';
+        var m = ctx.measureText(o.text);
+        var asc = m.fontBoundingBoxAscent, desc = m.fontBoundingBoxDescent;
+        if (!(asc > 0)) { asc = parseFloat(o.font.match(/(\d+(\.\d+)?)px/)[1]) * 0.88; desc = asc * 0.25; }
+        ctx.fillText(o.text, o.x, o.y + (o.h - (asc + desc)) / 2 + asc);
+      }
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    /* 裁掉四周空白（留 12 單位），影片裡的譜例才不會偏小 */
+    var d = ctx.getImageData(0, 0, cv.width, cv.height).data, x0 = cv.width, y0 = cv.height, x1 = -1, y1 = -1;
+    for (var y = 0; y < cv.height; y++) for (var x = 0; x < cv.width; x++) {
+      var k = (y * cv.width + x) * 4;
+      if (d[k] < 235 || d[k + 1] < 235 || d[k + 2] < 235) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    if (x1 < 0) return cv;
+    var pad = Math.round(12 * sc);
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(cv.width - 1, x1 + pad); y1 = Math.min(cv.height - 1, y1 + pad);
+    var out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
+    var oc = out.getContext('2d'); oc.fillStyle = '#fff'; oc.fillRect(0, 0, out.width, out.height);
+    oc.drawImage(cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+    cv.width = 0; cv.height = 0;
+    return out;
+  }
+
+  global.MakerPdf = { exportPages: exportPages, elementCanvas: elementCanvas };
 })(window);
