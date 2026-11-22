@@ -293,7 +293,7 @@
   /* 譜例區：固定高度、可以上下捲動；按鍵區在下方 */
   .ch-staff-area { flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
     max-height: 46dvh; max-height: min(max(calc(var(--app-vh, 1vh) * 46), 260px), calc(var(--app-vh, 1vh) * 62)); }
-  .ch-staff-area .ch-score-box { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; overscroll-behavior-y: contain; padding: 6px 4px 6px; margin-bottom: 0; }
+  .ch-staff-area .ch-score-box { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; touch-action: pan-y; overscroll-behavior-y: contain; padding: 6px 4px 6px; margin-bottom: 0; scrollbar-gutter: stable; }   /* 先預留捲軸位置，電腦上右邊小節線才不會被捲軸擠掉 */
   .ch-keyboard-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
   .ch-play-sticky { position: sticky; top: 0; z-index: 20; background: var(--panel); padding: 6px 0 8px 0; margin-bottom: 4px; flex-wrap: nowrap; gap: 6px; }
   /* 播放、標準音按鈕：與「編輯低音／級數」分頁按鈕同大小（比照四部和聲） */
@@ -384,6 +384,9 @@
   .ch-rv-head { font-size: 13.5px; color: var(--ink); display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
   .ch-rv-time { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-soft); }
   #pageChReview .review-item { padding: 12px; }
+
+  /* 答案頁、錯題本是整頁捲動：也預留捲軸位置，避免畫完譜才出現捲軸把右邊擠掉 */
+  html { scrollbar-gutter: stable; }
 </style>
 </head>
 <body>
@@ -943,7 +946,7 @@ function showPage(pageId) {
   const LEVELS = [
     { id: 1, name: 'Lv.1 三和絃（含所有轉位）' },
     { id: 2, name: 'Lv.2 加入七和絃' },
-    { id: 3, name: 'Lv.3 加入副屬和絃／拿坡里／畢卡第三度' }
+    { id: 3, name: 'Lv.3 加入副屬和絃／拿坡里／皮卡第終止' }
   ];
   const LSEMI = [0, 2, 4, 5, 7, 9, 11], LETTER = 'CDEFGAB';
   const mod = (n, m) => ((n % m) + m) % m;
@@ -1027,7 +1030,7 @@ function showPage(pageId) {
   function renderScore(host, q, opts) {
     host.innerHTML = '';
     const mode = opts.mode, user = opts.user || { bass: {}, seq: {} };
-    const W = Math.max(280, host.clientWidth || 340);
+    const W = Math.max(280, (host.clientWidth || 340) - 4);   // 右邊留一點安全邊距，最後的小節線不貼邊
     let SC = W < 520 ? 0.74 : (W < 760 ? 0.86 : 1);
     if (opts.maxSysH) SC = Math.max(0.6, Math.min(SC, (opts.maxSysH - 8) / 327));   // 譜例區太矮（小手機）時縮小，讓一整行大譜表放得下
     const lineW = W / SC;
@@ -1825,7 +1828,7 @@ function showPage(pageId) {
     + '<div class="help-box"><button class="help-close" data-help-close aria-label="關閉">×</button>'
     + '<h2>聖詠和聲 — 玩法說明</h2>'
     + '<p class="help-lead">聆聽巴哈聖詠風格的四部和聲：上方三個聲部都已寫好，請在空格填出低音與級數 (含轉位)。</p>'
-    + '<h3>設定</h3><p>可選調性 (隨機 24 大小調／僅大調／僅小調)、拍號 (4/4、3/4)、小節數 (4～12)、挖空多寡 (少／中／多)、速度、難度 Lv1～Lv3 (Lv1 三和絃含所有轉位；Lv2 加入七和絃；Lv3 加入副屬和絃、拿坡里與畢卡第三度)。</p>'
+    + '<h3>設定</h3><p>可選調性 (隨機 24 大小調／僅大調／僅小調)、拍號 (4/4、3/4)、小節數 (4～12)、挖空多寡 (少／中／多)、速度、難度 Lv1～Lv3 (Lv1 三和絃含所有轉位；Lv2 加入七和絃；Lv3 加入副屬和絃、拿坡里與皮卡第終止)。</p>'
     + '<h3>作答</h3><p>按「播放題目」聆聽 (延長記號的和絃會延長一倍)。挖空以「一組」為單位，下方有灰色括號標示。點譜例上的空格或下方的級數框選取一格：① <b>編輯低音</b>：寫出那一拍拍點上的低音 (時值就是那一格的拍數，拍中的經過音不用寫)；② <b>編輯級數</b>：選羅馬數字級數與轉位，另有減／半減、副屬、拿坡里 N6 等按鍵。有掛留音的拍子直接給答案 (例如 V⁷₄ - 3)，不用作答。</p>'
     + '<p>按提交 → 譜例上答對的變綠色、答錯的用紅色標出你的答案，旁邊綠色是正確答案；右上角是「低音與級數都對」的格數。</p>'
     + '<p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>'

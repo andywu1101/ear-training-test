@@ -119,6 +119,8 @@
         if (v < 3 && d === 6) errs.push(['三全音跳進', A.t, v]);
         if (v < 3 && d > 7) errs.push(['大跳', A.t, v]);
         if (v === 3 && d === 6) errs.push(['低音三全音', A.t]);
+        // 女高音不可用同音名半音（例如 C → C♯）直接進入延長記號
+        if (v === 0 && ferm && ferm[B.slot] && B.slot !== A.slot && A.L === B.L && A.m !== B.m) errs.push(['同音名半音進延長記號', B.t]);
         // 女高音跳四、五度之後一定要反向（作者規則；延留到下一拍的掛留除外）
         var C = ns[i + 2];
         if (v === 0 && (d === 5 || d === 7) && C && !B.tie && !(ferm && ferm[B.slot] && C.slot !== B.slot)) {
@@ -667,7 +669,7 @@
             else {
               if (n >= 5 && R() < 0.65 && PRE.test(s[n - 4])) s[n - 3] = isMin ? 'i64' : 'I64';
               s[n - 2] = (engLv >= 3 && R() < 0.7) ? 'V7' : 'V';
-              s[n - 1] = (isMin && engLv >= 4 && R() < 0.42) ? 'I' : T;   // 畢卡第三度（Lv.3，約四、五成）
+              s[n - 1] = (isMin && engLv >= 4 && R() < 0.42) ? 'I' : T;   // 皮卡第終止（Lv.3，約四、五成）
             }
             if (startWith) s[0] = startWith;
             // 模進：一題最多一段，放在句子中段
@@ -687,6 +689,10 @@
             if (!HE.skeletonOK(trial, isMin, Math.min(engLv, 3))) continue;
             var lastF = fin ? function (v) { return v[0] % 12 === keyObj.off; }
               : (function (fd, soft) { return function (v) { var dg = degOf(v[0], keyObj); return fermDegOK(fd.concat([dg])) && !(soft && fd.length && dg === fd[fd.length - 1]); }; })(fdeg, k < 250);
+            if (!fin && s[n - 1].indexOf('/') >= 0) {   // 停在副屬和絃：女高音不停在三音（暫時導音），改停根音或五音
+              var thirdPc = (HE.getChordPcs(s[n - 1], isMin)[1] + keyObj.off) % 12, lastF0 = lastF;
+              lastF = function (v) { return v[0] % 12 !== thirdPc && lastF0(v); };
+            }
             var sol = solvePhrase(trial, s, voic.length ? voic[voic.length - 1] : null, seqMark, lastF, contour(tplId, n));
             if (!sol) continue;
             got = s; gotV = sol; if (seqMark) { seqDone = true; seqAt = seq.length + Number(Object.keys(seqMark)[0]); }
