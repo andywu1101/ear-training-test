@@ -1375,6 +1375,17 @@ function showPage(pageId) {
     return s;
   }
 
+  /* v.111：同樣的音、不同的分析也給分（作者指定的對照表，只有這幾種；轉位要相同，只限三和絃）
+     大調：正解 V/IV 寫 I　　小調：正解 III 寫 V/VI、正解 V/VI 寫 III、正解 V/iv 寫 I（反過來不給分的照作者規則不列） */
+  function chordAltOK(u, q, isMin) {
+    for (const inv of ['', '6', '64']) {
+      if (!isMin && q === 'V' + inv + '/IV' && u === 'I' + inv) return true;
+      if (isMin && q === 'III' + inv && u === 'V' + inv + '/VI') return true;
+      if (isMin && q === 'V' + inv + '/VI' && u === 'III' + inv) return true;
+      if (isMin && q === 'V' + inv + '/iv' && u === 'I' + inv) return true;
+    }
+    return false;
+  }
   // 副屬和絃借用目標（相對主音的音級數字，0-11）
   const SECDOM_TARGET_ROOT = {
       'ii': 2, 'IV': 5, 'V': 7, 'vi': 9,           // 大調可借用目標
@@ -2199,6 +2210,7 @@ function showPage(pageId) {
             let pv = prevNode.last;
             // 防聲部超越
             if (tv[0] < pv[1] || tv[1] < pv[2] || tv[2] < pv[3]) continue;
+            if (tv[1] > pv[0] || tv[2] > pv[1] || tv[3] > pv[2]) continue;   // v.111：往上也不可超越（下方聲部不可高過上方聲部前一個和絃的音）
             
             // 上三聲部（S/A/T, index 0-2）跳進規則：
             //   - 不可三全音、不可超過完全五度（7 半音）
@@ -2773,7 +2785,7 @@ function showPage(pageId) {
       for(let i = 0; i < this.bars; i++){
         const uNorm = normalizeChord(this.userSeq[i], this.keyObj.isMin);
         const qNorm = normalizeChord(this.questionSeq[i], this.keyObj.isMin);
-        const isChordC = (this.userSeq[i] !== '' && this.userSeq[i] != null && uNorm === qNorm);
+        const isChordC = (this.userSeq[i] !== '' && this.userSeq[i] != null && (uNorm === qNorm || chordAltOK(uNorm, qNorm, this.keyObj.isMin)));
         const isBassC = (this.userBass[i] != null) && (this.userBass[i].midi === this.questionVoicings[i][3]);
         results.push({ chord: isChordC, bass: isBassC });
       }
@@ -2862,7 +2874,7 @@ function showPage(pageId) {
         for(let i=0; i<self.bars; i++){
           const uNorm = normalizeChord(self.userSeq[i], self.keyObj.isMin);
           const qNorm = normalizeChord(self.questionSeq[i], self.keyObj.isMin);
-          const chordOK = (self.userSeq[i] !== '' && uNorm === qNorm);
+          const chordOK = (self.userSeq[i] !== '' && (uNorm === qNorm || chordAltOK(uNorm, qNorm, self.keyObj.isMin)));
           const bassOK = (self.userBass[i] != null) && (self.userBass[i].midi === self.questionVoicings[i][3]);
           if(!chordOK) lost += 1;
           if(!bassOK) lost += 1;
@@ -3190,7 +3202,7 @@ function showPage(pageId) {
              else {
                  let uNorm = normalizeChord(userSeq[i], keyObj.isMin);
                  let qNorm = normalizeChord(this.questionSeq[i], keyObj.isMin);
-                 slot.className = 'chord-slot ' + ((uNorm === qNorm) ? 'correct' : 'wrong');
+                 slot.className = 'chord-slot ' + ((uNorm === qNorm || chordAltOK(uNorm, qNorm, keyObj.isMin)) ? 'correct' : 'wrong');
              }
         }
         else {
@@ -3761,7 +3773,7 @@ function showPage(pageId) {
       for (let i = 0; i < this.bars; i++) {
         let uNorm = normalizeChord(this.userSeq[i], this.keyObj.isMin);
         let qNorm = normalizeChord(this.questionSeq[i], this.keyObj.isMin);
-        let isChordC = (this.userSeq[i] !== '' && uNorm === qNorm);
+        let isChordC = (this.userSeq[i] !== '' && (uNorm === qNorm || chordAltOK(uNorm, qNorm, this.keyObj.isMin)));
         // 未填低音 (null) 視為錯誤，不再直接讀取 .midi 造成 crash
         let isBassC = (this.userBass[i] != null) && (this.userBass[i].midi === this.questionVoicings[i][3]);
         

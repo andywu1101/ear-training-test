@@ -1212,6 +1212,7 @@
             let pv = prevNode.last;
             // 防聲部超越
             if (tv[0] < pv[1] || tv[1] < pv[2] || tv[2] < pv[3]) continue;
+            if (tv[1] > pv[0] || tv[2] > pv[1] || tv[3] > pv[2]) continue;   // v.111：往上也不可超越（下方聲部不可高過上方聲部前一個和絃的音）
             
             // 上三聲部（S/A/T, index 0-2）跳進規則：
             //   - 不可三全音、不可超過完全五度（7 半音）

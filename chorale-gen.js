@@ -150,9 +150,9 @@
     var avoid = {}; if (isMin) [8, 9, 10, 11].forEach(function (x) { avoid[(off + x) % 12] = 1; });
     var added = 0, perSlot = [], touched = {}, noask = {};
     for (var z = 0; z < n; z++) perSlot.push(0);
-    // 拿坡里到終止要乾淨：N6、後面接的 I64、V 都不加和聲外音、掛留、八度跳（作者規則）
+    // 拿坡里、增六到終止要乾淨：N6／增六、後面接的 I64、V 都不加和聲外音、掛留、八度跳（作者規則）
     var clean = {};
-    for (z = 0; z < n; z++) if (seq[z] === 'N6') {
+    for (z = 0; z < n; z++) if (seq[z] === 'N6' || /^(It|Fr|Ger)6$/.test(seq[z])) {   // 增六到 V 也一樣（作者規則）
       clean[z] = 1;
       for (var w = z + 1; w < n && (/^(I|i)64$/.test(seq[w]) || (/^V/.test(seq[w]) && seq[w].indexOf('/') < 0)); w++) clean[w] = 1;
     }
@@ -386,6 +386,8 @@
         if (base(seq[i + 1]) === tgt || /^V/.test(seq[i + 1])) hit = [[i, i + 1], '副屬', 3];
       }
       if (!hit && /^N/.test(seq[i]) && i + 1 < n && /^(V|I|i)/.test(seq[i + 1])) hit = [[i, i + 1], '拿坡里', 3];
+      if (!hit && /^(It|Fr)6$/.test(seq[i]) && i + 1 < n) hit = [[i, i + 1], '增六', 3];
+      if (!hit && seq[i] === 'Ger6' && i + 2 < n) hit = [[i, i + 1, i + 2], '增六', 3];
       if (!hit) hit = [[i], '單', /\d/.test(seq[i]) ? 1.3 : 1.0];
       U.push(hit); i = hit[0][hit[0].length - 1] + 1;
     }
@@ -479,7 +481,7 @@
         if ((degs[i] === 3 || degs[i] === 5) && (degs[i - 1] === 3 || degs[i - 1] === 5) && (degs[i - 2] === 3 || degs[i - 2] === 5)) return false;
       return true;
     }
-    var PRE = /^((IV|iv|ii|ii°)(6|65|7|43|42)?|N6|V7?\/V|V65\/V|V43\/V|V42\/V|V6\/V)$/;
+    var PRE = /^((IV|iv|ii|ii°)(6|65|7|43|42)?|N6|It6|Fr6|Ger6|V7?\/V|V65\/V|V43\/V|V42\/V|V6\/V)$/;
 
     /* 同樣兩個和絃（不論轉位）不可 A–B–A–B 來回；A–B–A（輔助、經過）可以 */
     function noSwing(s) {
@@ -533,6 +535,10 @@
             if (/^(ii|ii°)$/.test(pr) && /^(I|i)$/.test(r) && !/64$/.test(x)) return false;   // ii → I 不行；ii → 終止六四可以
             if (/^(I|i)6?$/.test(p) && /^(I|i)64$/.test(x)) return false;
             if (p === 'N6' && !((/^V/.test(x) && x.indexOf('/') < 0) || /^(I|i)64$/.test(x))) return false;
+            // 增六（Lv.4）：義、法接 V／V7；德先接 I64 再到 V（比照四部和聲）。前面只接主和絃類、下屬和絃類（不接 N6）
+            if (/^(It|Fr)6$/.test(p) && !/^V7?$/.test(x)) return false;
+            if (p === 'Ger6' && !(/^(I|i)64$/.test(x) && /^V7?$/.test(s[i + 1] || ''))) return false;
+            if (/^(It|Fr|Ger)6$/.test(x) && !/^((I|i)6?|vi|VI|(IV|iv)6?)$/.test(p)) return false;
             if (i >= 2 && r === pr && r === root(s[i - 2])) return false;
           }
         }
@@ -624,6 +630,8 @@
             if (i === 0 && prevLast) o = o.filter(function (v) { return joinOK(prevLast, v); });
             if (seqMark && seqMark[i] !== undefined) o = o.filter(function (v) { return v[0] % 12 === memberPc(s[i], seqMark[i]); });
             if (i === n - 1 && lastFilter) o = o.filter(lastFilter);
+            // 大調的德國增六：女高音不放借來的降三級音（降三 → 還原三像「唱錯再更正」，作者規則），放內聲部
+            if (s[i] === 'Ger6' && !isMin) o = o.filter(function (v) { return mod(v[0] - keyObj.off, 12) !== 3; });
             return o;
           });
         };
@@ -633,6 +641,9 @@
       for (var attempt = 0; attempt < 60; attempt++) {
         var P = (B === 3 && bars % 4 === 0 && bars >= 8 && R() < 0.8) ? 4 : 2, m = bars / P;   // 4/4 一律兩小節一句；3/4 多半四小節
         var plan = planKinds(m), ends = [], ups = [pickup ? 1 : 0];
+        // Lv.4：選一句放增六（半終止、正格、假終止的句子都可以）
+        var augAt = -1;
+        if (cfg.level >= 4) { var augC = []; plan.forEach(function (kd, i) { if (/^(hc|pac|final|dc)$/.test(kd)) augC.push(i); }); augAt = augC.length ? augC[Math.floor(R() * augC.length)] : -1; }
         for (var e = 0; e < m - 1; e++) { ends.push(pickEnd()); ups.push(ends[e][1]); }
         var seq = [], durs = [], ferm = [], phraseOf = [], kinds = [], okAll = true, startWith = null, fdeg = [], voic = [], seqDone = false, seqAt = -1, tpls = [], prevTpl = null;
         for (var p = 0; p < m; p++) {
@@ -647,8 +658,9 @@
           else { var cand = TPLS.filter(function (x) { return x !== prevTpl; }); tplId = cand[Math.floor(R() * cand.length)]; }
           for (k = 0; k < 400 && !got; k++) {
             var s;
-            if (kind === 'hc' || kind === 'sec') s = HE.generateSkeleton(n + 1, isMin, engLv, DENS).slice(0, n);
-            else s = HE.generateSkeleton(n, isMin, engLv, DENS);
+            var gLv = Math.min(engLv, 4);   // 增六不交給引擎隨機放，由下面固定放在一句的終止前（一題一個）
+            if (kind === 'hc' || kind === 'sec') s = HE.generateSkeleton(n + 1, isMin, gLv, DENS).slice(0, n);
+            else s = HE.generateSkeleton(n, isMin, gLv, DENS);
             s = s.map(function (x) { return ({ 'iii6': 'iii', 'vi6': 'vi', 'III6': 'III', 'VI6': 'VI' })[x] || x; });
             if (kind === 'hc') s[n - 1] = 'V';
             else if (kind === 'sec') { s[n - 1] = isMin ? (R() < 0.4 ? 'V/III' : 'V/V') : (R() < 0.35 ? 'V/vi' : 'V/V'); if (/^V/.test(s[n - 2])) continue; }
@@ -671,6 +683,15 @@
               s[n - 2] = (engLv >= 3 && R() < 0.7) ? 'V7' : 'V';
               s[n - 1] = (isMin && engLv >= 4 && R() < 0.42) ? 'I' : T;   // 皮卡第終止（Lv.3，約四、五成）
             }
+            // Lv.4 增六：放在選定那一句的終止前。半終止：It6／Fr6 → V（停在延長記號上）或 Ger6 → I64 → V；
+            // 正格、假終止：It6／Fr6 → V(7) → 句尾，或 Ger6 → I64 → V(7) → 句尾
+            if (p === augAt) {
+              var aug = ['It6', 'Fr6', 'Ger6'][Math.floor(R() * 3)], ai;
+              if (kind === 'hc') { if (aug === 'Ger6' && n >= 5) { ai = n - 3; s[n - 2] = T + '64'; } else { if (aug === 'Ger6') aug = R() < 0.5 ? 'It6' : 'Fr6'; ai = n - 2; } }
+              else { if (aug === 'Ger6' && n >= 6) { ai = n - 4; s[n - 3] = T + '64'; s[n - 2] = /^V7?$/.test(s[n - 2]) ? s[n - 2] : 'V'; } else { if (aug === 'Ger6') aug = R() < 0.5 ? 'It6' : 'Fr6'; ai = n - 3; } }
+              s[ai] = aug;
+              if (ai >= 1 && !/^((I|i)6?|vi|VI|(IV|iv)6?)$/.test(s[ai - 1])) s[ai - 1] = isMin ? ['iv6', 'iv', 'VI', 'i6'][Math.floor(R() * 4)] : ['IV6', 'IV', 'vi', 'I6'][Math.floor(R() * 4)];
+            }
             if (startWith) s[0] = startWith;
             // 模進：一題最多一段，放在句子中段
             var seqMark = null;
@@ -685,6 +706,7 @@
             if (!phraseOK(s, kind)) continue;
             var trial = seq.concat(s);
             if (trial.filter(function (x) { return x === 'N6'; }).length > 1) continue;   // 一題最多一個 N6
+            if (trial.filter(function (x) { return /^(It|Fr|Ger)6$/.test(x); }).length > (cfg.level >= 4 ? 1 : 0)) continue;   // 增六只在 Lv.4，一題一個
             if (!noSwing(trial)) continue;
             if (!HE.skeletonOK(trial, isMin, Math.min(engLv, 3))) continue;
             var lastF = fin ? function (v) { return v[0] % 12 === keyObj.off; }
@@ -716,7 +738,7 @@
       return null;
     }
 
-    /* cfg：{ level 1–3, keyPref 'mix'|'major'|'minor', bars, meter '4/4'|'3/4', pickup, amount 'few'|'mid'|'many', seed } */
+    /* cfg：{ level 1–4, keyPref 'mix'|'major'|'minor', bars, meter '4/4'|'3/4', pickup, amount 'few'|'mid'|'many', seed } */
     function generate(cfg) {
       var R = rng(cfg.seed != null ? cfg.seed : Math.floor(Math.random() * 4294967296));
       for (var tries = 0; tries < 40; tries++) {

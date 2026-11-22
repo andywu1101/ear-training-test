@@ -554,6 +554,9 @@
         </div>
         <div class="kb-row" id="kb-row-n6" style="display:none;">
           <button class="kb-btn deg-btn" id="btn-deg-N" style="background:#eef4f0; border-color:#bcd;" data-deg="N6">N6</button>
+          <button class="kb-btn aug6-btn" data-aug6="It6" style="display:none; background:#eef4f0; border-color:#bcd;">It<sup class="fb-plus">+</sup>6</button>
+          <button class="kb-btn aug6-btn" data-aug6="Fr6" style="display:none; background:#eef4f0; border-color:#bcd;">Fr<sup class="fb-plus">+</sup>6</button>
+          <button class="kb-btn aug6-btn" data-aug6="Ger6" style="display:none; background:#eef4f0; border-color:#bcd;">Ger<sup class="fb-plus">+</sup>6</button>
         </div>
         </div>
         <div class="kb-row">
@@ -950,7 +953,8 @@ function showPage(pageId) {
   const LEVELS = [
     { id: 1, name: 'Lv.1 三和絃（含所有轉位）' },
     { id: 2, name: 'Lv.2 加入七和絃' },
-    { id: 3, name: 'Lv.3 加入副屬和絃／拿坡里／皮卡第終止' }
+    { id: 3, name: 'Lv.3 加入副屬和絃／拿坡里／皮卡第終止' },
+    { id: 4, name: 'Lv.4 加入增六和絃 (義／法／德)' }
   ];
   const LSEMI = [0, 2, 4, 5, 7, 9, 11], LETTER = 'CDEFGAB';
   const mod = (n, m) => ((n % m) + m) % m;
@@ -983,6 +987,18 @@ function showPage(pageId) {
     });
   }
 
+  /* v.111：同樣的音、不同的分析也給分（作者指定的對照表，只有這幾種；轉位要相同，只限三和絃）
+     大調：正解 V/IV 寫 I　　小調：正解 III 寫 V/VI、正解 V/VI 寫 III、正解 V/iv 寫 I（反過來不給分的照作者規則不列） */
+  function chordAltOK(u, q, isMin) {
+    for (const inv of ['', '6', '64']) {
+      if (!isMin && q === 'V' + inv + '/IV' && u === 'I' + inv) return true;
+      if (isMin && q === 'III' + inv && u === 'V' + inv + '/VI') return true;
+      if (isMin && q === 'V' + inv + '/VI' && u === 'III' + inv) return true;
+      if (isMin && q === 'V' + inv + '/iv' && u === 'I' + inv) return true;
+    }
+    return false;
+  }
+  function chordEq(u, q, isMin) { const a = normalizeChord(u, isMin), b = normalizeChord(q, isMin); return a === b || chordAltOK(a, b, isMin); }
   /* ---------- 數字低音的顯示（作者寫法：一個數字在正右方；兩層在右上／右下；三層上中下） ---------- */
   // 文字節點的實際基線（螢幕座標）：在文字後面插一個高度 0 的 inline-block，它的上緣就是基線
   function baselineOf(tn) {
@@ -1009,6 +1025,7 @@ function showPage(pageId) {
     if (!s) return null;
     const main = s.split('/')[0], sec = s.slice(main.length);
     if (main === 'N6') return { roman: 'N6', special: 'n6', rows: [] };
+    if (/^(It|Fr|Ger)6$/.test(main)) return { roman: main, special: 'aug', rows: [] };
     const m = main.match(/(\d+)$/), dg = m ? m[1] : '';
     return { roman: main.slice(0, main.length - dg.length), sec, rows: (STD[dg] || dg.split('').map(Number)).map(n => ({ n, a: '' })) };
   }
@@ -1058,7 +1075,7 @@ function showPage(pageId) {
     const hasBlank = meas.map(([a, b]) => (mode === 'ask' || mode === 'paper') && q.starts.some((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9));
     // 挖空的拍子裡有經過音時，框只框正拍那個音，所以這一拍再多留一點寬度
     const passBlank = meas.map(([a, b]) => (mode !== 'ask' && mode !== 'paper') ? 0 : q.starts.filter((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9 && q.V[3].filter(e => e.slot === k).length > 1).length);
-    const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27, labSum[i] + 24, hasBlank[i] ? 24 + (m[1] - m[0]) * BLANK_BEAT_W + passBlank[i] * 40 : 0));
+    const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27, labSum[i] + 24, hasBlank[i] ? 24 + (m[1] - m[0]) * BLANK_BEAT_W + passBlank[i] * 40 : 0) + ((opts._padR || {})[i] || 0));
     const headW = first => 42 + nSig * 10 + (first ? 26 : 0);
     // 排成一行一行
     const systems = []; let cur = [], used = 0;
@@ -1210,7 +1227,7 @@ function showPage(pageId) {
         voices.forEach(o => o.voice.setSoftmaxFactor(SOFTMAX));
         const fmt = new VF.Formatter({ softmaxFactor: SOFTMAX });
         fmt.joinVoices([voices[0].voice, voices[1].voice]); fmt.joinVoices([voices[2].voice, voices[3].voice]);
-        const fw = mw - (nsx - x) - 14;
+        const fw = mw - (nsx - x) - 14 - ((opts._padR || {})[mi] || 0) * stretch;   // _padR：行尾的級數文字（掛留解決、副屬）超出右邊時，這一小節右邊多留空
         fmt.format(voices.map(o => o.voice), fw);
         // 最後一個音（含附點）離小節線太近（短音在小節尾）時，整小節往左收一點再排一次：至少留一個符頭寬
         const endX = x + mw, MIN_GAP = 14;
@@ -1264,7 +1281,7 @@ function showPage(pageId) {
           html = f ? figHtml(f) : '';
           cls = 'ch-num-slot' + (opts.active === k ? ' active' : '') + (f ? ' filled' : '');
         } else {
-          const ok = user.seq[k] && normalizeChord(user.seq[k], q.key.isMin) === normalizeChord(q.seq[k], q.key.isMin);
+          const ok = !!user.seq[k] && chordEq(user.seq[k], q.seq[k], q.key.isMin);
           html = ok ? '<span class="cg">' + figHtml(q.figs[k]) + '</span>'
                     : '<span class="cr">' + (user.seq[k] ? figHtml(userFig(user.seq[k])) : '？') + '</span><span class="cg ch-fix">' + figHtml(q.figs[k]) + '</span>';
           cls = ok ? 'ok' : 'ng';
@@ -1296,8 +1313,16 @@ function showPage(pageId) {
           const rows = f.rows.map((r, i) => i === f.sus.row ? f.sus.res : r);
           r2.innerHTML = '<span class="cfroman" style="visibility:hidden">' + esc(f.roman) + '</span>' + stackHtml(rows, f.sus.row) + (f.sec ? '<span class="cfsec">' + esc(f.sec) + '</span>' : '');
           div.appendChild(r2);
-          const rr = r2.querySelector('.cfroman').getBoundingClientRect().width;
-          r2.style.left = (rx - rr / 2) + 'px';
+          // 解決後的數字（例如「3」）正對解決音下方（作者規則）；副屬的「/x」接在後面
+          r2.style.left = '0px';
+          const tr0 = r2.querySelectorAll('.cfr')[f.sus.row], hb0 = div.getBoundingClientRect();
+          let c0 = null;
+          if (tr0 && tr0.firstChild && tr0.firstChild.nodeValue) {
+            const rg = document.createRange(); rg.setStart(tr0.firstChild, 0); rg.setEnd(tr0.firstChild, 1);
+            const rc = rg.getBoundingClientRect(); c0 = (rc.left + rc.right) / 2 - hb0.left;
+          }
+          if (c0 == null) c0 = r2.querySelector('.cfroman').getBoundingClientRect().width / 2;
+          r2.style.left = (rx - c0) + 'px';
           // 「-」放在兩段之間、跟數字同一層
           const lb = lab.getBoundingClientRect(), hb = div.getBoundingClientRect();
           const fr = lab.querySelectorAll('.cfr')[f.sus.row], tr = r2.querySelectorAll('.cfr')[f.sus.row];
@@ -1323,7 +1348,7 @@ function showPage(pageId) {
         if (l < right + 4) {
           const dx = right + 4 - l;
           el.style.left = (l + dx) + 'px';
-          (el._followers || []).forEach(f => { f.style.left = (f.offsetLeft + dx) + 'px'; });
+          (el._followers || []).forEach(f => { if (f.classList.contains('ch-dash')) f.style.left = (f.offsetLeft + dx / 2) + 'px'; });   // 解決數字留在解決音下方，「-」維持在兩段中間
         }
         right = Math.max(el.offsetLeft + el.offsetWidth, ...(el._followers || []).map(f => f.offsetLeft + f.offsetWidth));
       });
@@ -1382,7 +1407,7 @@ function showPage(pageId) {
     if (mode === 'ask') sysEls.forEach(div => {
       const labs = Array.from(div.querySelectorAll('.ch-num:not(.ch-res)')).sort((a, b) => a.offsetLeft - b.offsetLeft);
       const isSlot = el => el.classList.contains('ch-num-slot');
-      const move = (el, dx) => { el.style.left = (el.offsetLeft + dx) + 'px'; (el._followers || []).forEach(f => { f.style.left = (f.offsetLeft + dx) + 'px'; }); };
+      const move = (el, dx) => { el.style.left = (el.offsetLeft + dx) + 'px'; (el._followers || []).forEach(f => { if (f.classList.contains('ch-dash')) f.style.left = (f.offsetLeft + dx / 2) + 'px'; }); };
       const rightOf = el => Math.max(el.offsetLeft + el.offsetWidth, ...(el._followers || []).map(f => f.offsetLeft + f.offsetWidth));
       for (let i = 1; i < labs.length; i++) {
         const a = labs[i - 1], b = labs[i], over = rightOf(a) + 4 - b.offsetLeft;
@@ -1420,6 +1445,16 @@ function showPage(pageId) {
       });
     }
     function systemIndexOf(n) { const st = n.getStave(); for (let i = 0; i < sysEls.length; i++) if (sysEls[i]._ctx === st.getContext()) return i; return 0; }
+    // 級數文字超出譜的右邊（會被裁切）：那一行最後一小節右邊多留空，重排一次（最多三次）
+    if ((opts._fit || 0) < 3) {
+      const pad = Object.assign({}, opts._padR || {}); let more = false;
+      sysEls.forEach((div, si) => {
+        const hb = div.getBoundingClientRect(), lim = hb.left + W - 3; let mx = -1e9;
+        div.querySelectorAll('.ch-num, .ch-dash').forEach(el => { const r = el.getBoundingClientRect(); if (r.width) mx = Math.max(mx, r.right); });
+        if (mx > lim) { const lm = systems[si][systems[si].length - 1]; pad[lm] = (pad[lm] || 0) + (mx - lim) / SC + 6; more = true; }
+      });
+      if (more) return renderScore(host, q, Object.assign({}, opts, { _padR: pad, _fit: (opts._fit || 0) + 1 }));
+    }
     return { sysOfSlot, sysEls, labOf };
   }
 
@@ -1603,6 +1638,7 @@ function showPage(pageId) {
       this.currentOctave = 3; this.updateOctaveLabels();
       const lv = this.curLevel.id;
       document.getElementById('kb-row-n6').style.display = lv >= 3 ? '' : 'none';
+      document.querySelectorAll('#kb-row-n6 .aug6-btn').forEach(b => { b.style.display = lv >= 4 ? 'inline-block' : 'none'; });   // 增六：Lv.4
       document.getElementById('btn-slash').style.display = lv >= 3 ? 'inline-block' : 'none';
       document.getElementById('btn-sev-switch').style.display = lv >= 2 ? 'inline-block' : 'none';
       const sev = document.getElementById('btn-sev-switch');
@@ -1691,6 +1727,11 @@ function showPage(pageId) {
         this.updateUI(); return;
       }
       const k0 = this.activeSlot;
+      if (type === 'aug6') {   // 增六（Lv.4）：直接寫入這一格，接著跳下一格（比照四部和聲）
+        if (this.pendingSlashStage !== 0) { this.pendingSlashStage = 0; this.pendingSlashSlot = null; }
+        this.userSeq[k0] = val; this.lastEditedChordSlot = k0; this.activeSlot = this.nextSlot(k0);
+        this.updateUI(); return;
+      }
       if (type === 'deg') {
         const isUpper = document.getElementById('btn-case-switch').classList.contains('active-toggle');
         const roman = (val === 'N6') ? 'N6' : (isUpper ? ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'] : ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii'])[val - 1];
@@ -1800,7 +1841,7 @@ function showPage(pageId) {
       this.slots.forEach((k, i) => {
         const ub = this.userBass[k], us = this.userSeq[k];
         const okB = !!ub && ub.midi === q.bassOn[k].m;
-        const okS = !!us && normalizeChord(us, isMin) === normalizeChord(q.seq[k], isMin);
+        const okS = !!us && chordEq(us, q.seq[k], isMin);
         if (okB) bOk++; if (okS) sOk++; if (okB && okS) both++;
         if (!okB || !okS) wrong.push({ i: i + 1, k, okB, okS });
       });
@@ -1904,6 +1945,7 @@ function showPage(pageId) {
       document.querySelectorAll('.deg-btn').forEach(b => b.onclick = () => this.handleKbInput('deg', b.dataset.deg));
       document.querySelectorAll('.inv-btn').forEach(b => b.onclick = () => this.handleKbInput('inv', b.dataset.inv));
       document.querySelectorAll('.mod-btn').forEach(b => b.onclick = () => this.handleKbInput('mod', b.dataset.mod));
+      document.querySelectorAll('.aug6-btn').forEach(b => b.onclick = () => this.handleKbInput('aug6', b.dataset.aug6));
       document.getElementById('kb-backspace').onclick = () => this.handleKbInput('back');
       document.getElementById('kb-clear').onclick = () => this.handleKbInput('clear');
       document.getElementById('ch-submitBtn').onclick = () => this.submitAnswer();
@@ -2069,8 +2111,8 @@ function showPage(pageId) {
     + '<div class="help-box"><button class="help-close" data-help-close aria-label="關閉">×</button>'
     + '<h2>聖詠和聲 — 玩法說明</h2>'
     + '<p class="help-lead">聆聽巴哈聖詠風格的四部和聲：上方三個聲部都已寫好，請在空格填出低音與級數 (含轉位)。</p>'
-    + '<h3>設定</h3><p>可選調性 (隨機 24 大小調／僅大調／僅小調)、拍號 (4/4、3/4)、小節數 (4～12)、挖空多寡 (少／中／多)、速度、難度 Lv1～Lv3 (Lv1 三和絃含所有轉位；Lv2 加入七和絃；Lv3 加入副屬和絃、拿坡里與皮卡第終止)。</p>'
-    + '<h3>作答</h3><p>按「播放題目」聆聽 (開頭有預備拍；延長記號會多停一拍)。挖空以「一組」為單位，下方有灰色括號標示。點譜例上的空格或下方的級數框選取一格：① <b>編輯低音</b>：寫出那一拍拍點上的低音 (時值就是那一格的拍數，拍中的經過音不用寫)；② <b>編輯級數</b>：選羅馬數字級數與轉位，另有減／半減、副屬、拿坡里 N6 等按鍵。有掛留音的拍子直接給答案 (例如 V⁷₄ - 3)，不用作答。</p>'
+    + '<h3>設定</h3><p>可選調性 (隨機 24 大小調／僅大調／僅小調)、拍號 (4/4、3/4)、小節數 (4～12)、挖空多寡 (少／中／多)、速度、難度 Lv1～Lv4 (Lv1 三和絃含所有轉位；Lv2 加入七和絃；Lv3 加入副屬和絃、拿坡里與皮卡第終止；Lv4 加入增六和絃)。</p>'
+    + '<h3>作答</h3><p>按「播放題目」聆聽 (開頭有預備拍；延長記號會多停一拍)。挖空以「一組」為單位，下方有灰色括號標示。點譜例上的空格或下方的級數框選取一格：① <b>編輯低音</b>：寫出那一拍拍點上的低音 (時值就是那一格的拍數，拍中的經過音不用寫)；② <b>編輯級數</b>：選羅馬數字級數與轉位，另有減／半減、副屬、拿坡里 N6、增六 (It⁺6／Fr⁺6／Ger⁺6) 等按鍵。有掛留音的拍子直接給答案 (例如 V⁷₄ - 3)，不用作答。</p>'
     + '<p>按提交 → 譜例上答對的變綠色、答錯的用紅色標出你的答案，旁邊綠色是正確答案；右上角是「低音與級數都對」的格數。</p>'
     + '<p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>'
     + '<div class="help-foot"><button data-help-close>我知道了</button></div></div>';
