@@ -51,7 +51,7 @@
         /* v.111：譜例影片（譜例＋音檔，mp4） */
         '<div id="em-video-wrap" style="display:none;">' +
           '<div class="em-fmt">影片方向 <span class="em-seg"><button type="button" data-vo="P">直式</button><button type="button" data-vo="L">橫式</button></span></div>' +
-          '<button type="button" class="em-btn ghost" id="em-video">🎬 下載影片</button>' +
+          '<button type="button" class="em-btn ghost" id="em-video">🎬 下載譜例影片</button>' +
         '</div>' +
         /* v.102：一次下載音檔＋譜例（PNG 與 PDF），全部同一個主檔名 */
         '<div id="em-all" style="display:none;">' +
