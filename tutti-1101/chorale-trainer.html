@@ -26,6 +26,8 @@
 <script>window.Soundfont||document.write('<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"><\/script>');</script>
 <script src="piano-engine.js"></script>
 <script src="audio-export.js"></script>
+<script src="sheet-export.js"></script>
+<script src="export-menu.js"></script>
 <script src="vexflow-min.js"></script>
 <script src="chorale-engine.js"></script>
 <script src="chorale-gen.js"></script>
@@ -582,6 +584,7 @@
 
     <div class="unified-action-row" style="margin-top:10px; margin-bottom:12px;">
       <button class="play-btn" id="ch-btnPlayAns" disabled>🔊 聽正解</button>
+      <button class="play-btn exp-btn" id="ch-ansExport" title="導出正解">⬇️</button>
     </div>
 
     <div class="review-label">綠色＝答對；紅色＝你的答案，旁邊的綠色是正確答案：</div>
@@ -1050,16 +1053,26 @@ function showPage(pageId) {
     const headW = first => 42 + nSig * 10 + (first ? 26 : 0);
     // 排成一行一行
     const systems = []; let cur = [], used = 0;
-    meas.forEach((m, i) => {
-      const need = baseW[i] + (cur.length ? 0 : headW(systems.length === 0));
-      if (cur.length && used + need > lineW - 30) { systems.push(cur); cur = []; used = 0; }
-      cur.push(i); used += baseW[i] + (cur.length === 1 ? headW(systems.length === 0) : 0);
-    });
-    if (cur.length) systems.push(cur);
+    if (opts.barsPerSys) {   // 導出：固定每行幾小節（弱起小節跟著第一行）
+      let full = 0;
+      meas.forEach(([a, b], i) => {
+        const isFull = (b - a) >= q.beats - 1e-9 || i === meas.length - 1;
+        if (isFull && full === opts.barsPerSys) { systems.push(cur); cur = []; full = 0; }
+        cur.push(i); if (isFull) full++;
+      });
+      if (cur.length) systems.push(cur);
+    } else {
+      meas.forEach((m, i) => {
+        const need = baseW[i] + (cur.length ? 0 : headW(systems.length === 0));
+        if (cur.length && used + need > lineW - 30) { systems.push(cur); cur = []; used = 0; }
+        cur.push(i); used += baseW[i] + (cur.length === 1 ? headW(systems.length === 0) : 0);
+      });
+      if (cur.length) systems.push(cur);
+    }
 
     // 事件預先標記：跨拍連結線、所在格、是否挖空隱藏
     q.V.forEach(v => v.forEach((e, i) => { e._tiedIn = i > 0 && !!v[i - 1].tie; }));
-    const blank = q.blank || {};
+    const blank = mode === 'clean' ? {} : (q.blank || {});   // clean：導出用的乾淨正解，不挖空、不上色
     const hitInfo = [];   // 挖空格的點選區域
     const notePos = new Map();   // 事件 → {sys, x}
     const tiePairs = [];
@@ -1069,7 +1082,11 @@ function showPage(pageId) {
       const first = si === 0;
       const totalBase = ms.reduce((s, i) => s + baseW[i], 0);
       const hw = headW(first);
-      const stretch = (si === systems.length - 1 && totalBase + hw < lineW * 0.7) ? 1 : (lineW - 30 - hw) / totalBase;
+      let stretch = (si === systems.length - 1 && totalBase + hw < lineW * 0.7) ? 1 : (lineW - 30 - hw) / totalBase;
+      if (opts.barsPerSys) {   // 固定小節數時：最後一行小節較少，寬度照比例，不硬拉滿
+        const nFull = ms.filter(i => (meas[i][1] - meas[i][0]) >= q.beats - 1e-9 || i === meas.length - 1).length;
+        stretch = Math.max(0.6, ((lineW - 30) * Math.min(1, nFull / opts.barsPerSys) - hw) / totalBase);
+      }
       const H = 327, Y0 = 20;
       const div = document.createElement('div'); div.className = 'ch-sys';
       div.style.height = (H * SC) + 'px';
@@ -1206,7 +1223,7 @@ function showPage(pageId) {
     // 級數列與點選區
     const noAsk = {}; (q.noAsk || []).forEach(k => noAsk[k] = 1);
     const xOf = n => (n.getAbsoluteX() + 6) * SC;
-    const slotLab = {};
+    const slotLab = {}, labOf = {};
     const sysOfSlot = {};
     for (let k = 0; k < q.seq.length; k++) {
       const n = notePos.get('B' + k); if (!n) continue;
@@ -1233,7 +1250,7 @@ function showPage(pageId) {
         html = f0.sus ? figHtml(Object.assign({}, f0, { sec: '' })) : figHtml(f0);   // 有掛留時，「/V」寫在解決數字後面
       }
       lab.className += ' ' + cls;
-      lab.innerHTML = html;
+      lab.innerHTML = html; labOf[k] = lab;
       div.appendChild(lab);
       // 級數置中在低音音符上（只看羅馬數字本身）
       const rEl = lab.querySelector('.cfroman');
@@ -1346,13 +1363,17 @@ function showPage(pageId) {
       });
     });
     function systemIndexOf(n) { const st = n.getStave(); for (let i = 0; i < sysEls.length; i++) if (sysEls[i]._ctx === st.getContext()) return i; return 0; }
-    return { sysOfSlot, sysEls };
+    return { sysOfSlot, sysEls, labOf };
   }
 
   /* ---------- 播放 ---------- */
   function playEvents(q, bpm) {
-    const segs = q.durs.map((d, i) => [q.starts[i], q.starts[i] + d, q.ferm[i] ? 2 : 1]);   // 延長記號固定延長一倍
-    const T = qn => { let s = 0; for (const [a, b, f] of segs) { if (qn >= b) s += (b - a) * f; else { s += Math.max(0, qn - a) * f; break; } } return s * 60 / bpm; };
+    // 延長記號一律多停一拍（最後的和絃也一樣）
+    const segs = q.durs.map((d, i) => [q.starts[i], q.starts[i] + d, q.ferm[i] ? (d + 1) / d : 1]);
+    // 預備拍：4/4 敲 4 下、3/4 敲 3 下；有弱起拍時只敲到弱起拍之前
+    const spb = 60 / bpm, nClick = q.beats - (q.pickup ? 1 : 0), lead = nClick * spb;
+    const clicks = []; for (let i = 0; i < nClick; i++) clicks.push({ type: 'click', time: i * spb, freq: i === 0 ? 1000 : 700, gain: 0.2 });
+    const T = qn => { let s = 0; for (const [a, b, f] of segs) { if (qn >= b) s += (b - a) * f; else { s += Math.max(0, qn - a) * f; break; } } return lead + s * 60 / bpm; };
     const ev = [];
     q.V.forEach(notes => {
       for (let k = 0; k < notes.length; k++) {
@@ -1363,7 +1384,81 @@ function showPage(pageId) {
         ev.push({ midi: x.m, time: t0, duration: (t1 - t0) * 0.97, gain: 3.5 * Math.pow(10, lift / 20) * 0.8 });
       }
     });
-    return { ev, end: T(q.total) };
+    return { ev, clicks, lead, end: T(q.total) };
+  }
+  function scheduleClicks(ctx, t0, clicks) {   // 預備拍（三角波，第一拍 1000 Hz、其他 700 Hz，比照單旋律）
+    clicks.forEach(c => {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.value = c.freq;
+      g.gain.setValueAtTime(c.gain, t0 + c.time); g.gain.exponentialRampToValueAtTime(0.01, t0 + c.time + 0.05);
+      o.connect(g); g.connect(audioOut(ctx)); o.start(t0 + c.time); o.stop(t0 + c.time + 0.05);
+    });
+  }
+  /* ---------- 贊助者版：導出正解（免費版按鈕會被 export-menu.js 隱藏） ---------- */
+  function exportAudio(q, bpm, btn) {
+    if (!q || !btn || btn.disabled || !window.AudioExport) return;
+    btn.disabled = true; const old = btn.textContent;
+    const TUNING = 2.0, GAP = 1.0, pe = playEvents(q, bpm);
+    const ev = [{ midi: 69, time: 0, duration: TUNING, gain: 3.5 * 0.8 }];   // 標準音 A 2 秒 → 停 1 秒 → 預備拍 → 題目
+    pe.clicks.forEach(c => ev.push(Object.assign({}, c, { time: TUNING + GAP + c.time })));
+    pe.ev.forEach(e => ev.push(Object.assign({}, e, { time: TUNING + GAP + e.time })));
+    AudioExport.exportEvents(ev, '聖詠和聲', {
+      onStage: st => { btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🎵' : '⬇️'); },
+      onProgress: pr => { btn.textContent = Math.round(pr * 100) + '%'; }
+    }).then(() => { btn.textContent = '✓'; }).catch(() => { btn.textContent = '✗'; })
+      .then(() => setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 1600));
+  }
+  // 級數寫成一行文字（給 MusicXML）：V43/V、V4-3、V7、ii65；臨時記號不寫進去
+  function figText(q, k) {
+    const f = q.figs[k], disp = (q.display && q.display[k]) || q.seq[k];
+    if (!f || !f.sus) return disp;
+    const other = f.rows.filter((r, i) => i !== f.sus.row && r.n).map(r => String(r.n)).join('');
+    const susTxt = (f.rows[f.sus.row].n || '') + '-' + (f.sus.res.n || '');
+    return f.roman + other + (other ? ' ' : '') + susTxt + (f.sec || '');   // 例如 V4-3、V7 4-3
+  }
+  function exportSheet(q, btn) {
+    if (!q || !btn || btn.disabled || !window.SheetExport) return;
+    btn.disabled = true; const old = btn.textContent;
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:1100px; background:#fff;';
+    holder.className = 'ch-export-shot';
+    document.body.appendChild(holder);
+    const done = txt => { btn.textContent = txt; holder.remove(); setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 1600); };
+    let r = null;
+    try { r = renderScore(holder, q, { mode: 'clean', barsPerSys: 4 }); } catch (e) { done('✗'); return; }
+    const items = [];
+    r.sysEls.forEach((div, si) => {
+      const svg = div.querySelector('svg'); if (!svg) return;
+      const sr = svg.getBoundingClientRect(), overlays = [];
+      // 級數、數字、「-」、調名：HTML 文字逐段轉成標註（位置和畫面一模一樣）
+      div.querySelectorAll('.ch-num, .ch-dash, .ch-keyname').forEach(el => {
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let tn; while ((tn = walker.nextNode())) {
+          const txt = tn.nodeValue; if (!txt || !txt.trim()) continue;
+          const pe2 = tn.parentElement, cs = getComputedStyle(pe2);
+          if (cs.visibility === 'hidden') continue;
+          const rg = document.createRange(); rg.selectNodeContents(tn); const rc = rg.getBoundingClientRect();
+          const fs = parseFloat(cs.fontSize) || 16;
+          overlays.push({ x: rc.left - sr.left, y: rc.bottom - sr.top - fs * 0.22, text: txt.trim(), size: Math.round(fs * 10) / 10,
+                          align: 'left', bold: cs.fontWeight >= 600, font: cs.fontFamily, noXml: !el.classList.contains('ch-keyname') });
+        }
+      });
+      // MusicXML 用：每個和絃寫一行級數（圖片上不畫）
+      Object.keys(r.sysOfSlot).forEach(k => {
+        if (r.sysOfSlot[k] !== si) return;
+        const lab = r.labOf && r.labOf[k]; if (!lab) return;
+        const lr = lab.getBoundingClientRect();
+        overlays.push({ x: lr.left - sr.left + 4, y: lr.bottom - sr.top, text: figText(q, k), size: 1, align: 'left', color: 'rgba(0,0,0,0)' });
+      });
+      items.push({ svg, overlays, extraH: 0, centre: false });
+    });
+    if (!items.length) { done('✗'); return; }
+    SheetExport.exportSheets(items, '聖詠和聲', { perRow: 1,
+      onStage: st => { btn.textContent = st === 'render' ? '⏳' : (st === 'encode' ? '🖼️' : '⬇️'); }
+    }).then(() => done('✓')).catch(() => done('✗'));
+  }
+  function openExport(q, bpm, btn) {
+    if (!window.ExportMenu || !q) return;
+    ExportMenu.open({ subtitle: '這一題的正解', onAudio: () => exportAudio(q, bpm, btn), onSheet: () => exportSheet(q, btn) });
   }
 
   /* ---------- 錯題本（存在本機，最多 50 題；鍵名與其他頁一致） ---------- */
@@ -1617,6 +1712,7 @@ function showPage(pageId) {
       this.isPlaying = true; this.hasPlayed = true; this.updatePlayBtns();
       const ctx = ensureAudio(), t0 = ctx.currentTime + 0.1;
       const pe = playEvents(q, bpm);
+      scheduleClicks(ctx, t0, pe.clicks);
       pe.ev.forEach(e => pianoInst.play(e.midi, t0 + e.time, { duration: e.duration, gain: e.gain }));
       PianoEngine.holdUntil(ctx, t0 + pe.end);
       pendingTimers.push(setTimeout(() => { self.isPlaying = false; self.updatePlayBtns(); }, pe.end * 1000 + 200));
@@ -1691,10 +1787,11 @@ function showPage(pageId) {
         const box = document.createElement('div'); box.className = 'review-item';
         const d = new Date(it.ts), when = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
         box.innerHTML = `<div class="ch-rv-head"><b>#${idx + 1}</b>　${esc(it.label)}<span class="ch-rv-time">${when}</span></div>
-          <div class="unified-action-row" style="margin:8px 0;"><button class="play-btn ch-rv-play">🔊 重播</button></div>
+          <div class="unified-action-row" style="margin:8px 0;"><button class="play-btn ch-rv-play">🔊 重播</button><button class="play-btn exp-mini ch-rv-exp" title="導出正解">⬇️</button></div>
           <div class="ch-score-static staff-scroll-container"><div class="ch-score"></div></div>`;
         list.appendChild(box);
         box.querySelector('.ch-rv-play').onclick = () => { if (PianoEngine.isLocked()) return; self.play(it.q, rvBpm()); };
+        const xb = box.querySelector('.ch-rv-exp'); if (xb) xb.onclick = () => openExport(it.q, rvBpm(), xb);
         try { renderScore(box.querySelector('.ch-score'), it.q, { mode: 'check', user: { bass: it.userBass || {}, seq: it.userSeq || {} } }); }
         catch (e) { box.querySelector('.ch-score').textContent = '（這一題無法顯示）'; }
       });
@@ -1720,6 +1817,7 @@ function showPage(pageId) {
       };
       document.getElementById('ch-btnPlay').onclick = () => { if (PianoEngine.isLocked()) return; this.play(); };
       document.getElementById('ch-btnPlayAns').onclick = () => { if (PianoEngine.isLocked()) return; this.play(); };
+      const ansX = document.getElementById('ch-ansExport'); if (ansX) ansX.onclick = () => openExport(this.q, this.bpm, ansX);
       document.getElementById('btn-case-switch').onclick = (e) => {
         e.target.classList.toggle('active-toggle');
         const up = e.target.classList.contains('active-toggle');
@@ -1829,7 +1927,7 @@ function showPage(pageId) {
     + '<h2>聖詠和聲 — 玩法說明</h2>'
     + '<p class="help-lead">聆聽巴哈聖詠風格的四部和聲：上方三個聲部都已寫好，請在空格填出低音與級數 (含轉位)。</p>'
     + '<h3>設定</h3><p>可選調性 (隨機 24 大小調／僅大調／僅小調)、拍號 (4/4、3/4)、小節數 (4～12)、挖空多寡 (少／中／多)、速度、難度 Lv1～Lv3 (Lv1 三和絃含所有轉位；Lv2 加入七和絃；Lv3 加入副屬和絃、拿坡里與皮卡第終止)。</p>'
-    + '<h3>作答</h3><p>按「播放題目」聆聽 (延長記號的和絃會延長一倍)。挖空以「一組」為單位，下方有灰色括號標示。點譜例上的空格或下方的級數框選取一格：① <b>編輯低音</b>：寫出那一拍拍點上的低音 (時值就是那一格的拍數，拍中的經過音不用寫)；② <b>編輯級數</b>：選羅馬數字級數與轉位，另有減／半減、副屬、拿坡里 N6 等按鍵。有掛留音的拍子直接給答案 (例如 V⁷₄ - 3)，不用作答。</p>'
+    + '<h3>作答</h3><p>按「播放題目」聆聽 (開頭有預備拍；延長記號會多停一拍)。挖空以「一組」為單位，下方有灰色括號標示。點譜例上的空格或下方的級數框選取一格：① <b>編輯低音</b>：寫出那一拍拍點上的低音 (時值就是那一格的拍數，拍中的經過音不用寫)；② <b>編輯級數</b>：選羅馬數字級數與轉位，另有減／半減、副屬、拿坡里 N6 等按鍵。有掛留音的拍子直接給答案 (例如 V⁷₄ - 3)，不用作答。</p>'
     + '<p>按提交 → 譜例上答對的變綠色、答錯的用紅色標出你的答案，旁邊綠色是正確答案；右上角是「低音與級數都對」的格數。</p>'
     + '<p style="text-align:center;margin:14px 0 0;"><a href="https://forms.gle/EdacP17KLz1VBpyE8" target="_blank" rel="noopener" style="font-size:13px;font-weight:700;color:#75705f;text-decoration:none;border-bottom:1px dashed #ddd8c9;">🐞 回報問題或建議</a></p>'
     + '<div class="help-foot"><button data-help-close>我知道了</button></div></div>';

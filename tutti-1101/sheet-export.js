@@ -738,6 +738,10 @@
               if (tStop) nt.push('<tied type="stop"/>');
               if (tStart) nt.push('<tied type="start"/>');
               if (i === 0 && tFirst) nt.push('<tuplet type="start" bracket="yes" placement="above"/>');   // 和 PNG 一樣有括弧
+              if (i === 0 && !rest) {   // v.111：延長記號（聖詠和聲：女高音上方 a@a、男低音下方 a@u）
+                var fmods = (n.getModifiers ? n.getModifiers() : n.modifiers) || [];
+                fmods.forEach(function (md2) { if (md2 && (md2.type === 'a@a' || md2.type === 'a@u')) nt.push('<fermata type="' + (md2.type === 'a@u' ? 'inverted' : 'upright') + '"/>'); });
+              }
               if (i === 0 && tLast) nt.push('<tuplet type="stop"/>');
               if (nt.length) x.push('<notations>' + nt.join('') + '</notations>');
               if (i === 0 && !lyricDone && v === lowestVoice && lyrics.length) {
