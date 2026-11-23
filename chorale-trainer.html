@@ -1840,14 +1840,7 @@ function showPage(pageId) {
       const info = renderScore(host, this.q, { maxSysH: box.clientHeight, mode: 'ask', user: { bass: this.userBass, seq: this.userSeq }, active: this.activeSlot, onPick: (k, part) => this.pickSlot(k, part) });
       host.style.minHeight = '';
       box.scrollTop = keep;
-      // 選到的格子所在的那一行沒有完整顯示時，把整個大譜表對齊譜例區頂端（四個聲部與級數都看得到）
-      const si = info.sysOfSlot[this.activeSlot];
-      if (si != null && box.scrollHeight > box.clientHeight + 4) {
-        const sr = info.sysEls[si].getBoundingClientRect(), br = box.getBoundingClientRect();
-        if (sr.top < br.top - 1 || sr.bottom > br.bottom + 1) {
-          box.scrollTo({ top: Math.max(0, box.scrollTop + (sr.top - br.top) - 4), behavior: 'smooth' });
-        }
-      }
+      // v111.18：不再跟著選到的格子自動捲動（作者：捲動交給使用者；新題目從第一小節開始）
       this.updatePlayBtns();
     },
 
