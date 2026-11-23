@@ -132,7 +132,7 @@
       var audio = await global.PianoEngine.renderOffline(events);
       /* v.111：影片導出要用算好的聲音（還沒轉 mp3）；只做影片時到這裡就結束 */
       if (col && col.raw) {
-        col.raw.audio = audio; col.raw.prefix = prefix;
+        col.raw.audio = audio; col.raw.prefix = prefix; col.raw.events = events;   // v.112：跟隨影片用發聲事件對時間
         if (col.videoOnly) { var rv = { ok: true, collected: true }; if (ui.onStage) ui.onStage('done', rv); return rv; }
       }
       if (ui.onStage) ui.onStage('encode');

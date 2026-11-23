@@ -50,7 +50,7 @@
         '<button type="button" class="em-btn ghost" id="em-sheet2" style="display:none;"></button>' +
         /* v.111：譜例影片（譜例＋音檔，mp4） */
         '<div id="em-video-wrap" style="display:none;">' +
-          '<div class="em-fmt">影片方向 <span class="em-seg"><button type="button" data-vo="P">直式</button><button type="button" data-vo="L">橫式</button></span></div>' +
+          '<div class="em-fmt">影片方向 <span class="em-seg"><button type="button" data-vo="A">自動</button><button type="button" data-vo="P">直式</button><button type="button" data-vo="L">橫式</button></span></div>' +
           '<button type="button" class="em-btn ghost" id="em-video">🎬 下載譜例影片</button>' +
         '</div>' +
         /* v.102：一次下載音檔＋譜例（PNG 與 PDF），全部同一個主檔名 */
@@ -106,8 +106,9 @@
 
   /* ---- 影片方向（v.111，記住上次的選擇）---- */
   var VO_KEY = 'earTrainer.export.videoOrient';
-  function videoOrient() { try { if (localStorage.getItem(VO_KEY) === 'L') return 'L'; } catch (e) {} return 'P'; }
-  function setOrient(v) { try { localStorage.setItem(VO_KEY, v === 'L' ? 'L' : 'P'); } catch (e) {} }
+  /* v.112：自動｜直式｜橫式，預設自動（v.111 存的 P／L 照舊沿用） */
+  function videoOrient() { try { var v = localStorage.getItem(VO_KEY); if (v === 'L' || v === 'P') return v; } catch (e) {} return 'A'; }
+  function setOrient(v) { try { localStorage.setItem(VO_KEY, (v === 'L' || v === 'P') ? v : 'A'); } catch (e) {} }
 
   /* ---- 譜例影片（v.111）----
      跟「全部下載」同一套：照這一頁原本的流程算音檔、畫譜例，但不產生檔案，
@@ -135,9 +136,11 @@
   }
   async function buildVideo(col, onPct) {
     await ensureVideo();
-    var cvs = col.raw.canvases;
-    return await global.VideoExport.make(cvs[cvs.length - 1], col.raw.audio,
-      { orient: videoOrient(), onProgress: onPct });
+    var cvs = col.raw.canvases, cv = cvs[cvs.length - 1];
+    return await global.VideoExport.make(cv, col.raw.audio,
+      { orient: videoOrient(), onProgress: onPct,
+        follow: cv.__follow || global.VideoExport.followFromScore(cv.__score, col.raw.events),   // v.112：跟隨影片（頁面給的拍點，或由譜面＋發聲事件推算；推不出來就是靜態）
+        unitScale: (cv.__layout && cv.__layout.scale) || 1 });
   }
   async function runVideo() {
     if (busy || !current) return;

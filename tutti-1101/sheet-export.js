@@ -233,6 +233,7 @@
     var ctx = canvas.getContext('2d');
     ctx.scale(scale, scale);
     ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+    var cellPos = [];
 
     items.forEach(function (it, i) {
       var r = Math.floor(i / perRow), c = i % perRow;
@@ -248,6 +249,7 @@
       var sy = y + (hasNum ? NUM_H : 0) + (hasTitle ? TITLE_H : 0);
       /* 譜例在格子裡置中（各頁的譜例寬度不一樣），並裁掉上下的空白 */
       var ox = x + (cellW - s.w) / 2;
+      cellPos[i] = { ox: ox, sy: sy, cutTop: s.cutTop, cutH: s.cutH, w: s.w };   // v.112：跟隨影片要知道每一格在畫布上的位置
       /* 標題寫在譜例上方，第一個字對齊譜號（titleX 是譜例座標系裡譜號的左緣） */
       if (it.title) {
         ctx.fillStyle = INK;
@@ -286,6 +288,36 @@
         ctx.fillText(it.answer, ax, sy + cellH + extraH + 16);
       }
     });
+
+    /* v.112：跟隨影片。頁面在 items[i].follow 給「每一拍的時間與 x（譜例座標）」，換算成畫布座標交給 VideoExport */
+    if (items.some(function (it) { return it.follow; })) {
+      var fl = { clicks: [], lines: [] };
+      items.forEach(function (it, i) {
+        var f = it.follow, c = cellPos[i];
+        if (!f || !c) return;
+        if (f.clicks && f.clicks.length) fl.clicks = f.clicks;
+        fl.lines.push({ y0: c.sy, y1: c.sy + c.cutH, x0: c.ox, x1: c.ox + c.w,
+          pts: f.pts.map(function (p) { return { t: p.t, x: c.ox + p.x }; }) });
+      });
+      canvas.__follow = fl;
+    } else {
+      var sc = [];
+      items.forEach(function (it, i) {
+        var c = cellPos[i], sh = shots[i], f = null;
+        try { f = followScore(it.svg); } catch (e) {}
+        sc.push({ y0: c.sy, y1: c.sy + c.cutH, x0: c.ox, x1: c.ox + c.w, ox: c.ox,
+                  headX: (sh && sh.box && sh.box.headCentre != null) ? c.ox + sh.box.headCentre : null,
+                  onsets: f ? f.onsets.map(function (o) { return { tick: o.tick, x: c.ox + o.x, sound: o.sound }; }) : [],
+                  measures: f ? f.measures.map(function (m) { return { s: m.s, e: m.e, x0: c.ox + m.x0, x1: c.ox + m.x1, beat: m.beat }; }) : [] });
+      });
+      canvas.__score = sc;
+    }
+    /* 每一格的上下改成「那一排」的範圍（含下方的答案文字），換頁時才不會切到字 */
+    var bandOf = function (y) { for (var r = 0; r < rows; r++) { var top = PAD + r * blockH; if (y >= top - 1 && y < top + blockH) return { top: top, bottom: top + blockH - ((rows > 1) ? ROW_GAP : 0) }; } return null; };
+    if (rows > 1) {
+      (canvas.__score || []).forEach(function (c) { var b = bandOf(c.y0); if (b) { c.y0 = b.top; c.y1 = b.bottom; } });
+      if (canvas.__follow) canvas.__follow.lines.forEach(function (l) { var b = bandOf(l.y0); if (b) { l.y0 = b.top; l.y1 = b.bottom; } });
+    }
 
     /* 版面資訊給 PDF 換頁用：每一排的上下緣（畫布座標，未乘解析度） */
     canvas.__layout = { W: W, H: H, scale: scale, rows: rows, bands: (function () {
@@ -628,6 +660,71 @@
     });
     return { cols: cols, nStaff: nStaff,
              tieInfo: tieInfo, beamInfo: beamInfo, alterOf: alterOf };
+  }
+
+  /* ===== v.112：跟隨影片用的譜面資訊 =====
+     從記下來的 VexFlow 音符算出：每個起音的 tick（四分音符＝MX_DIV）與 x、每個小節的範圍與拍長。
+     時間不在這裡算——由影片端拿「實際的發聲事件」逐一對應（各頁不必另外提供速度）。 */
+  function fTx(el) {
+    var t = 0;
+    for (var e = el && el.parentNode; e && e.nodeName && e.nodeName.toLowerCase() !== 'svg'; e = e.parentNode) {
+      var m = ((e.getAttribute && e.getAttribute('transform')) || '').match(/translate\(\s*(-?[0-9.]+)/);
+      if (m) t += parseFloat(m[1]);
+    }
+    return t;
+  }
+  function fNoteX(svg, n) {
+    try {
+      var id = n.attrs && n.attrs.id, g = id && svg.querySelector('[id="vf-' + id + '"]');
+      if (g) {
+        var xs = [];
+        g.querySelectorAll('.vf-notehead path').forEach(function (p) {
+          var m = (p.getAttribute('d') || '').match(/M\s*(-?[0-9.]+)/); if (m) xs.push(parseFloat(m[1]) + fTx(p));
+        });
+        if (xs.length) return Math.min.apply(null, xs) + 6;
+      }
+    } catch (e) {}
+    return mxNoteX(n) + 6;
+  }
+  function followScore(svg) {
+    var md = mxItemModel(svg);
+    if (!md || !md.cols.length) return null;
+    var onsets = [], measures = [], tick0 = 0;
+    md.cols.forEach(function (c) {
+      var len = 0, beat = MX_DIV;
+      var tm = String(c.time || '').match(/^(\d+)\/(\d+)$/);
+      if (tm) { var num = +tm[1], den = +tm[2]; len = num * MX_DIV * 4 / den;
+        beat = (den === 8 && num % 3 === 0) ? MX_DIV * 1.5 : MX_DIV * 4 / den; }
+      var byTick = {};
+      for (var si = 0; si < md.nStaff; si++) {
+        var groups = {}, order = [];
+        var gi = new Map();
+        c.notes[si].forEach(function (n) {
+          var v = n.voice || n.getVoice && (function () { try { return n.getVoice(); } catch (e) { return null; } })() || 'v';   // 同 MusicXML 的分聲部方式
+          if (!gi.has(v)) { gi.set(v, order.length); order.push(order.length); groups[gi.get(v)] = []; }
+          groups[gi.get(v)].push(n);
+        });
+        order.forEach(function (v) {
+          var g = groups[v].slice().sort(function (a, b) { return mxNoteX(a) - mxNoteX(b); }), t = 0;
+          g.forEach(function (n) {
+            var rest = n.isRest ? n.isRest() : /r$/.test(String(n.getDuration ? n.getDuration() : ''));
+            var ti = md.tieInfo.get(n), tied = ti && Object.keys(ti.stop).length >= (n.keys || [1]).length;
+            var x = fNoteX(svg, n), o = byTick[t];
+            if (!o) o = byTick[t] = { tick: tick0 + t, x: x, sound: false };
+            else o.x = Math.min(o.x, x);
+            if (!rest && !tied) o.sound = true;
+            t += mxDur(n).div;
+          });
+          if (t > len) len = t;
+        });
+      }
+      var st = c.staves[0], x0 = st.getNoteStartX ? st.getNoteStartX() : st.x, x1 = st.x + (st.width || 0);
+      measures.push({ s: tick0, e: tick0 + len, x0: x0, x1: x1 - 6, beat: beat });
+      Object.keys(byTick).forEach(function (k) { onsets.push(byTick[k]); });
+      tick0 += len;
+    });
+    onsets.sort(function (a, b) { return a.tick - b.tick; });
+    return { onsets: onsets, measures: measures };
   }
 
   function buildMusicXML(items, ui) {

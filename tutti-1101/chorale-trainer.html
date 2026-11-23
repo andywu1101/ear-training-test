@@ -1522,7 +1522,7 @@ function showPage(pageId) {
         else ev.push({ midi: x.m, time: t0, duration: (t1 - t0) * 0.97, gain: 3.5 * Math.pow(10, lift / 20) * 0.8 });
       }
     });
-    return { ev, clicks, lead, end: T(q.total) };
+    return { ev, clicks, lead, end: T(q.total), T };
   }
   function scheduleClicks(ctx, t0, clicks) {   // 預備拍（三角波，第一拍 1000 Hz、其他 700 Hz，比照單旋律）
     clicks.forEach(c => {
@@ -1559,7 +1559,35 @@ function showPage(pageId) {
     const susTxt = (f.rows[f.sus.row].n || '') + '-' + (f.sus.res.n || '');
     return f.roman + other + (other ? ' ' : '') + susTxt + (f.sec || '');   // 例如 V4-3、V7 4-3
   }
-  function exportSheet(q, btn) {
+  /* v.112：跟隨影片的拍點。時間與 exportEventsOf 相同（標準音 2 秒＋停 1 秒＋預備拍＋題目），
+     x 是這一行譜例（SVG）裡的位置：每個和絃取級數的中心（級數以低音置中），
+     一個和絃佔好幾拍時，中間的拍在這個和絃與下一個和絃之間等分；行尾加一點在最後的小節線。 */
+  function followOf(q, bpm, r, si, svg) {
+    if (!bpm) return null;
+    const OFF = 2.0 + 1.0, pe = playEvents(q, bpm), sr = svg.getBoundingClientRect();
+    const ks = Object.keys(r.sysOfSlot).map(Number).filter(k => r.sysOfSlot[k] === si && r.labOf && r.labOf[k]).sort((a, b) => a - b);
+    if (!ks.length) return null;
+    // 級數的中心再吸附到最近的符頭（級數有 ♯、數字時中心會偏右）
+    const heads = []; svg.querySelectorAll('.vf-notehead').forEach(h => { const b = h.getBoundingClientRect(); if (b.width) heads.push((b.left + b.right) / 2 - sr.left); });
+    const xOf = k => {
+      const lr = r.labOf[k].getBoundingClientRect(), c = (lr.left + lr.right) / 2 - sr.left;
+      let best = c, d = 26; heads.forEach(h => { if (Math.abs(h - c) < d) { d = Math.abs(h - c); best = h; } });
+      return best;
+    };
+    let xEnd = 0;
+    svg.querySelectorAll('rect').forEach(rc => { const x = parseFloat(rc.getAttribute('x')) + parseFloat(rc.getAttribute('width') || 0); if (x > xEnd) xEnd = x; });
+    if (!xEnd) xEnd = sr.width - 8;
+    const pts = [];
+    ks.forEach((k, i) => {
+      const x0 = xOf(k), x1 = i + 1 < ks.length ? xOf(ks[i + 1]) : xEnd - 8;
+      const n = Math.max(1, Math.round(q.durs[k]));   // 聖詠是 4/4、3/4：一拍＝一個四分音符
+      for (let b = 0; b < n; b++) pts.push({ t: OFF + pe.T(q.starts[k] + b), x: x0 + (x1 - x0) * b / n });
+    });
+    const kl = ks[ks.length - 1];
+    pts.push({ t: OFF + pe.T(q.starts[kl] + q.durs[kl]) - 0.001, x: xEnd - 8 });
+    return { pts, clicks: si === 0 ? pe.clicks.map(c => OFF + c.time) : null };
+  }
+  function exportSheet(q, btn, bpm) {
     if (!q || !btn || btn.disabled || !window.SheetExport) return;
     btn.disabled = true; const old = btn.textContent;
     const holder = document.createElement('div');
@@ -1593,7 +1621,7 @@ function showPage(pageId) {
         const lr = lab.getBoundingClientRect();
         overlays.push({ x: lr.left - sr.left + 4, y: lr.bottom - sr.top, text: figText(q, k), size: 1, align: 'left', color: 'rgba(0,0,0,0)' });
       });
-      items.push({ svg, overlays, extraH: 0, centre: false });
+      items.push({ svg, overlays, extraH: 0, centre: false, follow: followOf(q, bpm, r, si, svg) });
     });
     if (!items.length) { done('✗'); return; }
     SheetExport.exportSheets(items, '聖詠和聲', { perRow: 1,
@@ -1602,7 +1630,7 @@ function showPage(pageId) {
   }
   function openExport(q, bpm, btn) {
     if (!window.ExportMenu || !q) return;
-    ExportMenu.open({ subtitle: '這一題的正解', onAudio: () => exportAudio(q, bpm, btn), onSheet: () => exportSheet(q, btn) });
+    ExportMenu.open({ subtitle: '這一題的正解', onAudio: () => exportAudio(q, bpm, btn), onSheet: () => exportSheet(q, btn, bpm) });
   }
 
   /* ---------- 錯題本（存在本機，最多 50 題；鍵名與其他頁一致） ---------- */
