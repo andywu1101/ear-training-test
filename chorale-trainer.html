@@ -649,7 +649,7 @@ function showPage(pageId) {
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
   document.body.classList.toggle('practice-locked', pageId === 'ch-practice');
   if (pageId === 'ch-settings') document.getElementById('pageChSettings').classList.add('active');
-  else if (pageId === 'ch-practice') document.getElementById('pageChPractice').classList.add('active');
+  else if (pageId === 'ch-practice') { document.getElementById('pageChPractice').classList.add('active'); const _kb = document.querySelector('#pageChPractice .ch-keyboard-area'); if(_kb) _kb.scrollTop = 0; }   // 按鍵區一律從最上面開始
   else if (pageId === 'ch-answer') document.getElementById('pageChAnswer').classList.add('active');
   else if (pageId === 'ch-review') { document.getElementById('pageChReview').classList.add('active'); if (window.chModule) window.chModule.renderReviewPage(); }
   window.scrollTo({ top: 0, behavior: 'smooth' });

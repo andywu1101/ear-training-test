@@ -654,8 +654,8 @@ function showPage(pageId) {
   if (window.melStopAll) window.melStopAll();
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
   if (pageId === 'mel-settings') { document.getElementById('pageMelSettings').classList.add('active'); if(window.melModule) window.melModule.refreshReviewCount(); }
-  else if (pageId === 'mel-practice') document.getElementById('pageMelPractice').classList.add('active');
-  else if (pageId === 'mel-answer') document.getElementById('pageMelAnswer').classList.add('active');
+  else if (pageId === 'mel-practice') { document.getElementById('pageMelPractice').classList.add('active'); resetStaffScroll(); const _bs = document.querySelector('#pageMelPractice .practice-bottom-scroll'); if(_bs) _bs.scrollTop = 0; }   // 頁面顯示後再歸零，譜例才會回到第一小節
+  else if (pageId === 'mel-answer') { const _ap = document.getElementById('pageMelAnswer'); _ap.classList.add('active'); _ap.scrollTop = 0; }   // 解答頁一律從頂端開始
   else if (pageId === 'mel-review') { document.getElementById('pageMelReview').classList.add('active'); if(window.melModule) window.melModule.renderReviewPage(); initReviewBpm(); }
 }
 

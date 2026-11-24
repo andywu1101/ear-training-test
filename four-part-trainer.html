@@ -657,7 +657,7 @@ function showPage(pageId) {
   // 僅作答頁鎖定 body（滿版不捲動）；其他頁面正常可捲動
   document.body.classList.toggle('practice-locked', pageId === 'fpt-practice');
   if (pageId === 'fpt-settings') document.getElementById('pageFptSettings').classList.add('active');
-  else if (pageId === 'fpt-practice') document.getElementById('pageFptPractice').classList.add('active');
+  else if (pageId === 'fpt-practice') { document.getElementById('pageFptPractice').classList.add('active'); const _kb = document.querySelector('#pageFptPractice .fpt-keyboard-area'); if(_kb) _kb.scrollTop = 0; }   // 按鍵區一律從最上面開始
   else if (pageId === 'fpt-answer') document.getElementById('pageFptAnswer').classList.add('active');
   else if (pageId === 'fpt-review') {
     document.getElementById('pageFptReview').classList.add('active');
