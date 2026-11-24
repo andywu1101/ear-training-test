@@ -1262,7 +1262,7 @@ function updateStaffHeader(pageId){
     function generateQ(){
       const pool = activePool(); const key = pool[Math.floor(Math.random() * pool.length)];
       const root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
-      const baseIvs = QUALITIES[key].intervals; const invIdx = inversion ? Math.floor(Math.random() * baseIvs.length) : 0;
+      const baseIvs = QUALITIES[key].intervals; const invIdx = inversion ? Math.floor(Math.random() * Math.min(baseIvs.length, 4)) : 0;   // v.112.4：九和絃不出第四轉位（九音不放低音）
       const voiced = applyInv(baseIvs, invIdx);
       return withSpell({ root, qualityKey: key, intervals: voiced.map(v=>v.semis), steps: voiced.map(v=>v.step) });
     }
@@ -1278,7 +1278,7 @@ function updateStaffHeader(pageId){
       if(allowRepeat){ const qs = [], used = new Set(); for(let i=0; i<count; i++){ const q = genNotSame(generateQ, used); used.add(pitchSig(q)); qs.push(q); } return qs; }
       return shuffleCopy(activePool()).slice(0, count).map(key => {
         const root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
-        const baseIvs = QUALITIES[key].intervals; const invIdx = inversion ? Math.floor(Math.random() * baseIvs.length) : 0;
+        const baseIvs = QUALITIES[key].intervals; const invIdx = inversion ? Math.floor(Math.random() * Math.min(baseIvs.length, 4)) : 0;   // v.112.4：九和絃不出第四轉位（九音不放低音）
         const voiced = applyInv(baseIvs, invIdx);
         return withSpell({ root, qualityKey: key, intervals: voiced.map(v=>v.semis), steps: voiced.map(v=>v.step) });
       });
