@@ -1114,9 +1114,11 @@ function showPage(pageId) {
 
     // 事件預先標記：跨拍連結線、所在格、是否挖空隱藏
     q.V.forEach(v => v.forEach((e, i) => { e._tiedIn = i > 0 && !!v[i - 1].tie; }));
-    const blank = mode === 'clean' ? {} : (q.blank || {});   // clean：導出用的乾淨正解，不挖空、不上色
+    // v112.6：和聲作業（opts.hw＝'keep' 掛留數字保留／'blank' 掛留也留空）：每一拍都作答，四聲部照常畫
+    const hwMode = mode === 'paper' && !!opts.hw;
+    const blank = mode === 'clean' ? {} : (hwMode ? q.seq.reduce((o, _, k) => (o[k] = 1, o), {}) : (q.blank || {}));   // clean：導出用的乾淨正解，不挖空、不上色
     // paper：音聽出考卷（opts.paper＝'blank' 作答卷：低音挖空；'key' 解答卷：低音照常畫）。版面兩者相同
-    const hideBass = mode === 'ask' || (mode === 'paper' && opts.paper === 'blank');
+    const hideBass = mode === 'ask' || (mode === 'paper' && opts.paper === 'blank' && !hwMode);
     const hitInfo = [];   // 挖空格的點選區域
     const notePos = new Map();   // 事件 → {sys, x}
     const tiePairs = [];
@@ -1221,7 +1223,7 @@ function showPage(pageId) {
             tick.push(note); allNotes.push(note);
             notePos.set(e, note); e._note = note; e._sys = si;
             if (v === 3 && Math.abs(e.t - q.starts[e.slot]) < 1e-9) notePos.set('B' + e.slot, note);
-            if (mode === 'paper' && v === 3 && blank[e.slot] && Math.abs(e.t - q.starts[e.slot]) < 1e-9)   // 解答卷：括號的位置照作答卷
+            if (mode === 'paper' && !hwMode && v === 3 && blank[e.slot] && Math.abs(e.t - q.starts[e.slot]) < 1e-9)   // 解答卷：括號的位置照作答卷（和聲作業沒有低音括號）
               hitInfo.push({ slot: e.slot, note, stave: sB, sys: si, nextIn: evs[ei + 1] && evs[ei + 1].slot === e.slot ? evs[ei + 1] : null });
             ei++;
           }
@@ -1278,7 +1280,7 @@ function showPage(pageId) {
     }));
 
     // 級數列與點選區
-    const noAsk = {}; (q.noAsk || []).forEach(k => noAsk[k] = 1);
+    const noAsk = {}; if (!hwMode) (q.noAsk || []).forEach(k => noAsk[k] = 1);   // 和聲作業：每一拍都要作答（含掛留）
     const xOf = n => (n.getAbsoluteX() + 6) * SC;
     const slotLab = {}, labOf = {};
     const sysOfSlot = {};
@@ -1292,7 +1294,11 @@ function showPage(pageId) {
       lab.style.top = y + 'px';
       let html = '', cls = '';
       if (blank[k] && !noAsk[k]) {
-        if (mode === 'paper') html = opts.paper === 'key' ? figHtml(q.figs[k]) : '';   // 考卷：作答卷空白、解答卷寫正解（黑色）
+        if (mode === 'paper') {
+          html = opts.paper === 'key' ? (q.figs[k].sus ? figHtml(Object.assign({}, q.figs[k], { sec: '' })) : figHtml(q.figs[k])) : '';   // 考卷：作答卷空白、解答卷寫正解（黑色）。掛留的「/x」寫在解決數字後面
+          // 和聲作業、掛留保留：作答卷只印掛留數字（羅馬數字佔位但不顯示，位置與解答卷相同）
+          if (hwMode && opts.paper !== 'key' && opts.hw === 'keep' && q.figs[k].sus) html = figHtml(Object.assign({}, q.figs[k], { sec: '' })).replace('class="cfroman"', 'class="cfroman" style="visibility:hidden"');
+        }
         else if (mode === 'ask') {
           const f = userFig(user.seq[k]);
           html = f ? figHtml(f) : '';
@@ -1320,7 +1326,7 @@ function showPage(pageId) {
       if (blank[k] && !noAsk[k] && mode === 'ask') slotLab[k] = lab;
       // 掛留：解決音下方寫解決後的數字，中間「-」
       const f = q.figs[k];
-      if (f.sus) {
+      if (f.sus && !(hwMode && opts.paper !== 'key' && opts.hw === 'blank')) {   // 和聲作業、掛留留空：作答卷不印解決數字
         const vv = q.V.find(v => v.some(e => e.slot === k && e.k === 'res'));
         const re = vv && vv.find(e => e.slot === k && e.k === 'res');
         if (re && re._note) {
@@ -2055,9 +2061,9 @@ function showPage(pageId) {
   const PAPER_W = 1133;   // 畫譜寬度（VexFlow 單位）：排到 A4 內容寬（180 mm）時，譜表大小和四部和聲一樣（約 0.6 倍）
   const ULINE = 60;   // 考卷底線的長度（夠寫 V⁶₅/V）
   const ULINE_DY = 23;   // 底線在羅馬數字基線下方多少：三層數字（V⁶₄₃/V）最下層數字的基線約在 +19.3，再留約 3.5 的空隙
-  function makerSnap(m) { return { levelId: m.curLevel.id, keyPref: m.keyPref, meterPref: m.meterPref, barsPref: m.barsPref, amount: m.amount, bpm: m.bpm, timbre: useOrgan() ? 'organ' : 'piano' }; }
-  function makerData(q, snap) { return { q: storable(q), bpm: snap.bpm, levelId: snap.levelId, timbre: snap.timbre === 'organ' ? 'organ' : 'piano' }; }
-  function makerTitle(d) { const q = d.q; return q.key.name.replace(' ', '') + ' ' + q.meter + '拍 ' + q.bars + '小節'; }
+  function makerSnap(m) { return { levelId: m.curLevel.id, keyPref: m.keyPref, meterPref: m.meterPref, barsPref: m.barsPref, amount: m.amount, bpm: m.bpm, timbre: useOrgan() ? 'organ' : 'piano', hw: m.makerHw || false }; }   // v112.6：hw＝作答卷樣式（false 聽寫／'keep' 和聲作業／'blank' 和聲作業含掛留）
+  function makerData(q, snap) { return { q: storable(q), bpm: snap.bpm, levelId: snap.levelId, timbre: snap.timbre === 'organ' ? 'organ' : 'piano', hw: (snap.hw === 'keep' || snap.hw === 'blank') ? snap.hw : false }; }
+  function makerTitle(d) { const q = d.q; return q.key.name.replace(' ', '') + ' ' + q.meter + '拍 ' + q.bars + '小節' + (d.hw === 'keep' ? '（和聲作業）' : d.hw === 'blank' ? '（和聲作業，含掛留）' : ''); }
   function makerOffer() {
     const m = chModule, btn = document.getElementById('ch-enterBtn');
     m.barsPref = document.getElementById('ch-barsSelect').value;
@@ -2071,14 +2077,14 @@ function showPage(pageId) {
     }, () => { m.busy = false; btn.textContent = old; });
   }
   // 一份考卷用的譜：每行一張 SVG（音符、括號、調名、級數都畫在 SVG 裡，列印與 PDF 都不會跑位）
-  function paperSystems(q, which) {
+  function paperSystems(q, which, hw) {
     const holder = document.createElement('div');
     holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:' + (PAPER_W + 4) + 'px; background:#fff;';
     document.body.appendChild(holder);
     const r1 = v => Math.round(v * 10) / 10;
     const attr = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     try {
-      const r = renderScore(holder, JSON.parse(JSON.stringify(q)), { mode: 'paper', paper: which, barsPerSys: 3, numFs: 20 });
+      const r = renderScore(holder, JSON.parse(JSON.stringify(q)), { mode: 'paper', paper: which, barsPerSys: 3, numFs: 20, hw: hw || false });
       return r.sysEls.map(div => {
         const svg = div.querySelector('svg'), sr = svg.getBoundingClientRect();
         const W = r1(sr.width), H = r1(sr.height);
@@ -2114,7 +2120,7 @@ function showPage(pageId) {
     type: 'chorale',
     regen: function (snap) { return genAsync(cfgFrom(snap)).then(q => makerData(q || genSync(cfgFrom(snap)), snap)); },
     musicxml: function () { return ''; },   // 聖詠和聲的考卷用 paper() 畫好的譜，不經過 MusicXML
-    paper: function (data) { return { blank: paperSystems(data.q, 'blank'), key: paperSystems(data.q, 'key') }; },
+    paper: function (data) { return { blank: paperSystems(data.q, 'blank', data.hw), key: paperSystems(data.q, 'key', data.hw) }; },
     answers: function (data) { return { key: data.q.key.name.replace(' ', '') + '：' }; },
     events: function (data) {   // 用那一題自己記的音色（沒有記的舊題目＝鋼琴）
       timbreOverride = data && data.timbre === 'organ' ? 'organ' : 'piano';
@@ -2130,6 +2136,15 @@ function showPage(pageId) {
     st.textContent = 'body.maker-mode #pageChSettings .nav-header-row, body.maker-mode #ch-reviewEntryBtn { display:none !important; }';
     document.head.appendChild(st);
     const enter = document.getElementById('ch-enterBtn'); if (enter) enter.textContent = '➕ 出題';
+    /* v112.6：作答卷樣式（只在出題模式加進設定頁；題目卡片上也能再改） */
+    const tg = document.getElementById('ch-timbreSwitch');
+    if (tg) {
+      const g = document.createElement('div'); g.className = 'switch-group';
+      g.innerHTML = '<div class="switch-group-label">作答卷樣式</div><select id="ch-hwSelect" class="select-box">' +
+        '<option value="">聽寫（低音與級數挖空）</option><option value="keep">和聲作業（掛留數字保留）</option><option value="blank">和聲作業（掛留也留空）</option></select>';
+      tg.parentNode.parentNode.insertBefore(g, tg.parentNode.nextSibling);
+      g.querySelector('select').onchange = e => { chModule.makerHw = e.target.value || false; };
+    }
   }
 
   chModule.init(); loadPiano();

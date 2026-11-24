@@ -349,6 +349,11 @@
   .it-set{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; margin-top:8px; }
   .it-r2, .it-r3{ display:contents; }
   .it-r3:empty{ display:none; }
+  /* v112.6：題目卡片的列表式按鈕（樂器）：外觀是一顆按鈕，點下去是系統內建的列表；.it-brk 讓後面的項目換到下一行 */
+  .it-brk{ flex-basis:100%; height:0; }
+  .it-ins{ position:relative; display:inline-flex; align-items:center; height:28px; box-sizing:border-box; padding:0 10px; border:1px solid var(--panel-border); border-radius:7px; background:#fff; font-size:13px; color:var(--ink-soft); cursor:pointer; white-space:nowrap; }
+  .it-ins select{ position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; font-size:16px; }
+  body.m .it-ins{ height:32px; font-size:14px; padding:0 12px; }
   .it-grp, .it-bpm, .it-sc{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:13px; color:var(--ink-soft); flex:none; }
   .it .it-sel, .it .it-bpm input, .it .it-sc input{ font-size:13px; height:28px; box-sizing:border-box; padding:0 6px; border:1px solid var(--panel-border); border-radius:7px; background:#fff; color:var(--ink); flex:none; }
   .it .it-bpm input{ width:54px; text-align:center; }

@@ -384,25 +384,61 @@
           });
           hs.dataset.row = 'r3'; extra.push(hs);
         }
+        /* v112.6：聖詠和聲的作答卷樣式（聽寫｜和聲作業）；和聲作業再選掛留提示（保留｜留空）。只改作答卷，和絃、音檔、解答不變 */
+        if (it.type === 'chorale') {
+          var setHw = function (v) {
+            if ((it.data.hw || false) === v) return;
+            var tBase = String(it.autoTitle || '').replace(/（和聲作業[^）]*）$/, '');
+            var suf = v === 'keep' ? '（和聲作業）' : v === 'blank' ? '（和聲作業，含掛留）' : '';
+            if (it.autoTitle != null && it.title === it.autoTitle) it.title = tBase + suf;   // 沒改過標題才跟著換
+            if (it.autoTitle != null) it.autoTitle = tBase + suf;
+            it.data.hw = v; it.snapshot = Object.assign({}, it.snapshot || {}, { hw: v });
+            it.chSvg = null;   // 作答卷要重畫
+            save(); renderList(); renderPreview();
+          };
+          var cs = document.createElement('span'); cs.className = 'seg it-seg'; cs.title = '作答卷樣式';
+          [[false, '聽寫'], ['keep', '和聲作業']].forEach(function (o2) {
+            var cb = document.createElement('button'); cb.type = 'button'; cb.textContent = o2[1];
+            if (!!it.data.hw === !!o2[0]) cb.classList.add('on');
+            cb.onclick = function () { setHw(o2[0] ? (it.data.hw || 'keep') : false); };
+            cs.appendChild(cb);
+          });
+          cs.dataset.row = 'r3'; extra.push(cs);
+          if (it.data.hw) {
+            var ss = document.createElement('span'); ss.className = 'seg it-seg'; ss.title = '掛留提示';
+            var sl = document.createElement('span'); sl.textContent = '掛留提示'; sl.style.cssText = 'font-size:12px; margin-right:4px; color:#555;'; ss.appendChild(sl);
+            [['keep', '保留'], ['blank', '留空']].forEach(function (o2) {
+              var sb = document.createElement('button'); sb.type = 'button'; sb.textContent = o2[1];
+              if (it.data.hw === o2[0]) sb.classList.add('on');
+              sb.onclick = function () { setHw(o2[0]); };
+              ss.appendChild(sb);
+            });
+            ss.dataset.row = 'r3'; extra.push(ss);
+          }
+        }
         /* v110.1：單旋律、兩聲部、找錯音的音色（每一題自己記；沒有記的舊題目＝鋼琴）。只影響播放與 mp3，譜例不變；存模板時一起記住 */
         /* v111：四部和聲、聖詠和聲的音色（鋼琴／管風琴），做法相同 */
         var TIMBRES = (it.type === 'melody' || it.type === 'twopart' || it.type === 'pitcherr') ? [['piano', '鋼琴'], ['winds', '長笛／低音管']]
                     : (it.type === 'fourpart' || it.type === 'chorale') ? [['piano', '鋼琴'], ['organ', '管風琴']] : null;
         if (TIMBRES) {
+          /* v112.6：樂器改成一顆按鈕「樂器：鋼琴 ▾」，點下去用系統內建的列表選（之後新增音色只要加進 TIMBRES）。
+             四部和聲、聖詠和聲的樂器放到下一行（前面有作答卷樣式） */
           var curT = function () { return TIMBRES.some(function (o3) { return o3[0] === it.data.timbre; }) ? it.data.timbre : 'piano'; };
-          var ts = document.createElement('span'); ts.className = 'seg it-seg'; ts.title = '音色（只影響播放與 mp3）';
-          TIMBRES.forEach(function (o2) {
-            var tb = document.createElement('button'); tb.type = 'button'; tb.textContent = o2[1];
-            if (curT() === o2[0]) tb.classList.add('on');
-            tb.onclick = function () {
-              if (curT() === o2[0]) return;
-              stopPlayer();
-              it.data.timbre = o2[0]; it.snapshot = Object.assign({}, it.snapshot || {}, { timbre: o2[0] });
-              save();   // v110.2：只換這兩顆按鈕的樣子，不重畫列表（不會跳回頂端）
-              ts.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === tb); });
-            };
-            ts.appendChild(tb);
-          });
+          var nameT = function (v) { var f = TIMBRES.filter(function (o3) { return o3[0] === v; })[0]; return f ? f[1] : v; };
+          var ts = document.createElement('label'); ts.className = 'it-ins'; ts.title = '樂器（只影響播放與 mp3）';
+          var tl = document.createElement('span'); tl.textContent = '樂器：' + nameT(curT()) + ' ▾';
+          var tsel = document.createElement('select');
+          TIMBRES.forEach(function (o2) { var op = document.createElement('option'); op.value = o2[0]; op.textContent = o2[1]; tsel.appendChild(op); });
+          tsel.value = curT();
+          tsel.onchange = function () {
+            var v = tsel.value; if (v === curT()) return;
+            stopPlayer();
+            it.data.timbre = v; it.snapshot = Object.assign({}, it.snapshot || {}, { timbre: v });
+            save();   // 只換按鈕文字，不重畫列表（不會跳回頂端）
+            tl.textContent = '樂器：' + nameT(v) + ' ▾';
+          };
+          ts.appendChild(tl); ts.appendChild(tsel);
+          if (it.type === 'fourpart' || it.type === 'chorale') { var brk = document.createElement('span'); brk.className = 'it-brk'; brk.dataset.row = 'r3'; extra.push(brk); }
           ts.dataset.row = 'r3'; extra.push(ts);
         }
         /* 小題配分：空白＝不印 */
