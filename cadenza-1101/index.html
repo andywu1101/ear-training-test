@@ -190,6 +190,22 @@
   .pv{ display:none; flex:1; min-height:0; overflow:auto; padding:20px 0 60px; }
   .pv.on{ display:block; }
   .main.off{ display:none; }
+  /* v112.9 電腦版：預覽時考卷放在左欄，右邊的設定與列表、拉桿都留著；出題頁藏在底下繼續運作（重抽要用） */
+  .main > .left, .main > .pv, .main > .pvz{ grid-column:1; grid-row:1; }
+  .main > .split{ grid-column:2; grid-row:1; }
+  .main > .right{ grid-column:3; grid-row:1; }
+  body:not(.m) .main.off{ display:grid; }
+  body:not(.m).pvon .main > .left, body:not(.m).pvon .frames iframe{ visibility:hidden !important; pointer-events:none !important; }
+  body:not(.m) .main > .pv{ min-width:0; min-height:0; margin-bottom:14px; padding:20px 12px 60px; }
+  body:not(.m) .main .pages{ width:fit-content; margin:0 auto; }
+  body:not(.m) .barhit{ width:var(--bhd, 12px); margin-left:calc(var(--bhd, 12px) / -2 + 6px); }
+  /* 縮放：浮在考卷右下角（－、比例選單、＋） */
+  .pvz{ display:none; align-self:end; justify-self:end; z-index:3; margin:0 26px 34px 0; align-items:center; gap:2px; padding:4px; background:#fff; border:1px solid var(--panel-border); border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,.12); }
+  body.pvon:not(.m) .pvz{ display:flex; }
+  .pvz button{ border:0; background:none; width:30px; height:28px; border-radius:7px; font-size:16px; color:var(--ink); }
+  .pvz button:hover{ background:var(--panel); }
+  .pvz .it-ins{ min-width:74px; justify-content:center; border-color:transparent; color:var(--ink); }
+  .pvz .it-ins:hover{ background:var(--panel); }
   .pv-hint{ text-align:center; font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; }
   .pages{ display:flex; flex-direction:column; align-items:center; gap:18px; }
 
@@ -479,6 +495,7 @@
   </div>
   <!-- v108：左右分隔（拖曳調整右邊寬度，雙擊恢復預設） -->
   <div class="split d-only" id="split" title="拖曳調整寬度（雙擊恢復）"><span class="knob"><i></i><i></i><i></i></span></div>
+  <div class="pvz" id="pvZoom"><button id="pzOut" title="縮小">－</button><span class="it-ins" title="縮放"><span id="pzLab">100%</span>&nbsp;▾<select id="pzSel"><option value="fw">符合寬度</option><option value="fp">整頁</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></span><button id="pzIn" title="放大">＋</button></div>
   <div class="right">
     <div id="setSlotD"></div>
     <div class="list-head">

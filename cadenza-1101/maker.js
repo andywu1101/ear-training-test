@@ -46,6 +46,7 @@
     return p;
   }
   function save() {
+    schedulePv();
     var slim = JSON.parse(JSON.stringify(paper, function (k, v) { return (k === 'measures' || k === 'shownBreaks' || k === 'chSvg') ? undefined : v; }));
     try { localStorage.setItem(STORE, JSON.stringify(slim)); } catch (e) {}
   }
@@ -741,14 +742,21 @@
     if (v !== 'edit') { pvMode = v; document.querySelectorAll('#mPvSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === v); }); }
     if (v === 'edit') renderList(); else renderPreview();
   }
+  /* v112.9 電腦版：右邊列表還在，任何修改（存檔）之後都重畫考卷；直接呼叫 renderPreview 的會取消這次排程 */
+  var pvTimer = 0;
+  function schedulePv() {
+    if (!view || view === 'edit' || isM()) return;
+    clearTimeout(pvTimer); pvTimer = setTimeout(renderPreview, 250);
+  }
   function renderPreview() {
+    clearTimeout(pvTimer);
     if (view === 'edit') return;
-    var box = $('pvPages'), y = $('pvView').scrollTop;
+    var box = $('pvPages'), y = $('pvView').scrollTop, x = $('pvView').scrollLeft;
     box.innerHTML = '';
     if (!paper.items.length) { box.innerHTML = '<div class="empty">還沒有題目。</div>'; return; }
     buildPages(view, true).forEach(function (p) { box.appendChild(p); });
-    applyPvZoom();
-    $('pvView').scrollTop = y;
+    applyPvZoom(true);
+    $('pvView').scrollTop = y; $('pvView').scrollLeft = x;
   }
   document.querySelectorAll('#viewSeg button').forEach(function (b) { b.onclick = function () { setView(b.dataset.v); }; });
 
@@ -1106,6 +1114,9 @@
     var m = isM();
     document.body.classList.toggle('m', m);
     closeTplMenu();
+    /* v112.9：電腦版把預覽放進左欄（右邊列表留著），手機版放回原處 */
+    if (m) $('mainView').parentNode.insertBefore($('pvView'), $('mainView').nextSibling);
+    else $('mainView').insertBefore($('pvView'), $('pvZoom'));
     if (m) { $('setSlotM').appendChild($('setCard')); setMTab(mtab === 'set' ? 'make' : mtab); }
     else {
       $('setSlotD').appendChild($('setCard'));
@@ -1168,13 +1179,69 @@
   })();
   /* 預覽：A4 縮到螢幕寬（CSS zoom 會重新排版，放大後仍清楚）；兩指縮放 1～4 倍 */
   var PAGE_PX = 210 / 25.4 * 96;
-  function applyPvZoom() {
-    if (!isM()) { $('pvPages').style.zoom = ''; return; }
+  function applyPvZoom(keep) {
+    if (!isM()) { applyDeskZoom(keep); return; }
     var fit = Math.max(0.2, ($('pvView').clientWidth - 16) / PAGE_PX);
     var eff = fit * pvZoom;
     $('pvPages').style.zoom = eff.toFixed(4);
     $('pvPages').style.setProperty('--bhw', Math.max(16, Math.min(60, 34 / eff)).toFixed(1) + 'px');   // 小節線的點擊框在螢幕上約 34px 寬
   }
+  /* v112.9 電腦版預覽縮放：符合寬度、整頁、固定比例；－／＋ 跳到上一個／下一個固定比例；Ctrl＋滾輪同 －／＋ */
+  var PZ_KEY = 'earTrainer.maker.pvZoom', PZ_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2], PAGE_H = 297 / 25.4 * 96;
+  var pzMode = (function () { try { return localStorage.getItem(PZ_KEY) || 'fw'; } catch (e) { return 'fw'; } })(), pzCur = 1;
+  function deskZoomVal() {
+    var pv = $('pvView'), w = (pv.clientWidth - 24) / PAGE_PX;
+    if (pzMode === 'fw') return w;
+    if (pzMode === 'fp') {   // 扣掉上方說明文字與留白，第一頁從頭到尾都看得到
+      var top = $('pvPages').getBoundingClientRect().top - pv.getBoundingClientRect().top + pv.scrollTop;
+      return Math.min(w, (pv.clientHeight - top - 14) / PAGE_H);
+    }
+    return parseFloat(pzMode) || 1;
+  }
+  function applyDeskZoom(keep, anchor) {
+    var pv = $('pvView'), pg = $('pvPages');
+    if (view === 'edit') { pg.style.zoom = ''; return; }
+    var z = Math.max(0.1, deskZoomVal()), old = pzCur;
+    pzCur = z;
+    pg.style.zoom = z.toFixed(4);
+    pg.style.setProperty('--bhd', Math.max(12, Math.min(30, 12 / z)).toFixed(1) + 'px');   // 小節線點擊框在螢幕上至少約 12px 寬
+    $('pzLab').textContent = Math.round(z * 100) + '%';
+    $('pzSel').value = pzMode;
+    if (!keep && old && Math.abs(old - z) > 1e-4) {   // 比例變了：以游標（或畫面中央）為準維持位置
+      var f = z / old, ax = anchor ? anchor.x : pv.clientWidth / 2, ay = anchor ? anchor.y : pv.clientHeight / 2;
+      pv.scrollTop = (pv.scrollTop + ay) * f - ay;
+      pv.scrollLeft = (pv.scrollLeft + ax) * f - ax;
+    }
+  }
+  function setPz(m, anchor) {
+    pzMode = String(m);
+    try { localStorage.setItem(PZ_KEY, pzMode); } catch (e) {}
+    applyDeskZoom(false, anchor);
+  }
+  function stepPz(dir, anchor) {
+    var c = pzCur, n = null;
+    if (dir > 0) { for (var i = 0; i < PZ_STEPS.length; i++) if (PZ_STEPS[i] > c + 0.005) { n = PZ_STEPS[i]; break; } }
+    else { for (var j = PZ_STEPS.length - 1; j >= 0; j--) if (PZ_STEPS[j] < c - 0.005) { n = PZ_STEPS[j]; break; } }
+    if (n != null) setPz(n, anchor);
+  }
+  $('pzSel').onchange = function () { setPz($('pzSel').value); };
+  $('pzIn').onclick = function () { stepPz(1); };
+  $('pzOut').onclick = function () { stepPz(-1); };
+  (function () {
+    var pv = $('pvView'), acc = 0;
+    pv.addEventListener('wheel', function (e) {
+      if (!e.ctrlKey || isM() || view === 'edit') return;
+      e.preventDefault();
+      acc += e.deltaY;
+      if (Math.abs(acc) < 60) return;   // 滑鼠一格約 100；觸控板開合是很多小量，累積到門檻才跳一級
+      var r = pv.getBoundingClientRect();
+      stepPz(acc < 0 ? 1 : -1, { x: e.clientX - r.left, y: e.clientY - r.top });
+      acc = 0;
+    }, { passive: false });
+    if (window.ResizeObserver) new ResizeObserver(function () {
+      if (!isM() && view !== 'edit' && (pzMode === 'fw' || pzMode === 'fp')) applyDeskZoom(true);
+    }).observe(pv);
+  })();
   (function () {
     var pv = $('pvView'), pinch = null;
     function dist(t) { return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
