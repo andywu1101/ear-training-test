@@ -246,6 +246,7 @@
       var data = await w.__maker.regen(c.snapshot);   // 聖詠和聲的 regen 回傳 Promise
       var n = buildCandidate(w, c.type, data, c.snapshot, autoTitleOf(w, data, c));
       card.cand = n; drawCardScore(); resetCardAudio();
+      $('cardTitle').textContent = (card.replaceId ? '重抽：' : '預覽：') + n.title;   // v112.8：重抽後標題跟著換
     } catch (e) { $('cardMsg').textContent = '重抽失敗：' + e.message; $('cardMsg').className = 'msg err'; }
   };
   $('cardPlay').onclick = async function () {
