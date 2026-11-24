@@ -1087,7 +1087,11 @@ function showPage(pageId) {
     const hasBlank = meas.map(([a, b]) => (mode === 'ask' || mode === 'paper') && q.starts.some((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9));
     // 挖空的拍子裡有經過音時，框只框正拍那個音，所以這一拍再多留一點寬度
     const passBlank = meas.map(([a, b]) => (mode !== 'ask' && mode !== 'paper') ? 0 : q.starts.filter((st, k) => (q.blank || {})[k] && st >= a - 1e-9 && st < b - 1e-9 && q.V[3].filter(e => e.slot === k).length > 1).length);
-    const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27, labSum[i] + 24, hasBlank[i] ? 24 + (m[1] - m[0]) * BLANK_BEAT_W + passBlank[i] * 40 : 0) + ((opts._padR || {})[i] || 0));
+    // v112.5：有臨時記號的拍點多留一點寬度（臨時記號佔在符頭左邊，不留的話小節尾的音會被擠到小節線上）
+    const accOnsets = meas.map(([a, b]) => { const inM = e => e.t >= a - 1e-9 && e.t < b - 1e-9, s = new Set();
+      [accidentalsFor(q.V[0].filter(inM).concat(q.V[1].filter(inM)), KS), accidentalsFor(q.V[2].filter(inM).concat(q.V[3].filter(inM)), KS)]
+        .forEach(mp => mp.forEach((v, e) => { if (v) s.add(e.t); })); return s.size; });
+    const baseW = meas.map((m, i) => Math.max(70, 24 + onsetCount[i] * 27 + accOnsets[i] * 10, labSum[i] + 24, hasBlank[i] ? 24 + (m[1] - m[0]) * BLANK_BEAT_W + passBlank[i] * 40 : 0) + ((opts._padR || {})[i] || 0));
     const headW = first => 42 + nSig * 10 + (first ? 26 : 0);
     // 排成一行一行
     const systems = []; let cur = [], used = 0;
@@ -1245,10 +1249,11 @@ function showPage(pageId) {
         const endX = x + mw, MIN_GAP = 14;
         const gapNow = () => { let g = 1e9; voices.forEach(o => o.voice.getTickables().forEach(n => {
           n.setStave(o.stave); let r = n.getAbsoluteX() + 12;
-          try { const m = n.getMetrics(); r = n.getAbsoluteX() + (m.noteWidth || 0) + (m.modRightPx || 0); } catch (e) {}
+          try { const m = n.getMetrics(); r = n.getAbsoluteX() + (m.notePx || 0) + (m.rightDisplacedHeadPx || 0) + (m.modRightPx || 0);   /* v112.5：VexFlow 3 沒有 noteWidth，要用 notePx（符頭寬） */ } catch (e) {}
           g = Math.min(g, endX - r); })); return g; };
-        const g0 = gapNow();
-        if (g0 < MIN_GAP) fmt.format(voices.map(o => o.voice), fw - (MIN_GAP - g0));
+        /* v112.5：VexFlow 重排的結果不一定和縮小的量成正比，所以一次不夠就再縮（最多 6 次） */
+        let gNow = gapNow(), dw = 0;
+        for (let it = 0; gNow < MIN_GAP && it < 6; it++) { dw += (MIN_GAP - gNow) + 1; fmt.format(voices.map(o => o.voice), fw - dw); gNow = gapNow(); }
         voices.forEach(o => o.voice.draw(ctx, o.stave));
         beams.forEach(bm => bm.setContext(ctx).draw());
         x += mw;
