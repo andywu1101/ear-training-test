@@ -533,9 +533,10 @@ function updateStaffHeader(pageId){
     return null;
   }
 
-  function spellNotes(root, intervals, steps){
+  /* spell：根音的寫法 { letter }（v.112.3 起出題時選好存在題目裡）；舊題目沒有就用 ROOT_SPELLING */
+  function spellNotes(root, intervals, steps, spell){
     const rootPc = ((root % 12) + 12) % 12;
-    const rootLetterIdx = LETTERS.indexOf(ROOT_SPELLING[rootPc].letter);
+    const rootLetterIdx = LETTERS.indexOf(spell && spell.letter ? spell.letter : ROOT_SPELLING[rootPc].letter);
     return intervals.map((iv, i) => {
       const step = steps[i]; const noteMidi = root + iv;
       const letterIdx = (rootLetterIdx + step) % 7; const letter = LETTERS[letterIdx];
@@ -546,8 +547,24 @@ function updateStaffHeader(pageId){
       return { letter, diff, octave, midi: noteMidi, accCode, vexKey: `${letter.toLowerCase()}${accCode || ''}/${octave}` };
     });
   }
+  /* v.112.3：選寫法——音高不變，只換根音的寫法（以根音往上疊三度）。
+     不用重升重降；臨時記號最少的優先；一樣少時優先不用升 E、升 B、降 C、降 F；再一樣就隨機。 */
+  function pickSpelling(root, intervals, steps){
+    const pc = ((root % 12) + 12) % 12, best = []; let bestScore = 1e9;
+    LETTERS.forEach(L => {
+      let d = pc - NATURAL_PC[L]; d = ((d % 12) + 12) % 12; if(d > 6) d -= 12;
+      if(Math.abs(d) > 1) return;
+      const ns = spellNotes(root, intervals, steps, { letter: L });
+      if(ns.some(n => Math.abs(n.diff) > 1)) return;
+      const rare = ns.filter(n => (n.diff === 1 && (n.letter === 'E' || n.letter === 'B')) || (n.diff === -1 && (n.letter === 'C' || n.letter === 'F'))).length;
+      const sc = ns.filter(n => n.diff !== 0).length * 10 + rare;
+      if(sc < bestScore){ bestScore = sc; best.length = 0; }
+      if(sc === bestScore) best.push({ letter: L });
+    });
+    return best.length ? best[Math.floor(Math.random() * best.length)] : null;
+  }
 
-  function renderGrandStaff(container, root, intervals, steps, width, height){
+  function renderGrandStaff(container, root, intervals, steps, width, height, spell){
     container.innerHTML = ''; const VF = Vex.Flow;
     const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(width, height);
     const context = renderer.getContext();
@@ -561,7 +578,7 @@ function updateStaffHeader(pageId){
     new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.BOLD_DOUBLE_RIGHT).setContext(context).draw();
     new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.BRACE).setContext(context).draw();
     new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
-    const spelled = spellNotes(root, intervals, steps);
+    const spelled = spellNotes(root, intervals, steps, spell);
     const trebleNotes = spelled.filter(n => n.midi >= 60); const bassNotes = spelled.filter(n => n.midi < 60);
     if(trebleNotes.length){
       const note = new VF.StaveNote({ clef: 'treble', keys: trebleNotes.map(n => n.vexKey), duration: 'w' });
@@ -1055,7 +1072,7 @@ function updateStaffHeader(pageId){
       const row = document.createElement('div'); row.className = 'review-item';
       const mini = document.createElement('div'); mini.className = 'review-staff-mini';
       row.appendChild(mini);
-      try{ renderGrandStaff(mini, q.root, q.intervals, q.steps, 210, 210); }catch(e){}
+      try{ renderGrandStaff(mini, q.root, q.intervals, q.steps, 210, 210, q.spell); }catch(e){}
 
       const meta = document.createElement('div'); meta.className = 'review-meta';
       meta.innerHTML = '<div class="q-num-badge">【第 ' + (i+1) + ' 題】' + (ok ? '✓' : '✗') + '</div>' +
@@ -1094,19 +1111,19 @@ function updateStaffHeader(pageId){
   }
 
   /* 譜例導出：另外畫一份乾淨的譜（畫面上那份有外框與和絃代號，不適合直接轉檔）。 */
-  function offscreenStaff(root, intervals, steps, w, h){
+  function offscreenStaff(root, intervals, steps, w, h, spell){
     const holder = document.createElement('div');
     holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:' + w + 'px;';
     document.body.appendChild(holder);
-    try{ renderGrandStaff(holder, root, intervals, steps, w, h); }catch(e){}
+    try{ renderGrandStaff(holder, root, intervals, steps, w, h, spell); }catch(e){}
     return { holder: holder, svg: holder.querySelector('svg') };
   }
 
-  async function doExportSheetSingle(root, intervals, steps, answer){
+  async function doExportSheetSingle(root, intervals, steps, answer, spell){
     const btn = window.__expBtn || document.getElementById('chr-ansExport');
     if(btn.disabled) return;
     btn.disabled = true; const old = btn.textContent;
-    const made = offscreenStaff(root, intervals, steps, 280, 260);
+    const made = offscreenStaff(root, intervals, steps, 280, 260, spell);
     try{
       if(!made.svg) throw new Error('沒有譜例');
       await SheetExport.exportSheets([{ svg: made.svg, answer: answer }], '和絃', {
@@ -1124,7 +1141,7 @@ function updateStaffHeader(pageId){
     btn.disabled = true; const old = btn.textContent;
     const made = [];
     try{
-      questions.forEach(q => made.push(offscreenStaff(q.root, q.intervals, q.steps, 280, 260)));
+      questions.forEach(q => made.push(offscreenStaff(q.root, q.intervals, q.steps, 280, 260, q.spell)));
       const items = made.map((m, i) => ({
         svg: m.svg, num: i + 1,
         answer: labels ? (labels[questions[i].qualityKey] || questions[i].qualityKey) : ''
@@ -1225,7 +1242,14 @@ function updateStaffHeader(pageId){
       const p = ((pc % 12) + 12) % 12;
       return `${ROOT_SPELLING[p].letter}${accCodeFromDiff(ROOT_SPELLING[p].diff) || ''}`;
     }
-    function buildSymbol(root, key, intervals){
+    function buildSymbol(root, key, intervals, steps, spell){
+      /* v.112.3：有記寫法的題目，根音與低音的名稱照譜上的寫法 */
+      if (spell && steps && intervals && intervals.length) {
+        const ns = spellNotes(root, intervals, steps, spell), nm = n => n.letter + (n.accCode || '');
+        const rn = ns[intervals.indexOf(intervals.filter(iv => iv % 12 === 0)[0])] || ns[0];
+        const b2 = `${nm(rn)}${QUALITIES[key].symbol}`;
+        return intervals[0] ? `${b2}/${nm(ns[0])}` : b2;
+      }
       const base = `${pcName(root)}${QUALITIES[key].symbol}`;
       if (!intervals || !intervals.length) return base;
       const bassOffset = intervals[0];
@@ -1240,8 +1264,9 @@ function updateStaffHeader(pageId){
       const root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
       const baseIvs = QUALITIES[key].intervals; const invIdx = inversion ? Math.floor(Math.random() * baseIvs.length) : 0;
       const voiced = applyInv(baseIvs, invIdx);
-      return { root, qualityKey: key, intervals: voiced.map(v=>v.semis), steps: voiced.map(v=>v.step) };
+      return withSpell({ root, qualityKey: key, intervals: voiced.map(v=>v.semis), steps: voiced.map(v=>v.step) });
     }
+    function withSpell(q){ const sp = pickSpelling(q.root, q.intervals, q.steps); if(sp) q.spell = sp; return q; }   // v.112.3
     /* v.106：判斷兩題音高是否一模一樣（實際發聲的音高組合，異名同音算一樣） */
     function pitchSig(q){ return q ? q.intervals.map(function(i){ return q.root + i; }).sort(function(a,b){ return a-b; }).join(',') : ''; }
     function genNotSame(gen, usedSigs){
@@ -1255,7 +1280,7 @@ function updateStaffHeader(pageId){
         const root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
         const baseIvs = QUALITIES[key].intervals; const invIdx = inversion ? Math.floor(Math.random() * baseIvs.length) : 0;
         const voiced = applyInv(baseIvs, invIdx);
-        return { root, qualityKey: key, intervals: voiced.map(v=>v.semis), steps: voiced.map(v=>v.step) };
+        return withSpell({ root, qualityKey: key, intervals: voiced.map(v=>v.semis), steps: voiced.map(v=>v.step) });
       });
     }
     function renderTabs(){
@@ -1390,8 +1415,8 @@ function updateStaffHeader(pageId){
         ? `這是 <span class="right-ans">${QUALITIES[correctKey].label}</span>`
         : `你的答案：<span class="wrong-ans">${userLabel}</span>　正解：<span class="right-ans">${QUALITIES[correctKey].label}</span>`;
       const staffDiv = document.getElementById('chr-ansStaff'); staffDiv.innerHTML = '';
-      renderGrandStaff(staffDiv, current.root, current.intervals, current.steps, 280, 260);
-      const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.textContent = buildSymbol(current.root, correctKey, current.intervals); staffDiv.appendChild(lbl);
+      renderGrandStaff(staffDiv, current.root, current.intervals, current.steps, 280, 260, current.spell);
+      const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.textContent = buildSymbol(current.root, correctKey, current.intervals, current.steps, current.spell); staffDiv.appendChild(lbl);
       document.getElementById('chr-ansScore').textContent = (mode==='test' && testSession) ? `${testSession.correct} / ${testSession.total}` : `${score.correct} / ${score.total}`;
       const nb = document.getElementById('chr-ansNextBtn');
       if(mode==='test' && testSession){ nb.textContent = testSession.index >= testSession.total ? '查看成績 →' : '下一題 →'; }
@@ -1410,7 +1435,7 @@ function updateStaffHeader(pageId){
 
     function addToRev(q, userKey, qNum){
       window.REVIEW_STORE.add('chord', {
-        root: q.root, qualityKey: q.qualityKey, intervals: q.intervals, steps: q.steps,
+        root: q.root, qualityKey: q.qualityKey, intervals: q.intervals, steps: q.steps, spell: q.spell,
         userAnswerKey: userKey || null, levelId: curLevel.id, questionNum: qNum || null,
         yourText: userKey ? QUALITIES[userKey].label : '(未作答)',
         correctText: QUALITIES[q.qualityKey].label
@@ -1550,11 +1575,11 @@ function updateStaffHeader(pageId){
       items.forEach(it => {
         const row = document.createElement('div'); row.className = 'review-item';
         const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
-        try{ renderGrandStaff(staffMini, it.root, it.intervals, it.steps, 210, 210); }catch(e){}
+        try{ renderGrandStaff(staffMini, it.root, it.intervals, it.steps, 210, 210, it.spell); }catch(e){}
         const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label';
         /* ⚠ 和絃頁的 buildSymbol 需要 (root, key, intervals) 三個參數，
            只傳一個會讓 QUALITIES[undefined] 拋錯，整張列表都畫不出來。 */
-        lbl.style.fontSize = '13.5px'; lbl.textContent = buildSymbol(it.root, it.qualityKey, it.intervals); staffMini.appendChild(lbl);
+        lbl.style.fontSize = '13.5px'; lbl.textContent = buildSymbol(it.root, it.qualityKey, it.intervals, it.steps, it.spell); staffMini.appendChild(lbl);
         const meta = document.createElement('div'); meta.className = 'review-meta';
         if(it.questionNum) meta.innerHTML += '<div class="q-num-badge">【第 ' + it.questionNum + ' 題】</div>';
         const userLabel = it.userAnswerKey ? QUALITIES[it.userAnswerKey].label : '(未作答)';
@@ -1572,7 +1597,7 @@ function updateStaffHeader(pageId){
           const ansText = QUALITIES[it.qualityKey] ? QUALITIES[it.qualityKey].label : '';
           ExportMenu.open({ subtitle: '這一題的正解',
             onAudio: () => doExportAudio(it.root, it.intervals),
-            onSheet: () => doExportSheetSingle(it.root, it.intervals, it.steps, ansText) });
+            onSheet: () => doExportSheetSingle(it.root, it.intervals, it.steps, ansText, it.spell) });
         };
         actions.appendChild(expBtn);
         row.appendChild(meta); row.appendChild(actions); list.appendChild(row);
@@ -1659,7 +1684,7 @@ function updateStaffHeader(pageId){
         finally{ curLevel = keepLevel; inversion = keepInv; }
       },
       musicxml: function(data){
-        const made = data.questions.map(q => offscreenStaff(q.root, q.intervals, q.steps, 280, 260));
+        const made = data.questions.map(q => offscreenStaff(q.root, q.intervals, q.steps, 280, 260, q.spell));
         try{ return window.SheetExport.buildMusicXML(made.map(m => ({ svg: m.svg })), {}); }
         finally{ made.forEach(m => m.holder.remove()); }
       },
@@ -1742,7 +1767,7 @@ function updateStaffHeader(pageId){
           ExportMenu.open({
             subtitle: '這一題的正解',
             onAudio: () => doExportAudio(q.root, q.intervals),
-            onSheet: () => doExportSheetSingle(q.root, q.intervals, q.steps, ansText)
+            onSheet: () => doExportSheetSingle(q.root, q.intervals, q.steps, ansText, q.spell)
           });
         };
         document.getElementById('chr-ansNextBtn').onclick = () => {
@@ -1811,7 +1836,7 @@ function updateStaffHeader(pageId){
             slot.classList.add(isC ? 'correct' : 'wrong'); if(tag) tag.draggable = false;
             if(isC) cor++;
             else wrongOfThisRun.push({ root: q.root, qualityKey: q.qualityKey, intervals: q.intervals,
-                                       steps: q.steps, userAnswerKey: uk || null, questionNum: i + 1 });
+                                       steps: q.steps, spell: q.spell, userAnswerKey: uk || null, questionNum: i + 1 });
           });
           if(wrongOfThisRun.length){
             window.REVIEW_STORE.add('chord', {
@@ -1894,7 +1919,7 @@ function updateStaffHeader(pageId){
           const ok = (ua === q.qualityKey);
           const row = document.createElement('div'); row.className = 'review-item';
           const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
-          renderGrandStaff(staffMini, q.root, q.intervals, q.steps, 210, 210);
+          renderGrandStaff(staffMini, q.root, q.intervals, q.steps, 210, 210, q.spell);
           const meta = document.createElement('div'); meta.className = 'review-meta';
           meta.innerHTML = '<div class="q-num-badge">【第 ' + (i+1) + ' 題】' + (ok ? '✓' : '✗') + '</div>' +
             '<div class="review-answers">你的答案：<span class="' + (ok ? 'right-ans' : 'wrong-ans') + '">' +

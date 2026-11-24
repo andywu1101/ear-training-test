@@ -11,6 +11,7 @@
 
   var FPS = 30, KEY_EVERY = 90, MARGIN = 40, V_BITRATE = 6e6, A_BITRATE = 192000;   // 畫質優先：關鍵畫面給足位元率，譜線邊緣才不會糊
   var SIZE = { P: [1080, 1920], L: [1920, 1080] };
+  var TB = 0;   // v.112.3：畫面上方的標題列高度（出考卷的影片才有；make() 依 opts.title 設定）
   var muxerReady = null;
 
   function loadScript(url) {
@@ -81,7 +82,7 @@
   /* 直式或橫式：'P'／'L' 照指定；'auto' 看譜例在哪一種放得比較大 */
   function fitScale(o, iw, ih) {
     var W = SIZE[o][0], H = SIZE[o][1];
-    return Math.min((W - 2 * MARGIN) / iw, (H - 2 * MARGIN) / ih);
+    return Math.min((W - 2 * MARGIN) / iw, (H - 2 * MARGIN - TB) / ih);
   }
   function chooseOrient(orient, iw, ih) {
     if (orient === 'P' || orient === 'L') return orient;
@@ -104,7 +105,7 @@
   var CUR_W = 16, CUR_RGB = '77,163,255', CUR_A = 0.35, CUR_FLASH_A = 0.55, FLASH_SEC = 0.3, SCROLL_SEC = 0.4;
   var PAN_BARS = 4;   // 一行很長（例如四部和聲 10 小節）：放大到一個畫面大約 4 小節，畫面跟著游標橫向移動
   function followView(o, f, Wu, Hu) {
-    var aw = SIZE[o][0] - 2 * MARGIN, ah = SIZE[o][1] - 2 * MARGIN, L = f.lines;
+    var aw = SIZE[o][0] - 2 * MARGIN, ah = SIZE[o][1] - 2 * MARGIN - TB, L = f.lines;
     var kAll = Math.min(aw / Wu, ah / Hu);
     if (L.length === 1 && L[0].mw) {
       var kPan = Math.min(aw / (L[0].lead + PAN_BARS * L[0].mw), ah / (Hu + 8));
@@ -183,8 +184,8 @@
     function draw(ctx, t) {
       ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
       var ox = Math.round((W - sc.width) / 2), oy;
-      if (v.paged) oy = Math.round(MARGIN - cam(t, topOf) * k);
-      else oy = Math.round((H - sc.height) / 2);
+      if (v.paged) oy = Math.round(MARGIN + TB - cam(t, topOf) * k);
+      else oy = Math.round(TB + (H - TB - sc.height) / 2);
       if (v.pan) {   // 游標保持在畫面左邊約 35% 的位置，頭尾不超出譜例
         var cc = cursor(t), viewW = (W - 2 * MARGIN) / k;
         var left = Math.max(0, Math.min((cc ? cc.x : 0) - viewW * 0.35, Wu - viewW));
@@ -194,7 +195,7 @@
       if (v.paged) {
         ctx.fillStyle = '#ffffff';
         var my = oy + cam(t, maskOf) * k; ctx.fillRect(0, Math.max(0, my), W, H);
-        var mt = oy + cam(t, maskTopOf) * k; if (mt > 0) ctx.fillRect(0, 0, W, mt);
+        var mt = oy + cam(t, maskTopOf) * k; if (mt > TB) ctx.fillRect(0, 0, W, mt);
       }
       var c = cursor(t), a = alphaAt(t);
       if (c && a > 0) {
@@ -284,6 +285,8 @@
     var prog = opts.onProgress || function () {};
     await ensureMuxer();
     var iw = image.width || image.naturalWidth, ih = image.height || image.naturalHeight;
+    TB = opts.title ? TITLE_H : 0;
+    try {
     var fs = (opts.follow && opts.follow.lines && opts.follow.lines.length) ? followSetup(image, opts.follow, opts.unitScale || 1, opts.orient) : null;
     var o = fs ? fs.o : chooseOrient(opts.orient, iw, ih), W = SIZE[o][0], H = SIZE[o][1];
     var vcfg = await pickVideo(W, H);
@@ -298,7 +301,8 @@
     if (!fs) {
       var k = fitScale(o, iw, ih), dw = iw * k, dh = ih * k;
       g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-      g.drawImage(image, Math.round((W - dw) / 2), Math.round((H - dh) / 2), Math.round(dw), Math.round(dh));
+      g.drawImage(image, Math.round((W - dw) / 2), Math.round(TB + (H - TB - dh) / 2), Math.round(dw), Math.round(dh));
+      drawTitle(g, W, opts.title);
     }
 
     var muxer = new global.Mp4Muxer.Muxer({
@@ -314,7 +318,7 @@
     ve.configure(vcfg);
     var nF = Math.max(1, Math.ceil(buf.duration * FPS));
     for (var i = 0; i < nF; i++) {
-      if (fs) fs.draw(g, i / FPS);
+      if (fs) { fs.draw(g, i / FPS); drawTitle(g, W, opts.title); }
       var vf = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
       ve.encode(vf, { keyFrame: i % KEY_EVERY === 0 }); vf.close();
       if (err) throw err;
@@ -349,6 +353,16 @@
     var blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
     blob.__orient = o;
     return blob;
+    } finally { TB = 0; }
+  }
+  /* 標題列（出考卷：「題號. 題目名稱」，與考卷上的小題標題相同） */
+  var TITLE_H = 110, TITLE_PX = 46;
+  function drawTitle(g, W, text) {
+    if (!text) return;
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, TB);
+    g.fillStyle = '#000000'; g.textBaseline = 'middle'; g.textAlign = 'left';
+    g.font = TITLE_PX + 'px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif';
+    g.fillText(text, MARGIN + 20, Math.round(MARGIN + (TB - MARGIN) / 2));
   }
 
   function isIOS() {

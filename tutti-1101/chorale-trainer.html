@@ -2115,6 +2115,8 @@ function showPage(pageId) {
       timbreOverride = data && data.timbre === 'organ' ? 'organ' : 'piano';
       try { return exportEventsOf(data.q, data.bpm || 66); } finally { timbreOverride = null; }
     },
+    /* v.112.3：出考卷的譜例影片——照本頁「下載譜例」的畫法畫正解譜（含跟隨用的拍點） */
+    sheet: function (data) { return window.SheetExport.collectCanvas(btn => exportSheet(data.q, btn, data.bpm || 66)); },
     titleOf: function (d) { return makerTitle(d); }
   };
   if (MAKER_MODE) {

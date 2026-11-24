@@ -202,13 +202,14 @@
       var k = (y * cv.width + x) * 4;
       if (d[k] < 235 || d[k + 1] < 235 || d[k + 2] < 235) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     }
-    if (x1 < 0) return cv;
+    if (x1 < 0) { cv.__crop = { x0: 0, y0: 0, sc: sc }; return cv; }
     var pad = Math.round(12 * sc);
     x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(cv.width - 1, x1 + pad); y1 = Math.min(cv.height - 1, y1 + pad);
     var out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1;
     var oc = out.getContext('2d'); oc.fillStyle = '#fff'; oc.fillRect(0, 0, out.width, out.height);
     oc.drawImage(cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
     cv.width = 0; cv.height = 0;
+    out.__crop = { x0: x0, y0: y0, sc: sc };   // v.112.3：影片要把考卷上的座標換算到這張圖
     return out;
   }
 

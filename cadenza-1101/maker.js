@@ -775,7 +775,26 @@
       document.head.appendChild(s);
     });
   }
-  async function itemCanvas(o) {
+  /* v.112.3：一格一題的大題（音程、和絃）——游標停在正在播的那一格。
+     格子中心用考卷畫譜時記下的位置（sys.__meta.cells），換算成影片用的「單位」（VexFlow 單位，圖片像素＝單位 × us） */
+  function cellsFollow(box, el, cv, d, ev) {
+    var sysEls = Array.prototype.filter.call(el.querySelectorAll('.sys'), function (s) { return s.__meta && s.__meta.cells && s.__meta.cells.length; });
+    var cr = cv.__crop; if (!cr || !sysEls.length) return null;
+    var k = d.k, us = k * cr.sc, base = box.getBoundingClientRect(), score = [];
+    sysEls.forEach(function (sys) {
+      var svg = sys.querySelector('svg'); if (!svg) return;
+      var r = svg.getBoundingClientRect();
+      var offX = ((r.left - base.left) * cr.sc - cr.x0) / us, offY = ((r.top - base.top) * cr.sc - cr.y0) / us;
+      var hU = r.height / k, cells = sys.__meta.cells;
+      cells.forEach(function (c) {
+        score.push({ headX: offX + c.centre, x0: offX + cells[0].x0, x1: offX + cells[cells.length - 1].x1, y0: offY, y1: offY + hU });
+      });
+    });
+    if (score.length < 2) return null;
+    var f = VideoExport.followFromScore(score, ev);
+    return f ? { follow: f, us: us } : null;
+  }
+  async function itemCanvas(o, ev) {
     var d = Engrave.DENSITY[paper.density] || Engrave.DENSITY.dense, cw = Engrave.contentPx(d);
     var box = document.createElement('div');
     box.style.cssText = 'position:fixed; left:-30000px; top:0; box-sizing:content-box; width:' + cw + 'px; padding:40px; background:#fff; color:#000; font-family:var(--paper-font); pointer-events:none;';
@@ -784,9 +803,19 @@
       : Engrave.renderItem(o.it, 'key', d, { item: o.num, cell: 1 }, null);
     el.style.marginTop = '0px';
     box.appendChild(el); document.body.appendChild(box);
-    try { await new Promise(function (r) { setTimeout(r, 60); }); return await MakerPdf.elementCanvas(box, 3); }
+    try {
+      await new Promise(function (r) { setTimeout(r, 60); });
+      var cv = await MakerPdf.elementCanvas(box, 3);
+      if (ev && o.it.layout === 'cells') {
+        var cf = null; try { cf = cellsFollow(box, el, cv, d, ev); } catch (e) { cf = null; }
+        if (cf) { cv.__follow = cf.follow; cv.__us = cf.us; }
+      }
+      return cv;
+    }
     finally { box.remove(); }
   }
+  /* v.112.3：節奏、單旋律、兩聲部、找錯音、四部和聲、聖詠和聲——請練習頁照「下載譜例」的畫法畫正解譜，游標逐拍跟隨 */
+  var SHEET_TYPES = { rhythm: 1, melody: 1, twopart: 1, fourpart: 1, pitcherr: 1, chorale: 1 };
   $('btnVideo').onclick = async function () {
     if (!paper.items.length) { flash('還沒有題目'); return; }
     stopPlayer();
@@ -801,10 +830,21 @@
         var o = list[i], label = '第 ' + (i + 1) + '／' + list.length + ' 題';
         busy(label + '：產生聲音…');
         var w = await waitFrame(o.it.type); zipWin = w;
-        var buf = await w.PianoEngine.renderOffline(w.__maker.events(o.it.data));
+        var ev = w.__maker.events(o.it.data);
+        var buf = await w.PianoEngine.renderOffline(ev);
         busy(label + '：畫譜例…');
-        var cv = await itemCanvas(o);
-        var blob = await VideoExport.make(cv, buf, { orient: 'auto', onProgress: function (p) { busy(label + '：製作影片 ' + Math.round(p * 100) + '%'); } });
+        var cv = null, follow = null, us = 1, title = null;
+        if (SHEET_TYPES[o.it.type] && w.__maker.sheet) {
+          try { cv = await w.__maker.sheet(o.it.data); } catch (e) { cv = null; }
+          if (cv) {
+            follow = cv.__follow || VideoExport.followFromScore(cv.__score, ev);
+            us = (cv.__layout && cv.__layout.scale) || 1;
+            title = o.num + '. ' + o.it.title + (window.__makerScoreText ? window.__makerScoreText(o.it.score) : '');
+          }
+        }
+        if (!cv) { cv = await itemCanvas(o, ev); follow = cv.__follow || null; us = cv.__us || 1; }
+        var blob = await VideoExport.make(cv, buf, { orient: 'auto', follow: follow, unitScale: us, title: title,
+          onProgress: function (p) { busy(label + '：製作影片 ' + Math.round(p * 100) + '%'); } });
         cv.width = 0; cv.height = 0;
         files.push({ name: o.num + '_' + safeName(o.sec) + '_' + safeName(o.it.title) + '.mp4', u8: new Uint8Array(await blob.arrayBuffer()) });
       }

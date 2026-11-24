@@ -2768,6 +2768,8 @@ function showPage(pageId) {
       finally{ made.holder.remove(); }
     },
     answers: function(){ return []; },
+    /* v.112.3：出考卷的譜例影片——照本頁「下載譜例」的畫法畫正解譜（含跟隨用的拍點資訊） */
+    sheet: function(data){ return window.SheetExport.collectCanvas(btn => doExportSheet(data.seq, data.pitch, data, data.tie)); },
     events: function(data){ return buildExportEvents(data.seq, data.pitch, data, data.tie); }
   };
   if(MAKER_MODE){

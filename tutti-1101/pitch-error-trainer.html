@@ -3000,6 +3000,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document
         return { note: ni, label: '應為 ' + cp.step + (MAKER_ACC[cp.acc] || '') + ' ' + (diff > 0 ? '↑' : '↓') + (Math.abs(diff) === 1 ? '半音' : '全音') };
       }) };
     },
+    /* v.112.3：出考卷的譜例影片——照本頁「下載譜例」的畫法畫正解譜（含跟隨用的拍點資訊） */
+    sheet: function(data){ return window.SheetExport.collectCanvas(btn => peModule.exportSheet(data, true, btn)); },
     events: function(d){ return peModule.exportEvents(d); }
   };
   if(MAKER_MODE){

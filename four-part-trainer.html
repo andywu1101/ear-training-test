@@ -3110,8 +3110,8 @@ function showPage(pageId) {
         let sT = bassOnly ? null : new VF.Stave(xPos, TREBLE_TOP, w);
         let sB = new VF.Stave(xPos, BASS_TOP, w);
         if (isFirst) { 
-            if (sT) sT.addClef('treble').addKeySignature(keyObj.vfk).addTimeSignature('4/4'); 
-            sB.addClef('bass').addKeySignature(keyObj.vfk).addTimeSignature('4/4'); 
+            if (sT) sT.addClef('treble').addKeySignature(keyObj.vfk).addTimeSignature('C'); 
+            sB.addClef('bass').addKeySignature(keyObj.vfk).addTimeSignature('C'); 
         }
         // 大譜表：小節線與終止線一律貫穿上下譜表，各譜表本身不畫右側線
         // 只有低音譜表時（bassOnly）沒有可連接的上譜表，改由該譜表自己畫

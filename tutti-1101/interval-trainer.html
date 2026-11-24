@@ -524,9 +524,10 @@ function updateStaffHeader(pageId){
     return null;
   }
 
-  function spellNotes(root, intervals, steps){
+  /* spell：下方音的寫法 { letter }（v.112.3 起出題時選好存在題目裡）；舊題目沒有就用 ROOT_SPELLING */
+  function spellNotes(root, intervals, steps, spell){
     const rootPc = ((root % 12) + 12) % 12;
-    const rootLetterIdx = LETTERS.indexOf(ROOT_SPELLING[rootPc].letter);
+    const rootLetterIdx = LETTERS.indexOf(spell && spell.letter ? spell.letter : ROOT_SPELLING[rootPc].letter);
     return intervals.map((iv, i) => {
       const step = steps[i]; const noteMidi = root + iv;
       const letterIdx = (rootLetterIdx + step) % 7; const letter = LETTERS[letterIdx];
@@ -537,8 +538,25 @@ function updateStaffHeader(pageId){
       return { letter, diff, octave, midi: noteMidi, accCode, vexKey: `${letter.toLowerCase()}${accCode || ''}/${octave}` };
     });
   }
+  /* v.112.3：選寫法——不用升 E、升 B、降 C、降 F，也不用重升重降；剩下的選臨時記號最少的（一樣少就隨機）。
+     stepsList：可以考慮的度數（增四／減五兩種都給）。都不行就回傳 null（出題端換一個下方音） */
+  function pickSpelling(root, intervals, stepsList){
+    const pc = ((root % 12) + 12) % 12, best = []; let bestScore = 99;
+    LETTERS.forEach(L => {
+      let d = pc - NATURAL_PC[L]; d = ((d % 12) + 12) % 12; if(d > 6) d -= 12;
+      if(Math.abs(d) > 1) return;
+      stepsList.forEach(steps => {
+        const ns = spellNotes(root, intervals, steps, { letter: L });
+        if(ns.some(n => Math.abs(n.diff) > 1 || (n.diff === 1 && (n.letter === 'E' || n.letter === 'B')) || (n.diff === -1 && (n.letter === 'C' || n.letter === 'F')))) return;
+        const sc = ns.filter(n => n.diff !== 0).length;
+        if(sc < bestScore){ bestScore = sc; best.length = 0; }
+        if(sc === bestScore) best.push({ spell: { letter: L }, steps: steps });
+      });
+    });
+    return best.length ? best[Math.floor(Math.random() * best.length)] : null;
+  }
 
-  function renderGrandStaff(container, root, intervals, steps, width, height){
+  function renderGrandStaff(container, root, intervals, steps, width, height, spell){
     container.innerHTML = ''; const VF = Vex.Flow;
     const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG); renderer.resize(width, height);
     const context = renderer.getContext();
@@ -552,16 +570,16 @@ function updateStaffHeader(pageId){
     new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.BOLD_DOUBLE_RIGHT).setContext(context).draw();
     new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.BRACE).setContext(context).draw();
     new VF.StaveConnector(trebleStave, bassStave).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(context).draw();
-    const spelled = spellNotes(root, intervals, steps);
+    const spelled = spellNotes(root, intervals, steps, spell);
     const trebleNotes = spelled.filter(n => n.midi >= 60); const bassNotes = spelled.filter(n => n.midi < 60);
     if(trebleNotes.length){
       const note = new VF.StaveNote({ clef: 'treble', keys: trebleNotes.map(n => n.vexKey), duration: 'w' });
-      trebleNotes.forEach((n, idx) => { if(n.accCode) note.addAccidental(idx, new VF.Accidental(n.accCode)); });
+      trebleNotes.forEach((n, idx) => { if(n.accCode && !(idx > 0 && trebleNotes[idx - 1].vexKey === n.vexKey)) note.addAccidental(idx, new VF.Accidental(n.accCode)); });   // 同度只寫一個臨時記號
       VF.Formatter.FormatAndDraw(context, trebleStave, [note]);
     }
     if(bassNotes.length){
       const note = new VF.StaveNote({ clef: 'bass', keys: bassNotes.map(n => n.vexKey), duration: 'w' });
-      bassNotes.forEach((n, idx) => { if(n.accCode) note.addAccidental(idx, new VF.Accidental(n.accCode)); });
+      bassNotes.forEach((n, idx) => { if(n.accCode && !(idx > 0 && bassNotes[idx - 1].vexKey === n.vexKey)) note.addAccidental(idx, new VF.Accidental(n.accCode)); });   // 同度只寫一個臨時記號
       VF.Formatter.FormatAndDraw(context, bassStave, [note]);
     }
     /* 畫完才做：兩行符頭對齊，再把整體置中（臨時記號不影響符頭的對齊） */
@@ -1052,7 +1070,7 @@ function updateStaffHeader(pageId){
       const row = document.createElement('div'); row.className = 'review-item';
       const mini = document.createElement('div'); mini.className = 'review-staff-mini';
       row.appendChild(mini);
-      try{ renderGrandStaff(mini, q.root, q.intervals, q.steps, 210, 210); }catch(e){}
+      try{ renderGrandStaff(mini, q.root, q.intervals, q.steps, 210, 210, q.spell); }catch(e){}
 
       const meta = document.createElement('div'); meta.className = 'review-meta';
       meta.innerHTML = '<div class="q-num-badge">【第 ' + (i+1) + ' 題】' + (ok ? '✓' : '✗') + '</div>' +
@@ -1090,20 +1108,20 @@ function updateStaffHeader(pageId){
 
   /* 譜例導出：另外畫一份乾淨的譜（畫面上的那份有外框與標籤，不適合直接轉檔）。
      離屏容器要留在 DOM 裡才量得到尺寸，畫完就移除。 */
-  function offscreenStaff(root, intervals, steps, w, h){
+  function offscreenStaff(root, intervals, steps, w, h, spell){
     const holder = document.createElement('div');
     holder.style.cssText = 'position:absolute; left:-9999px; top:0; width:' + w + 'px;';
     document.body.appendChild(holder);
-    try{ renderGrandStaff(holder, root, intervals, steps, w, h); }catch(e){}
+    try{ renderGrandStaff(holder, root, intervals, steps, w, h, spell); }catch(e){}
     const svg = holder.querySelector('svg');
     return { holder: holder, svg: svg };
   }
 
-  async function doExportSheetSingle(root, intervals, steps, answer){
+  async function doExportSheetSingle(root, intervals, steps, answer, spell){
     const btn = window.__expBtn || document.getElementById('int-ansExport');
     if(btn.disabled) return;
     btn.disabled = true; const old = btn.textContent;
-    const made = offscreenStaff(root, intervals, steps, 280, 260);
+    const made = offscreenStaff(root, intervals, steps, 280, 260, spell);
     try{
       if(!made.svg) throw new Error('沒有譜例');
       await SheetExport.exportSheets([{ svg: made.svg, answer: answer }], '音程', {
@@ -1122,7 +1140,7 @@ function updateStaffHeader(pageId){
     btn.disabled = true; const old = btn.textContent;
     const made = [];
     try{
-      questions.forEach(q => made.push(offscreenStaff(q.root, q.intervals, q.steps, 280, 260)));
+      questions.forEach(q => made.push(offscreenStaff(q.root, q.intervals, q.steps, 280, 260, q.spell)));
       const items = made.map((m, i) => ({
         svg: m.svg, num: i + 1,
         answer: labels ? (labels[questions[i].qualityKey] || questions[i].qualityKey) : ''
@@ -1219,20 +1237,33 @@ function updateStaffHeader(pageId){
     let testSession = null, dictSession = null, hasPlayed = false;
 
     function buildSymbol(key){ return QUALITIES[key].label; }
+    /* 一題：下方音 root、音程 key、八度位移 oct。v.112.3：選好寫法（spell、steps），找不到合格寫法回傳 null */
+    function buildQ(key, root, oct){
+      const q = QUALITIES[key], semis = q.semitones + oct;
+      const stepsList = (key === 'A4_d5' ? [3, 4] : [q.baseStep]).map(st => [0, st + (oct / 12) * 7]);
+      const sp = pickSpelling(root, [0, semis], stepsList);
+      return sp ? { root, qualityKey: key, intervals: [0, semis], steps: sp.steps, spell: sp.spell } : null;
+    }
     function generateQ(pool){
       const key = pool[Math.floor(Math.random() * pool.length)];
-      let root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
-      const q = QUALITIES[key]; let step = (key === 'A4_d5') ? (Math.random() < 0.5 ? 3 : 4) : q.baseStep;
-      let chosenOctave = 0;
-      // 完全一度不做八度位移（同度＋八度＝八度，會和完全八度撞在一起）；其餘複音程照舊
-      if(compound && key !== 'P1'){
-        const validOcts = [0, 12, 24].filter(oct => root + q.semitones + oct <= 83);
-        if(validOcts.length > 0) chosenOctave = validOcts[Math.floor(Math.random() * validOcts.length)];
+      for(let tries = 0; ; tries++){
+        let root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
+        const q = QUALITIES[key];
+        let chosenOctave = 0;
+        // 完全一度不做八度位移（同度＋八度＝八度，會和完全八度撞在一起）；其餘複音程照舊
+        if(compound && key !== 'P1'){
+          const validOcts = [0, 12, 24].filter(oct => root + q.semitones + oct <= 83);
+          if(validOcts.length > 0) chosenOctave = validOcts[Math.floor(Math.random() * validOcts.length)];
+        }
+        while(root + q.semitones + chosenOctave > 83) root -= 1;
+        const r = buildQ(key, root, chosenOctave);
+        if(r || tries > 60) return r || legacyQ(key, root, chosenOctave);
       }
-      let actualSemitones = q.semitones + chosenOctave;
-      while(root + actualSemitones > 83) root -= 1;
-      let actualStep = step + (chosenOctave / 12) * 7;
-      return { root, qualityKey: key, intervals: [0, actualSemitones], steps: [0, actualStep] };
+    }
+    /* 保險：理論上不會用到（每種音程都有合格的下方音） */
+    function legacyQ(key, root, oct){
+      const q = QUALITIES[key], step = (key === 'A4_d5') ? (Math.random() < 0.5 ? 3 : 4) : q.baseStep;
+      return { root, qualityKey: key, intervals: [0, q.semitones + oct], steps: [0, step + (oct / 12) * 7] };
     }
 
     /* v.106：判斷兩題音高是否一模一樣（實際發聲的音高組合，異名同音算一樣） */
@@ -1245,12 +1276,15 @@ function updateStaffHeader(pageId){
       /* v.106：可重複＝同一個音程可以再出，但音高不能和前面的題目一模一樣 */
       if(allowRepeat){ const qs = [], used = new Set(); for(let i=0; i<count; i++){ const q = genNotSame(function(){ return generateQ(currentPool); }, used); used.add(pitchSig(q)); qs.push(q); } return qs; }
       return shuffleCopy(currentPool).slice(0, count).map(key => {
-        let root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
-        const q = QUALITIES[key]; let step = (key === 'A4_d5') ? (Math.random() < 0.5 ? 3 : 4) : q.baseStep;
-        let chosenOctave = (compound && key !== 'P1') ? (Math.random()<0.5?12:0) : 0;
-        if(root + q.semitones + chosenOctave > 83) chosenOctave = 0;
-        while(root + q.semitones + chosenOctave > 83) root -= 1;
-        return { root, qualityKey: key, intervals: [0, q.semitones + chosenOctave], steps: [0, step + (chosenOctave/12)*7] };
+        for(let tries = 0; ; tries++){
+          let root = ROOT_MIN + Math.floor(Math.random() * (ROOT_MAX - ROOT_MIN + 1));
+          const q = QUALITIES[key];
+          let chosenOctave = (compound && key !== 'P1') ? (Math.random()<0.5?12:0) : 0;
+          if(root + q.semitones + chosenOctave > 83) chosenOctave = 0;
+          while(root + q.semitones + chosenOctave > 83) root -= 1;
+          const r = buildQ(key, root, chosenOctave);   // v.112.3：選好寫法，沒有合格寫法就換一個下方音
+          if(r || tries > 60) return r || legacyQ(key, root, chosenOctave);
+        }
       });
     }
     function renderTabs(){
@@ -1393,7 +1427,7 @@ function updateStaffHeader(pageId){
         ? `這個音程是 <span class="right-ans">${QUALITIES[correctKey].label}</span>`
         : `你的答案：<span class="wrong-ans">${userLabel}</span>　正解：<span class="right-ans">${QUALITIES[correctKey].label}</span>`;
       const staffDiv = document.getElementById('int-ansStaff'); staffDiv.innerHTML = '';
-      renderGrandStaff(staffDiv, current.root, current.intervals, current.steps, 280, 260);
+      renderGrandStaff(staffDiv, current.root, current.intervals, current.steps, 280, 260, current.spell);
       const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label'; lbl.textContent = buildSymbol(correctKey); staffDiv.appendChild(lbl);
       document.getElementById('int-ansScore').textContent = (mode==='test' && testSession) ? `${testSession.correct} / ${testSession.total}` : `${score.correct} / ${score.total}`;
       const nb = document.getElementById('int-ansNextBtn');
@@ -1413,7 +1447,7 @@ function updateStaffHeader(pageId){
 
     function addToRev(q, userKey, qNum){
       window.REVIEW_STORE.add('interval', {
-        root: q.root, qualityKey: q.qualityKey, intervals: q.intervals, steps: q.steps,
+        root: q.root, qualityKey: q.qualityKey, intervals: q.intervals, steps: q.steps, spell: q.spell,
         userAnswerKey: userKey || null, levelId: curLevel.id, questionNum: qNum || null,
         yourText: userKey ? QUALITIES[userKey].label : '(未作答)',
         correctText: QUALITIES[q.qualityKey].label
@@ -1553,7 +1587,7 @@ function updateStaffHeader(pageId){
       items.forEach(it => {
         const row = document.createElement('div'); row.className = 'review-item';
         const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
-        try{ renderGrandStaff(staffMini, it.root, it.intervals, it.steps, 210, 210); }catch(e){}
+        try{ renderGrandStaff(staffMini, it.root, it.intervals, it.steps, 210, 210, it.spell); }catch(e){}
         const lbl = document.createElement('div'); lbl.className = 'chord-symbol-label';
         lbl.style.fontSize = '13.5px'; lbl.textContent = buildSymbol(it.qualityKey); staffMini.appendChild(lbl);
         const meta = document.createElement('div'); meta.className = 'review-meta';
@@ -1573,7 +1607,7 @@ function updateStaffHeader(pageId){
           const ansText = QUALITIES[it.qualityKey] ? QUALITIES[it.qualityKey].label : '';
           ExportMenu.open({ subtitle: '這一題的正解',
             onAudio: () => doExportAudio(it.root, it.intervals),
-            onSheet: () => doExportSheetSingle(it.root, it.intervals, it.steps, ansText) });
+            onSheet: () => doExportSheetSingle(it.root, it.intervals, it.steps, ansText, it.spell) });
         };
         actions.appendChild(expBtn);
         row.appendChild(meta); row.appendChild(actions); list.appendChild(row);
@@ -1662,7 +1696,7 @@ function updateStaffHeader(pageId){
       },
       /* 譜例：用本頁的大譜表繪譜畫在畫面外，交給 MusicXML 記錄器（sheet-export.js）轉成文字 */
       musicxml: function(data){
-        const made = data.questions.map(q => offscreenStaff(q.root, q.intervals, q.steps, 280, 260));
+        const made = data.questions.map(q => offscreenStaff(q.root, q.intervals, q.steps, 280, 260, q.spell));
         try{ return window.SheetExport.buildMusicXML(made.map(m => ({ svg: m.svg })), {}); }
         finally{ made.forEach(m => m.holder.remove()); }
       },
@@ -1734,7 +1768,7 @@ function updateStaffHeader(pageId){
           ExportMenu.open({
             subtitle: '這一題的正解',
             onAudio: () => doExportAudio(q.root, q.intervals),
-            onSheet: () => doExportSheetSingle(q.root, q.intervals, q.steps, ansText)
+            onSheet: () => doExportSheetSingle(q.root, q.intervals, q.steps, ansText, q.spell)
           });
         };
         document.getElementById('int-ansNextBtn').onclick = () => {
@@ -1797,7 +1831,7 @@ function updateStaffHeader(pageId){
             slot.classList.add(isC ? 'correct' : 'wrong'); if(tag) tag.draggable = false;
             if(isC) cor++;
             else wrongOfThisRun.push({ root: q.root, qualityKey: q.qualityKey, intervals: q.intervals,
-                                       steps: q.steps, userAnswerKey: uk || null, questionNum: i + 1 });
+                                       steps: q.steps, spell: q.spell, userAnswerKey: uk || null, questionNum: i + 1 });
           });
           if(wrongOfThisRun.length){
             window.REVIEW_STORE.add('interval', {
@@ -1880,7 +1914,7 @@ function updateStaffHeader(pageId){
           const ok = (ua === q.qualityKey);
           const row = document.createElement('div'); row.className = 'review-item';
           const staffMini = document.createElement('div'); staffMini.className = 'review-staff-mini'; row.appendChild(staffMini);
-          renderGrandStaff(staffMini, q.root, q.intervals, q.steps, 210, 210);
+          renderGrandStaff(staffMini, q.root, q.intervals, q.steps, 210, 210, q.spell);
           const meta = document.createElement('div'); meta.className = 'review-meta';
           meta.innerHTML = '<div class="q-num-badge">【第 ' + (i+1) + ' 題】' + (ok ? '✓' : '✗') + '</div>' +
             '<div class="review-answers">你的答案：<span class="' + (ok ? 'right-ans' : 'wrong-ans') + '">' +

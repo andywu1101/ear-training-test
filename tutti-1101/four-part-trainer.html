@@ -3110,8 +3110,8 @@ function showPage(pageId) {
         let sT = bassOnly ? null : new VF.Stave(xPos, TREBLE_TOP, w);
         let sB = new VF.Stave(xPos, BASS_TOP, w);
         if (isFirst) { 
-            if (sT) sT.addClef('treble').addKeySignature(keyObj.vfk).addTimeSignature('4/4'); 
-            sB.addClef('bass').addKeySignature(keyObj.vfk).addTimeSignature('4/4'); 
+            if (sT) sT.addClef('treble').addKeySignature(keyObj.vfk).addTimeSignature('C'); 
+            sB.addClef('bass').addKeySignature(keyObj.vfk).addTimeSignature('C'); 
         }
         // 大譜表：小節線與終止線一律貫穿上下譜表，各譜表本身不畫右側線
         // 只有低音譜表時（bassOnly）沒有可連接的上譜表，改由該譜表自己畫
@@ -4123,6 +4123,11 @@ function showPage(pageId) {
           outSlots: [], outKeyRect: {} });
         return window.SheetExport.buildMusicXML([{ svg: holder.querySelector('svg') }], {});
       } finally { holder.remove(); }
+    },
+    /* v.112.3：出考卷的譜例影片——照本頁「下載譜例」的畫法畫正解譜（含級數、跟隨用的拍點資訊） */
+    sheet: function(data){
+      const item = { bars: data.bars, keyObj: data.keyObj, questionSeq: data.questionSeq, questionVoicings: data.questionVoicings, userBass: Array(data.bars).fill(null) };
+      return window.SheetExport.collectCanvas(btn => fptModule._exportReviewSheet(item, btn));
     },
     /* 解答文字：調名與每小節的級數（與解答頁、導出相同的 displayChord） */
     answers: function(data){

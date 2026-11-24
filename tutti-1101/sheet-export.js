@@ -692,7 +692,7 @@
     var onsets = [], measures = [], tick0 = 0;
     md.cols.forEach(function (c) {
       var len = 0, beat = MX_DIV;
-      var tm = String(c.time || '').match(/^(\d+)\/(\d+)$/);
+      var tm = String(c.time === 'C' ? '4/4' : (c.time || '')).match(/^(\d+)\/(\d+)$/);   // C 拍號＝4/4
       if (tm) { var num = +tm[1], den = +tm[2]; len = num * MX_DIV * 4 / den;
         beat = (den === 8 && num % 3 === 0) ? MX_DIV * 1.5 : MX_DIV * 4 / den; }
       var byTick = {};
@@ -783,6 +783,7 @@
           if (!groups.length) voices.push({ si: si, vn: si * 4 + 1, notes: [] });
         }
         var tm = c.time || lastTime, mlen;
+        if (tm === 'C') tm = '4/4';   // C 拍號＝4/4
         if (tm && /^\d+\/\d+$/.test(tm)) { var p = tm.split('/'); mlen = Math.round(parseInt(p[0], 10) * 4 / parseInt(p[1], 10) * MX_DIV); }
         else mlen = Math.max.apply(null, voices.map(function (v) { return v.notes.reduce(function (s, n) { return s + mxDur(n).div; }, 0); }).concat([MX_DIV * 4]));
         /* 屬性：第一小節或有改變時才寫 */
@@ -794,7 +795,8 @@
         if (mno === 1 || kStr !== lastKey) attr.push('<key><fifths>' + (keyNow ? keyNow.fifths : 0) + '</fifths>' + (keyNow && keyNow.minor ? '<mode>minor</mode>' : '') + '</key>');
         var tShow = c.time || null, tStr = tShow || ('hidden:' + mlen);
         if (mno === 1 || (tShow && tShow !== lastTime)) {
-          if (tShow && tShow !== 'C' && /^\d+\/\d+$/.test(tShow)) { var tp = tShow.split('/'); attr.push('<time><beats>' + tp[0] + '</beats><beat-type>' + tp[1] + '</beat-type></time>'); }
+          if (tShow === 'C') attr.push('<time symbol="common"><beats>4</beats><beat-type>4</beat-type></time>');
+          else if (tShow && /^\d+\/\d+$/.test(tShow)) { var tp = tShow.split('/'); attr.push('<time><beats>' + tp[0] + '</beats><beat-type>' + tp[1] + '</beat-type></time>'); }
           else attr.push('<time print-object="no"><beats>' + (mlen / MX_DIV) + '</beats><beat-type>4</beat-type></time>');
         }
         if (mno === 1) attr.push('<staves>' + nStaff + '</staves>');
@@ -924,7 +926,21 @@
     }
   }
 
+  /* v.112.3：出考卷的影片——請練習頁照「下載譜例」的畫法畫正解譜，只拿畫布、不產生檔案。
+     run(btn)：呼叫該頁原本的導出譜例函式（btn 是假的按鈕，避免動到畫面上的按鈕）。 */
+  async function collectCanvas(run) {
+    var col = { date: new Date(), files: [], failed: 0, videoOnly: true, expectNow: 1, raw: { audio: null, canvases: [] } };
+    var btn = { disabled: false, textContent: '' };
+    global.__expCollect = col; global.__expBtn = btn;
+    try {
+      await run(btn);
+      var t0 = Date.now();
+      while (!col.raw.canvases.length && Date.now() - t0 < 60000) await new Promise(function (r) { setTimeout(r, 60); });
+      return col.raw.canvases[0] || null;
+    } finally { global.__expCollect = null; global.__expBtn = null; }
+  }
   global.SheetExport = {
+    collectCanvas: collectCanvas,
     exportSheets: exportSheets,
     buildCanvas: buildCanvas,
     svgToImage: svgToImage,

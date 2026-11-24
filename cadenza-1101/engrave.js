@@ -122,7 +122,10 @@
     var keys = n.rest ? [clef === 'bass' ? 'd/3' : 'b/4'] : n.pitches.map(function (p) { return p.step + '/' + p.oct; });
     var sn = new VF.StaveNote({ clef: clef, keys: keys, duration: n.type + (n.rest ? 'r' : ''), auto_stem: !n.stem });
     if (n.stem) sn.setStemDirection(n.stem === 'up' ? 1 : -1);
-    if (!n.rest) n.pitches.forEach(function (p, i) { if (p.acc) sn.addAccidental(i, new VF.Accidental(p.acc)); });
+    if (!n.rest) n.pitches.forEach(function (p, i) {
+      var q = i > 0 ? n.pitches[i - 1] : null;   // v.112.3：同度（音名、八度、臨時記號都一樣）只寫一個臨時記號
+      if (p.acc && !(q && q.step === p.step && q.oct === p.oct && q.acc === p.acc)) sn.addAccidental(i, new VF.Accidental(p.acc));
+    });
     for (var d = 0; d < n.dots; d++) sn.addDotToAll();
     n.vf = sn;
     if (global.Engrave && global.Engrave.debugNotes) global.Engrave.debugNotes.push({ sn: sn, pitches: n.pitches });
