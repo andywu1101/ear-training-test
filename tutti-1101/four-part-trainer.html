@@ -1444,7 +1444,7 @@ function showPage(pageId) {
   // ================= 和聲對位演算法引擎 (狀態機語法) =================
   const HARMONY_ENGINE = {
     // v112.10：Lv.2 六四和絃的機率（結尾終止六四、結尾鄰音六四、中段套組）
-    LV2_P: { endCad: 0.07, endPed: 0.035, mid: 0.13 },
+    LV2_P: { endCad: 0.075, endPed: 0.015, mid: 0.13, wPass: 3 },
     getChordPcs: function(sym, isMinor) {
       let is7th = /7|65|43|42/.test(sym);
       if (sym.includes('N')) return [1, 5, 8]; // N: bII (1,5,8)
@@ -1724,11 +1724,15 @@ function showPage(pageId) {
           pool.forEach(b => {
             let isCad = /64$/.test(b[0]);
             for (let st = isCad ? 2 : 1; st + 2 <= hiEnd; st++) if (!(st === 1 && b[0] === T)) cands.push([b, st]);
+            if (b[0] === T && b[1] === 'V64') cands.push([b, 0]);   // v112.11（作者）：可以用經過六四開頭（I–V64–I6，第 0 格就是起始主和絃）
           });
           if (cands.length) {
             // 先平均選套組，再選位置（每種套組機會相同）
             let bs = pool.filter(b => cands.some(c => c[0] === b));
-            let bundle = bs[Math.floor(Math.random() * bs.length)];
+            // v112.11（作者）：中段優先挑經過六四（機會是其他套組的 wPass 倍）
+            const isPass = b => this.sixFourKind(b[1], b[0], b[2]) === 'pass';
+            let wsum = bs.reduce((t, b) => t + (isPass(b) ? LV2_P.wPass : 1), 0), rr = Math.random() * wsum, bundle = bs[bs.length - 1];
+            for (const b of bs) { rr -= isPass(b) ? LV2_P.wPass : 1; if (rr < 0) { bundle = b; break; } }
             let sts = cands.filter(c => c[0] === bundle);
             let start = sts[Math.floor(Math.random() * sts.length)][1];
             for (let k = 0; k < 3; k++) { seq[start + k] = bundle[k]; usedIdx.add(start + k); }
