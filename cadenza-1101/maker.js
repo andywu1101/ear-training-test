@@ -767,7 +767,7 @@
     var area = $('printArea'); area.innerHTML = '';
     buildPages(mode, false).forEach(function (p) { area.appendChild(p); });
     var old = document.title;
-    document.title = (mode === 'key' ? '聽寫課堂練習解答_' : '聽寫課堂練習作答卷_') + (paper.header.date || today());
+    document.title = outName(mode === 'key' ? '解答' : '作答卷');
     var restore = function () { document.title = old; area.innerHTML = ''; window.removeEventListener('afterprint', restore); };
     window.addEventListener('afterprint', restore);
     setTimeout(function () { window.print(); }, 50);
@@ -804,7 +804,7 @@
       var zip = zipWin.ExportMenu.makeZip(files, new Date());
       files = null;
       busy(null);
-      deliver(zip, '聽寫課堂練習音檔_' + (paper.header.date || today()) + '.zip', 'zip', list.length + ' 個 mp3');
+      deliver(zip, outName('音檔') + '.zip', 'zip', list.length + ' 個 mp3');
     } catch (e) { busy(null); alert('mp3 產生失敗：' + e.message); }
   };
 
@@ -897,7 +897,7 @@
       var zip = zipWin.ExportMenu.makeZip(files, new Date());
       files = null;
       busy(null);
-      deliver(zip, '聽寫課堂練習影片_' + (paper.header.date || today()) + '.zip', 'video', list.length + ' 支影片');
+      deliver(zip, outName('影片') + '.zip', 'video', list.length + ' 支影片');
     } catch (e) { busy(null); alert('譜例影片產生失敗：' + (e && e.message || e)); }
   };
 
@@ -1082,7 +1082,7 @@
     var area = document.createElement('div');
     area.style.cssText = 'position:fixed; left:-30000px; top:0; pointer-events:none;';
     document.body.appendChild(area);
-    var name = (mode === 'key' ? '聽寫課堂練習解答_' : '聽寫課堂練習作答卷_') + (paper.header.date || today());
+    var name = outName(mode === 'key' ? '解答' : '作答卷');
     try {
       var pages = buildPages(mode, false);
       pages.forEach(function (p) { area.appendChild(p); });
@@ -1325,6 +1325,13 @@
     for (var n = 2; ; n++) { var c = name + '(' + n + ')'; if (taken.indexOf(c) < 0) return c; }
   }
   function fmtTime(ms) { var d = new Date(ms), p = function (x) { return String(x).padStart(2, '0'); }; return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+  /* v112.10（作者）：匯出檔名＝標題_作答卷（有填標題就不加日期）；沒有標題＝聽寫課堂練習_作答卷_日期。斜線換成 - */
+  function outName(kind) {
+    var t = String(paper.header.title || '').trim();
+    if (!t) return '聽寫課堂練習_' + kind + '_' + (paper.header.date || today());
+    t = t.replace(/[\\/]/g, '-').replace(/[:*?"<>|]/g, '_').replace(/\s+/g, ' ').slice(0, 80);
+    return t + '_' + kind;
+  }
   function safeFile(s) { return String(s).replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || '考卷'; }
   var pList = [];
   function curRec() { return pList.filter(function (r) { return r.id === paper.savedId; })[0] || null; }

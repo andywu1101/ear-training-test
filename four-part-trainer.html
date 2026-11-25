@@ -1443,6 +1443,8 @@ function showPage(pageId) {
 
   // ================= 和聲對位演算法引擎 (狀態機語法) =================
   const HARMONY_ENGINE = {
+    // v112.10：Lv.2 六四和絃的機率（結尾終止六四、結尾鄰音六四、中段套組）
+    LV2_P: { endCad: 0.07, endPed: 0.035, mid: 0.13 },
     getChordPcs: function(sym, isMinor) {
       let is7th = /7|65|43|42/.test(sym);
       if (sym.includes('N')) return [1, 5, 8]; // N: bII (1,5,8)
@@ -1503,6 +1505,17 @@ function showPage(pageId) {
       for (let i = 0; i < n; i++) {
         if (!/64$/.test(seq[i]) || seq[i].includes('/')) continue;
         if (!this.sixFourKind(seq[i], seq[i - 1], seq[i + 1])) return false;
+      }
+      // v112.10（作者）：Lv.2 終止六四前一律是下屬和絃（不出 V–I64–V 等）；一題最多兩個六四
+      if (levelId === 2) {
+        let cnt = 0;
+        for (let i = 0; i < n; i++) {
+          if (!/64$/.test(seq[i])) continue;
+          cnt++;
+          if (this.sixFourKind(seq[i], seq[i - 1], seq[i + 1]) === 'cad' &&
+              !(isMinor ? /^(iv6?|ii°6)$/ : /^(IV6?|ii6?)$/).test(seq[i - 1] || '')) return false;
+        }
+        if (cnt > 2) return false;
       }
       if (levelId === 1) {
         for (let i = 0; i < n; i++) {
@@ -1676,7 +1689,54 @@ function showPage(pageId) {
         ['IV','I64','IV6'], ['IV6','I64','IV']   // v.100：經過六四（下屬和絃的兩個位置之間）
       ];
       let hasLv2Feature = false;
-      if (n - 3 >= 3) {
+      if (levelId === 2) {
+        // v112.10（作者）：Lv.2 六四和絃約每 3 題一次；結尾可有終止六四（下屬–I64–V–I）、鄰音六四（V–I–IV64–I），
+        //   中段一個套組；一題最多兩個六四；6 小節只放一種；終止六四前一律接下屬和絃
+        const T = isMinor ? 'i' : 'I', SD = isMinor ? 'iv' : 'IV', LV2_P = HARMONY_ENGINE.LV2_P, PDS = isMinor ? ['iv', 'iv6', 'ii°6'] : ['IV', 'IV6', 'ii', 'ii6'];
+        const pickPD = () => PDS[Math.floor(Math.random() * PDS.length)];
+        let endCad = Math.random() < LV2_P.endCad, endPed = Math.random() < LV2_P.endPed;
+        if (n < 7 && endCad && endPed) { if (Math.random() < 0.5) endCad = false; else endPed = false; }
+        let tail;   // 結尾從哪一格開始（含前面的下屬和絃）
+        if (endCad && endPed) tail = [pickPD(), T + '64', 'V', T, SD + '64', T];
+        else if (endCad) tail = [pickPD(), T + '64', 'V', T];
+        else if (endPed) tail = [pickPD(), 'V', T, SD + '64', T];
+        else tail = null;
+        let tailStart = n - 3;   // 沒有特殊結尾：原本的 下屬–V–I（下屬那格可以加轉位）
+        if (tail) {
+          tailStart = n - tail.length;
+          for (let k = 0; k < tail.length; k++) { seq[tailStart + k] = tail[k]; usedIdx.add(tailStart + k); }
+          hasLv2Feature = true;
+          // 結尾前一格若是 V（屬接下屬＝倒退），改成主和絃第一轉位或 vi／VI
+          let pi = tailStart - 1;
+          if (pi >= 1 && /^V/.test(seq[pi])) {
+            let opts = [T + '6', isMinor ? 'VI' : 'vi'].filter(x => x !== seq[pi - 1]);
+            seq[pi] = opts[Math.floor(Math.random() * opts.length)];
+            usedIdx.add(pi);
+          }
+        }
+        let six = (endCad ? 1 : 0) + (endPed ? 1 : 0);
+        // 中段套組：放在第 1 格之後、結尾之前；終止六四套組前面要有一格改成下屬和絃
+        //   沒有特殊結尾時，套組可以佔到倒數第三格（同原本）；第 1 格不放以主和絃原位開頭的套組（會和第 0 格重複）
+        if (!(n < 7 && tail) && Math.random() < LV2_P.mid) {
+          let pool = BUNDLES.filter(b => six < 2 || !b.some(x => /64$/.test(x)));
+          let hiEnd = tail ? tailStart - 1 : n - 3;   // 套組最後一格的上限
+          let cands = [];
+          pool.forEach(b => {
+            let isCad = /64$/.test(b[0]);
+            for (let st = isCad ? 2 : 1; st + 2 <= hiEnd; st++) if (!(st === 1 && b[0] === T)) cands.push([b, st]);
+          });
+          if (cands.length) {
+            // 先平均選套組，再選位置（每種套組機會相同）
+            let bs = pool.filter(b => cands.some(c => c[0] === b));
+            let bundle = bs[Math.floor(Math.random() * bs.length)];
+            let sts = cands.filter(c => c[0] === bundle);
+            let start = sts[Math.floor(Math.random() * sts.length)][1];
+            for (let k = 0; k < 3; k++) { seq[start + k] = bundle[k]; usedIdx.add(start + k); }
+            if (/64$/.test(bundle[0])) { seq[start - 1] = pickPD(); usedIdx.add(start - 1); }
+            hasLv2Feature = true;
+          }
+        }
+      } else if (n - 3 >= 3) {
         let startMax = (n - 2) - 3; // 可放置套組的內部起點上限（保留頭尾兩小節）
         if (startMax >= 1 && Math.random() < 0.22) {
           let start = 1 + Math.floor(Math.random() * startMax);
